@@ -1,1 +1,1 @@
-importify — manage Haskell imports easily
+# importify — manage Haskell imports easily
