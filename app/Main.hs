@@ -2,24 +2,26 @@ module Main where
 
 import           Universum
 
-import qualified Data.Map.Strict       as M
 import           Language.Haskell.Exts (ImportDecl (..), ImportSpec (..), Module (..),
-                                        ParseResult (..), parseFile, prettyPrint)
+                                        ParseResult (..), parseFileContents, prettyPrint)
 
-import           Importify.Common      (Identifier (..), collectImportsList,
+import           Importify.Common      (Identifier (..), collectImportsList, importSlice,
                                         removeImportIdentifier)
 
 main :: IO ()
 main = do
     [fileName, id] <- getArgs
-    ParseOk m@(Module l h p imports d) <- parseFile fileName
+    fileContent    <- readFile fileName
+    let ParseOk (Module _ _ _ imports _) = parseFileContents $ toString fileContent
 
-    let importsMap      = collectImportsList imports
-    let (newImports, _) = removeImportIdentifier (Identifier id) importsMap imports
-    let newModule       = Module l h p newImports d
+    whenJust (importSlice imports) $ \(start, end) -> do
+        let codeLines        = lines fileContent
+        let (preamble, rest) = splitAt (start - 1) codeLines
+        let (_, decls)       = splitAt (end - start + 1) rest
 
-    putText "----------------- // OLD IMPORTS // --------------"
-    mapM_ (putStrLn . prettyPrint) imports
+        let importsMap      = collectImportsList imports
+        let (newImports, _) = removeImportIdentifier (Identifier id) importsMap imports
 
-    putStrLn $ "-------------- // " ++ fileName ++ " // --------------"
-    putStrLn $ prettyPrint newModule
+        putText $ unlines preamble
+               <> toText (unlines $ map (toText . prettyPrint) newImports)
+               <> unlines decls
