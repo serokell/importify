@@ -1,26 +1,43 @@
+{-| Tool for managing import sections.
+
+    Remove redundant imports algorithm (current version):
+      1. For every import declaration that in @baseEnvironment@
+         traverse list of import names and collect those that are not in module.
+      2. Remove every name from corresponding imports lists.
+      3. Print new modified version of file with imports changed.
+ -}
+
 module Main where
 
 import           Universum
 
-import           Language.Haskell.Exts (ImportDecl (..), ImportSpec (..), Module (..),
-                                        ParseResult (..), parseFileContents, prettyPrint)
+import           Language.Haskell.Exts  (Module (..), fromParseResult, parseFileContents,
+                                         prettyPrint)
+import           Language.Haskell.Names (annotate, loadBase)
 
-import           Importify.Common      (Identifier (..), collectImportsList, importSlice,
-                                        removeImportIdentifier)
+import           Importify.Common       (collectImportsList, importSlice,
+                                         removeIdentifiers)
+import           Importify.Resolution   (collectUnusedSymbols)
 
 main :: IO ()
 main = do
-    [fileName, id] <- getArgs
-    fileContent    <- readFile fileName
-    let ParseOk (Module _ _ _ imports _) = parseFileContents $ toString fileContent
+    [fileName]  <- getArgs
+    fileContent <- readFile fileName
+    let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContents
+                                                       $ toString fileContent
 
     whenJust (importSlice imports) $ \(start, end) -> do
         let codeLines        = lines fileContent
         let (preamble, rest) = splitAt (start - 1) codeLines
         let (_, decls)       = splitAt (end - start + 1) rest
 
-        let importsMap      = collectImportsList imports
-        let (newImports, _) = removeImportIdentifier (Identifier id) importsMap imports
+        baseEnvironment <- loadBase
+        let annotatedAST = annotate baseEnvironment ast
+        let annotations  = toList annotatedAST
+        let unusedIds    = collectUnusedSymbols baseEnvironment imports annotations
+
+        let importsMap = collectImportsList imports
+        let newImports = removeIdentifiers unusedIds importsMap imports
 
         putText $ unlines preamble
                <> toText (unlines $ map (toText . prettyPrint) newImports)

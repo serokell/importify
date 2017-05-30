@@ -15,8 +15,10 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Importify.Common
+                       Importify.Resolution
   build-depends:       base >= 4.7 && < 5
                      , containers
+                     , haskell-names
                      , haskell-src-exts
                      , universum
   default-language:    Haskell2010
@@ -34,6 +36,7 @@ executable importify
                      , importify
                      , containers
                      , haskell-src-exts
+                     , haskell-names
                      , universum
   default-language:    Haskell2010
   default-extensions:  GeneralizedNewtypeDeriving
