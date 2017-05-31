@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 
 {-| Tool for managing import sections.
 
@@ -21,7 +20,7 @@ import           Importify.Common       (collectImportsList, importSlice,
                                          removeIdentifiers)
 import           Importify.Resolution   (collectUnusedSymbols)
 
-import           Importify.Options      (Command (..), SingleFileOptions (..),
+import           Options                (Command (..), SingleFileOptions (..),
                                          parseOptions)
 
 main :: IO ()

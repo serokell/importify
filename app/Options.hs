@@ -2,7 +2,7 @@
 
 -- | Command line options for Importify
 
-module Importify.Options
+module Options
        ( Command(..)
        , SingleFileOptions(..)
        , parseOptions
@@ -19,7 +19,7 @@ data Command
 
 data SingleFileOptions = SingleFileOptions
     { sfoFilename   :: !FilePath
-    -- ^ File to apply to tool to
+    -- ^ File to apply the tool to
     }
 
 optionsParser :: Parser Command
@@ -27,17 +27,16 @@ optionsParser =
     subparser
         (command
             "file"
-            (info (helper <*> singleParser)
+            (info (helper <*> fileParser)
                   (fullDesc <> progDesc "Importify a single file"))) <|>
-    singleParser
+    fileParser
 
-
-singleParser :: Parser Command
-singleParser = do
+fileParser :: Parser Command
+fileParser = do
     sfoFilename <- argument str $
         metavar "FILE" <>
         help "File to importify"
-    return $ SingleFile SingleFileOptions{..}
+    pure $ SingleFile SingleFileOptions{..}
 
 optsInfo :: ParserInfo Command
 optsInfo = info
