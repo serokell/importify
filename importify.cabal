@@ -16,10 +16,12 @@ library
   hs-source-dirs:      src
   exposed-modules:     Importify.Common
                        Importify.Resolution
+                       Importify.Options
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , haskell-names
                      , haskell-src-exts
+                     , optparse-applicative
                      , universum
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-orphans

@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 {-| Tool for managing import sections.
 
     Remove redundant imports algorithm (current version):
@@ -19,10 +21,18 @@ import           Importify.Common       (collectImportsList, importSlice,
                                          removeIdentifiers)
 import           Importify.Resolution   (collectUnusedSymbols)
 
+import           Importify.Options      (Command (..), SingleFileOptions (..),
+                                         parseOptions)
+
 main :: IO ()
 main = do
-    [fileName]  <- getArgs
-    fileContent <- readFile fileName
+    opts <- parseOptions
+    case opts of
+        SingleFile sfOpts -> importifySingleFile sfOpts
+
+importifySingleFile :: SingleFileOptions -> IO ()
+importifySingleFile SingleFileOptions{..} = do
+    fileContent <- readFile sfoFilename
     let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContents
                                                        $ toString fileContent
 
