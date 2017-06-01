@@ -15,6 +15,7 @@ import           Language.Haskell.Exts  (Module (..), fromParseResult, parseFile
                                          prettyPrint)
 import           Language.Haskell.Names (annotate, loadBase)
 import           System.Directory       (createDirectory, doesDirectoryExist)
+import           Turtle                 (cd, pwd, shell)
 
 import           Importify.Cabal        (getLibs, readCabal)
 import           Importify.Cache        (cachePath)
@@ -56,8 +57,14 @@ importifySingleFile SingleFileOptions{..} = do
                <> unlines decls
 
 buildCabalCache :: CabalCacheOptions -> IO ()
-buildCabalCache CabalCacheOptions{..} = unlessM (doesDirectoryExist cachePath) $ do
+buildCabalCache CabalCacheOptions{..} = do
     cabalDesc <- readCabal ccoFilename
     let libs   = getLibs cabalDesc
+
     print libs
-    -- createDirectory cachePath
+
+    unlessM (doesDirectoryExist cachePath) $ createDirectory cachePath
+
+    -- move to cache directory and download-unpack all libs there
+    cd (fromString cachePath)
+    forM_ libs $ \libName -> () <$ shell ("stack unpack " <> toText libName) empty
