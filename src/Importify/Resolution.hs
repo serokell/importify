@@ -17,7 +17,7 @@ import qualified Language.Haskell.Names             as N
 import           Language.Haskell.Names.SyntaxUtils (stringToName)
 
 import           Importify.Common                   (Identifier (..),
-                                                     importSpecToIdentifier)
+                                                     importSpecToIdentifiers)
 
 symbolByName :: String -> [N.Symbol] -> Maybe N.Symbol
 symbolByName name symbols = head $ do
@@ -38,7 +38,7 @@ collectUnusedSymbols env decls annotations = do
     Just moduleSymbols <- guarded isJust $ M.lookup (() <$ importModule) env
     Just (ImportSpecList _ _ specs) <- guarded isJust importSpecs
     spec <- specs
-    let id@(Identifier name) = importSpecToIdentifier spec
+    id@(Identifier name) <- importSpecToIdentifiers spec
     Just symbol <- guarded isJust $ symbolByName name moduleSymbols
     guard $ isNothing (symbolUsages symbol annotations)
     pure id
