@@ -14,12 +14,16 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Importify.Common
+  exposed-modules:     Importify.Cabal
+                       Importify.Cache
+                       Importify.Common
                        Importify.Resolution
   build-depends:       base >= 4.7 && < 5
+                     , Cabal
                      , containers
                      , haskell-names
                      , haskell-src-exts
+                     , path
                      , universum
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-orphans
@@ -41,9 +45,11 @@ executable importify
   build-depends:       base
                      , importify
                      , containers
+                     , directory
                      , optparse-applicative
                      , haskell-src-exts
                      , haskell-names
+                     , turtle
                      , universum
   default-language:    Haskell2010
 

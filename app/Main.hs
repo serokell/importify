@@ -1,4 +1,3 @@
-
 {-| Tool for managing import sections.
 
     Remove redundant imports algorithm (current version):
@@ -15,19 +14,24 @@ import           Universum
 import           Language.Haskell.Exts  (Module (..), fromParseResult, parseFileContents,
                                          prettyPrint)
 import           Language.Haskell.Names (annotate, loadBase)
+import           System.Directory       (createDirectory, doesDirectoryExist)
+import           Turtle                 (cd, pwd, shell)
 
+import           Importify.Cabal        (getLibs, readCabal)
+import           Importify.Cache        (cachePath)
 import           Importify.Common       (collectImportsList, importSlice,
                                          removeIdentifiers)
 import           Importify.Resolution   (collectUnusedSymbols)
 
-import           Options                (Command (..), SingleFileOptions (..),
-                                         parseOptions)
+import           Options                (CabalCacheOptions (..), Command (..),
+                                         SingleFileOptions (..), parseOptions)
 
 main :: IO ()
 main = do
     opts <- parseOptions
     case opts of
         SingleFile sfOpts -> importifySingleFile sfOpts
+        CabalCache ccOpts -> buildCabalCache ccOpts
 
 importifySingleFile :: SingleFileOptions -> IO ()
 importifySingleFile SingleFileOptions{..} = do
@@ -51,3 +55,16 @@ importifySingleFile SingleFileOptions{..} = do
         putText $ unlines preamble
                <> toText (unlines $ map (toText . prettyPrint) newImports)
                <> unlines decls
+
+buildCabalCache :: CabalCacheOptions -> IO ()
+buildCabalCache CabalCacheOptions{..} = do
+    cabalDesc <- readCabal ccoFilename
+    let libs   = getLibs cabalDesc
+
+    print libs
+
+    unlessM (doesDirectoryExist cachePath) $ createDirectory cachePath
+
+    -- move to cache directory and download-unpack all libs there
+    cd (fromString cachePath)
+    forM_ libs $ \libName -> () <$ shell ("stack unpack " <> toText libName) empty
