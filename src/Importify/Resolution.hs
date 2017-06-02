@@ -1,18 +1,18 @@
-{-# LANGUAGE PartialTypeSignatures #-}
-
 -- | This module contains functions to work with name resolution.
 
 module Importify.Resolution
        ( collectUnusedSymbols
+       , resolveOneModule
        ) where
 
 import           Universum
 
 import qualified Data.Map                           as M
 
-import           Language.Haskell.Exts              (ImportDecl (..), ImportSpecList (..))
+import           Language.Haskell.Exts              (ImportDecl (..), ImportSpecList (..),
+                                                     Module)
 import           Language.Haskell.Names             (Environment, NameInfo (GlobalSymbol),
-                                                     Scoped (Scoped), symbolName)
+                                                     Scoped (Scoped), resolve, symbolName)
 import qualified Language.Haskell.Names             as N
 import           Language.Haskell.Names.SyntaxUtils (stringToName)
 
@@ -42,3 +42,11 @@ collectUnusedSymbols env decls annotations = do
     Just symbol <- guarded isJust $ symbolByName name moduleSymbols
     guard $ isNothing (symbolUsages symbol annotations)
     pure id
+
+-- | Gather all symbols for given module.
+resolveOneModule :: Module l -> [N.Symbol]
+resolveOneModule m =
+    let clearedModule = () <$ m
+        symbolsEnv    = resolve [clearedModule] mempty
+        symbols       = concat $ M.elems symbolsEnv
+    in symbols

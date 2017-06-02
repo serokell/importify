@@ -11,17 +11,24 @@ module Main where
 
 import           Universum
 
-import           Language.Haskell.Exts  (Module (..), fromParseResult, parseFileContents,
-                                         prettyPrint)
-import           Language.Haskell.Names (annotate, loadBase)
-import           System.Directory       (createDirectory, doesDirectoryExist)
+import           Language.Haskell.Exts  (Module (..), ParseResult (..), fromParseResult,
+                                         parseFile, parseFileContents, prettyPrint)
+import           Language.Haskell.Names (annotate, loadBase, writeSymbols)
+import           Path                   (Dir, Rel, filename, fromAbsDir, fromAbsFile,
+                                         fromRelFile, parseAbsDir, parseRelDir,
+                                         parseRelFile, (</>))
+import           Path.Internal          (Path (..))
+import           System.Directory       (createDirectory, createDirectoryIfMissing,
+                                         doesDirectoryExist, getCurrentDirectory,
+                                         listDirectory, removeDirectoryRecursive)
 import           Turtle                 (cd, pwd, shell)
 
-import           Importify.Cabal        (getLibs, readCabal)
-import           Importify.Cache        (cachePath)
+import           Importify.Cabal        (getLibs, modulePaths, readCabal, withLibrary)
+import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsDir,
+                                         symbolsPath)
 import           Importify.Common       (collectImportsList, importSlice,
                                          removeIdentifiers)
-import           Importify.Resolution   (collectUnusedSymbols)
+import           Importify.Resolution   (collectUnusedSymbols, resolveOneModule)
 
 import           Options                (CabalCacheOptions (..), Command (..),
                                          SingleFileOptions (..), parseOptions)
@@ -61,10 +68,40 @@ buildCabalCache CabalCacheOptions{..} = do
     cabalDesc <- readCabal ccoFilename
     let libs   = getLibs cabalDesc
 
-    print libs
+    curDir           <- getCurrentDirectory
+    projectPath      <- parseAbsDir curDir
+    let importifyPath = projectPath </> cachePath
+    let importifyDir  = fromAbsDir importifyPath
 
-    unlessM (doesDirectoryExist cachePath) $ createDirectory cachePath
+    createDirectoryIfMissing True importifyDir  -- creates ./.importify
 
-    -- move to cache directory and download-unpack all libs there
-    cd (fromString cachePath)
-    forM_ libs $ \libName -> () <$ shell ("stack unpack " <> toText libName) empty
+    cd $ fromString cacheDir    -- cd to ./.importify/
+    forM_ libs $ \libName -> do -- download & unpack sources, then cache and delete
+        _exitCode            <- shell ("stack unpack " <> toText libName) empty
+        localPackages        <- listDirectory importifyDir
+        let maybePackage      = find (libName `isPrefixOf`) localPackages
+        let downloadedPackage = fromMaybe (error "Package wasn't downloaded!")
+                                          maybePackage  -- TODO: this is not fine
+
+        packagePath      <- parseRelDir downloadedPackage
+        let cabalFileName = guessCabalName libName
+        packageCabalDesc <- readCabal $ fromAbsFile
+                                      $ importifyPath </> packagePath </> cabalFileName
+
+        let symbolsCachePath = importifyPath </> symbolsPath
+        withLibrary packageCabalDesc $ \library -> do
+            modPaths <- modulePaths packagePath library
+            forM_ modPaths $ \modPath -> do
+                -- TODO: path default extensions from .cabal file here
+                putStrLn $ "Current module: " ++ fromRelFile modPath
+                ParseOk m <- parseFile $ fromRelFile modPath
+                let resolvedSymbols  = resolveOneModule m
+                modSymbolsPath      <- parseRelFile $ fromRelFile (filename modPath) ++ ".symbols"
+                let packageCachePath = symbolsCachePath </> packagePath
+                let moduleCachePath  = packageCachePath </> modSymbolsPath
+
+                -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
+                createDirectoryIfMissing True $ fromAbsDir packageCachePath
+                writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
+
+        removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
