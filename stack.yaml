@@ -4,6 +4,7 @@ packages: ['.']
 
 extra-deps:
 - universum-0.4.3
+- fmt-0.2.0.0
 
 flags: {}
 extra-package-dbs: []

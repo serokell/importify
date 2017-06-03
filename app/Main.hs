@@ -28,6 +28,7 @@ import           Importify.Cache        (cacheDir, cachePath, guessCabalName, sy
                                          symbolsPath)
 import           Importify.Common       (collectImportsList, importSlice,
                                          removeIdentifiers)
+import           Importify.CPP          (withModuleAST)
 import           Importify.Resolution   (collectUnusedSymbols, resolveOneModule)
 
 import           Options                (CabalCacheOptions (..), Command (..),
@@ -91,11 +92,10 @@ buildCabalCache CabalCacheOptions{..} = do
         let symbolsCachePath = importifyPath </> symbolsPath
         withLibrary packageCabalDesc $ \library -> do
             modPaths <- modulePaths packagePath library
-            forM_ modPaths $ \modPath -> do
+            forM_ modPaths $ \modPath -> withModuleAST modPath $ \moduleAST -> do
                 -- TODO: path default extensions from .cabal file here
                 putStrLn $ "Current module: " ++ fromRelFile modPath
-                ParseOk m <- parseFile $ fromRelFile modPath
-                let resolvedSymbols  = resolveOneModule m
+                let resolvedSymbols  = resolveOneModule moduleAST
                 modSymbolsPath      <- parseRelFile $ fromRelFile (filename modPath) ++ ".symbols"
                 let packageCachePath = symbolsCachePath </> packagePath
                 let moduleCachePath  = packageCachePath </> modSymbolsPath

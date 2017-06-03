@@ -17,15 +17,19 @@ library
   exposed-modules:     Importify.Cabal
                        Importify.Cache
                        Importify.Common
+                       Importify.CPP
                        Importify.Resolution
   build-depends:       base >= 4.7 && < 5
                      , Cabal
                      , containers
                      , directory
                      , filepath
+                     , fmt
                      , haskell-names
                      , haskell-src-exts
+                     , hse-cpp
                      , path
+                     , text-format
                      , universum
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-orphans

@@ -21,8 +21,9 @@ import           Data.Map.Strict       (Map)
 import qualified Data.Map.Strict       as M
 
 import           Language.Haskell.Exts (CName (..), ImportDecl (..), ImportSpec (..),
-                                        ImportSpecList (..), ModuleName, Name (..),
-                                        SrcSpan (..), SrcSpanInfo (..), combSpanInfo)
+                                        ImportSpecList (..), Module, ModuleName,
+                                        Name (..), SrcSpan (..), SrcSpanInfo (..),
+                                        SrcSpanInfo, combSpanInfo)
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
 getImportModuleName :: ImportDecl l -> ModuleName ()
