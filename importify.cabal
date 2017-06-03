@@ -21,9 +21,11 @@ library
   build-depends:       base >= 4.7 && < 5
                      , Cabal
                      , containers
+                     , unordered-containers
                      , haskell-names
                      , haskell-src-exts
                      , path
+                     , filepath
                      , universum
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-orphans
@@ -45,12 +47,13 @@ executable importify
   build-depends:       base
                      , importify
                      , containers
+                     , unordered-containers
                      , directory
                      , optparse-applicative
                      , haskell-src-exts
                      , haskell-names
                      , bytestring
-                     , cereal
+                     , aeson
                      , turtle
                      , universum
   default-language:    Haskell2010

@@ -12,8 +12,8 @@ module Importify.Cabal
 
 import           Universum                             hiding (fromString)
 
+import qualified Data.HashMap.Strict                   as Map
 import           Data.List                             (nub)
-import qualified Data.Map.Strict                       as Map
 import           Distribution.ModuleName               (ModuleName, fromString,
                                                         toFilePath)
 import           Distribution.Package                  (Dependency (..), PackageName (..))
@@ -27,9 +27,10 @@ import           Distribution.PackageDescription       (BuildInfo, Executable,
 import           Distribution.PackageDescription.Parse (readPackageDescription)
 import           Distribution.Verbosity                (normal)
 import           Language.Haskell.Extension            (Extension (..))
+import           System.FilePath.Posix                 (dropExtension)
 
-type TargetMap = Map String String
-type ExtensionsMap = Map String [String]
+type TargetMap = HashMap String String
+type ExtensionsMap = HashMap String [String]
 
 readCabal :: FilePath -> IO GenericPackageDescription
 readCabal = readPackageDescription normal
@@ -45,26 +46,33 @@ getBuildInfos GenericPackageDescription{..} =
 
 getExtensionMaps :: GenericPackageDescription -> (TargetMap, ExtensionsMap)
 getExtensionMaps GenericPackageDescription{..} =
-    ( foldr Map.union Map.empty $ libTargetsMaps ++ exeTargetsMaps
-    , foldr Map.union Map.empty $ libExtensionsMaps ++ exeExtensionsMaps)
+    ( Map.unions $ libTargetsMaps ++ exeTargetsMaps
+    , Map.unions $ libExtensionsMaps ++ exeExtensionsMaps)
   where
-    (libTargetsMaps, libExtensionsMaps) = unzip $ map (collectLibraryMaps . condTreeData) $ maybeToList condLibrary
+    (libTargetsMaps, libExtensionsMaps) = unzip $
+        map (collectLibraryMaps . condTreeData) $ maybeToList condLibrary
     (exeTargetsMaps, exeExtensionsMaps) = unzip $ do
         (name, condTree) <- condExecutables
         pure $ collectExecutableMaps name $ condTreeData condTree
 
 collectLibraryMaps :: Library -> (TargetMap, ExtensionsMap)
-collectLibraryMaps lib = collectModuleMaps "library" (map toFilePath $ libModules lib) (defaultExtensions $ libBuildInfo lib)
+collectLibraryMaps lib =
+    collectModuleMaps "library"
+                      (map toFilePath $ libModules lib)
+                      (defaultExtensions $ libBuildInfo lib)
 
 collectExecutableMaps :: String -> Executable -> (TargetMap, ExtensionsMap)
-collectExecutableMaps exeName exe = collectModuleMaps ("executable " ++ exeName) (exePath:(map toFilePath $ exeModules exe)) (defaultExtensions $ buildInfo exe)
+collectExecutableMaps exeName exe =
+    collectModuleMaps ("executable " ++ exeName)
+                      (exePath:(map toFilePath $ exeModules exe))
+                      (defaultExtensions $ buildInfo exe)
   where
-    exePath = take ((length $ modulePath exe) - 3) $ modulePath exe
+    exePath = dropExtension $ modulePath exe
 
 collectModuleMaps :: String -> [String] -> [Extension] -> (TargetMap, ExtensionsMap)
 collectModuleMaps target mods exts =
     ( Map.fromList $ zip mods (repeat target)
-    , Map.singleton target (map showExt exts)
+    , one (target, map showExt exts)
     )
 
 dependencyName :: Dependency -> String
@@ -73,7 +81,7 @@ dependencyName (Dependency PackageName{..} _) = unPackageName
 showExt :: Extension -> String
 showExt (EnableExtension ext)   = show ext
 showExt (DisableExtension ext)  = "No" ++ show ext
-showExt (UnknownExtension name) = error "Unknown extension: " ++ name
+showExt (UnknownExtension name) = name
 
 moduleNameToPath :: String -> String
 moduleNameToPath modNameStr = toFilePath modName

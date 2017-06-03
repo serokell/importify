@@ -11,16 +11,15 @@ module Main where
 
 import           Universum
 
+import           Data.Aeson             (decode, encode)
 import           Language.Haskell.Exts  (Extension, Module (..), fromParseResult,
                                          parseExtension, parseFileContentsWithExts,
                                          prettyPrint)
 import           Language.Haskell.Names (annotate, loadBase)
-import           Prelude                (id)
 import           Turtle                 (cd, pwd, shell)
 
-import qualified Data.ByteString        as BS
-import qualified Data.Map.Strict        as Map
-import           Data.Serialize         (decode, encode)
+import qualified Data.ByteString.Lazy   as BS
+import qualified Data.HashMap.Strict    as Map
 import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionMaps,
                                          getLibs, moduleNameToPath, readCabal)
 import           Importify.Cache        (cachePath)
@@ -45,7 +44,7 @@ importifySingleFile SingleFileOptions{..} = do
     fileContent <- readFile sfoFilename
     let moduleName = getModuleName fileContent
     extensionMaps <- readExtensionMaps
-    let exts = maybe [] id $ getExtensions moduleName extensionMaps
+    let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
     let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContentsWithExts exts
                                                        $ toString fileContent
 
@@ -105,10 +104,13 @@ readExtensionMaps = do
         targetsFile <- BS.readFile targetsMapFilename
         extensionsFile <- BS.readFile extensionsMapFilename
         cd ".."
-        pure $ Just ( either (error . toText) id $ decode targetsFile
-                    , either (error . toText) id $ decode extensionsFile)
+        pure $ fmap tup (decode targetsFile) <*> (decode extensionsFile)
+  where
+    tup :: a -> b -> (a, b)
+    tup a b = (a, b)
 
 targetsMapFilename :: String
 targetsMapFilename = "targets"
+
 extensionsMapFilename :: String
 extensionsMapFilename = "extensions"

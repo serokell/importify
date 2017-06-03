@@ -16,15 +16,18 @@ module Importify.Common
 
 import           Universum
 
-import           Data.Char             (isSpace)
-import qualified Data.List             as L
-import qualified Data.List.NonEmpty    as NE
-import           Data.Map.Strict       (Map)
-import qualified Data.Map.Strict       as M
+import qualified Data.List                    as L
+import qualified Data.List.NonEmpty           as NE
+import           Data.Map.Strict              (Map)
+import qualified Data.Map.Strict              as M
 
-import           Language.Haskell.Exts (CName (..), ImportDecl (..), ImportSpec (..),
-                                        ImportSpecList (..), ModuleName, Name (..),
-                                        SrcSpan (..), SrcSpanInfo (..), combSpanInfo)
+import           Language.Haskell.Exts        (CName (..), ImportDecl (..),
+                                               ImportSpec (..), ImportSpecList (..),
+                                               ModuleName, ModuleName (..), Name (..),
+                                               NonGreedy (..), PragmasAndModuleName (..),
+                                               SrcSpan (..), SrcSpanInfo (..),
+                                               combSpanInfo, fromParseResult, parse)
+import           Language.Haskell.Exts.Parser (ParseResult (..))
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
 getImportModuleName :: ImportDecl l -> ModuleName ()
@@ -161,19 +164,11 @@ importSlice (x:y:xs)         = Just $ startAndEndLines
 -- | Returns module name of the source file
 -- We can't parse the whole file to get it because default extensions are not available yet
 getModuleName :: Text -> String
-getModuleName src = case impl of
-                        [mn] -> L.init mn
-                        []   -> error "File doesn't have `module' declaration"
-                        _    -> error "File has multiple `module' declarations"
-
-  where
-    impl :: [String]
-    impl = do
-        tline <- lines src
-        let line = toString tline ++ " "
-        if isPrefixOf "module " line then do
-            modNameWithTail <- maybeToList $ find (isSpace . L.head) $ L.tails line
-            maybeToList $ find (isSpace . L.last) $ drop 1 $ L.inits $ drop 1 modNameWithTail
-        else
-            []
-
+getModuleName src =
+    let parseResult :: ParseResult (NonGreedy (PragmasAndModuleName SrcSpanInfo))
+        parseResult = parse $ toString src
+        NonGreedy (PragmasAndModuleName _ _pragmas maybeModuleName) =
+            fromParseResult parseResult
+        ModuleName _ modNameStr =
+            fromMaybe (error "File doesn't have `module' declaration") maybeModuleName
+    in modNameStr
