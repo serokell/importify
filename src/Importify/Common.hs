@@ -7,6 +7,7 @@ module Importify.Common
        ( Identifier (..)
        , collectImportsList
        , getImportModuleName
+       , getModuleName
        , importSpecToIdentifiers
        , importSlice
        , removeIdentifiers
@@ -15,7 +16,8 @@ module Importify.Common
 
 import           Universum
 
-import           Data.List             (delete)
+import           Data.Char             (isSpace)
+import qualified Data.List             as L
 import qualified Data.List.NonEmpty    as NE
 import           Data.Map.Strict       (Map)
 import qualified Data.Map.Strict       as M
@@ -98,8 +100,8 @@ deleteSpecThing _ _ = error "deleteSpecThing got something else than IThingWith.
 specListDelete :: Eq l => Maybe Identifier -> ImportSpec l -> ImportSpecList l -> Maybe (ImportSpecList l)
 specListDelete (Just id) spec specList@(ImportSpecList l b specs) = case deleteSpecThing id spec of
     Nothing      -> specListDelete Nothing spec specList
-    Just newSpec -> Just (ImportSpecList l b (newSpec:(delete spec specs)))
-specListDelete Nothing spec (ImportSpecList l b specs) = case delete spec specs of
+    Just newSpec -> Just (ImportSpecList l b (newSpec:(L.delete spec specs)))
+specListDelete Nothing spec (ImportSpecList l b specs) = case L.delete spec specs of
     [] -> Nothing
     sp -> Just $ ImportSpecList l b sp
 
@@ -155,3 +157,23 @@ importSlice []               = Nothing
 importSlice [ImportDecl{..}] = Just $ startAndEndLines importAnn
 importSlice (x:y:xs)         = Just $ startAndEndLines
                                     $ combSpanInfo (importAnn x) (importAnn $ NE.last (y :| xs))
+
+-- | Returns module name of the source file
+-- We can't parse the whole file to get it because default extensions are not available yet
+getModuleName :: Text -> String
+getModuleName src = case impl of
+                        [mn] -> L.init mn
+                        []   -> error "File doesn't have `module' declaration"
+                        _    -> error "File has multiple `module' declarations"
+
+  where
+    impl :: [String]
+    impl = do
+        tline <- lines src
+        let line = toString tline ++ " "
+        if isPrefixOf "module " line then do
+            modNameWithTail <- maybeToList $ find (isSpace . L.head) $ L.tails line
+            maybeToList $ find (isSpace . L.last) $ drop 1 $ L.inits $ drop 1 modNameWithTail
+        else
+            []
+

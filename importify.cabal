@@ -49,6 +49,8 @@ executable importify
                      , optparse-applicative
                      , haskell-src-exts
                      , haskell-names
+                     , bytestring
+                     , cereal
                      , turtle
                      , universum
   default-language:    Haskell2010
