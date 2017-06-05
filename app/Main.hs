@@ -77,7 +77,8 @@ buildCabalCache CabalCacheOptions{..} = do
     createDirectoryIfMissing True importifyDir  -- creates ./.importify
 
     cd $ fromString cacheDir    -- cd to ./.importify/
-    forM_ libs $ \libName -> do -- download & unpack sources, then cache and delete
+    -- download & unpack sources, then cache and delete
+    forM_ (filter (/= "base") libs) $ \libName -> do -- TODO: temp hack
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
         localPackages        <- listDirectory importifyDir
         let maybePackage      = find (libName `isPrefixOf`) localPackages
@@ -90,11 +91,9 @@ buildCabalCache CabalCacheOptions{..} = do
                                       $ importifyPath </> packagePath </> cabalFileName
 
         let symbolsCachePath = importifyPath </> symbolsPath
-        withLibrary packageCabalDesc $ \library -> do
+        withLibrary packageCabalDesc $ \library cabalExtensions -> do
             modPaths <- modulePaths packagePath library
-            forM_ modPaths $ \modPath -> withModuleAST modPath $ \moduleAST -> do
-                -- TODO: path default extensions from .cabal file here
-                putStrLn $ "Current module: " ++ fromRelFile modPath
+            forM_ modPaths $ \modPath -> withModuleAST modPath cabalExtensions $ \moduleAST -> do
                 let resolvedSymbols  = resolveOneModule moduleAST
                 modSymbolsPath      <- parseRelFile $ fromRelFile (filename modPath) ++ ".symbols"
                 let packageCachePath = symbolsCachePath </> packagePath

@@ -17,10 +17,14 @@ import           Distribution.PackageDescription       (BuildInfo (..), CondTree
                                                         Library (..), condTreeData)
 import           Distribution.PackageDescription.Parse (readPackageDescription)
 import           Distribution.Verbosity                (normal)
+import           Language.Haskell.Extension            (Extension (..),
+                                                        KnownExtension (..))
+import qualified Language.Haskell.Exts                 as HSE
 import           Path                                  (Abs, Dir, File, Path, Rel,
                                                         fromRelFile, parseRelDir,
                                                         parseRelFile, (</>))
 import           System.Directory                      (doesFileExist)
+import           Text.Read                             (read)
 
 readCabal :: FilePath -> IO GenericPackageDescription
 readCabal = readPackageDescription normal
@@ -41,15 +45,27 @@ getLibs GenericPackageDescription{..} =
 dependencyName :: Dependency -> String
 dependencyName (Dependency PackageName{..} _) = unPackageName
 
+cabalExtToHseExt :: Extension -> HSE.Extension
+cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show
+
+isHseExt :: Extension -> Bool
+isHseExt (EnableExtension NegativeLiterals) = False
+isHseExt (EnableExtension Unsafe)           = False
+isHseExt _                                  = True
+
 -- | Perform given action with package library 'BuilInfo'
 -- if 'Library' is present. We care only about library exposed modules
 -- because only they can be imported outside that package.
 withLibrary :: Applicative f
             => GenericPackageDescription
-            -> (Library -> f ())
+            -> (Library -> [HSE.Extension] -> f ())
             -> f ()
 withLibrary GenericPackageDescription{..} action =
-    whenJust condLibrary (action . condTreeData)
+    whenJust condLibrary $ \treeNode ->
+        let library       = condTreeData treeNode
+            BuildInfo{..} = libBuildInfo library
+            extensions    = filter isHseExt $ defaultExtensions ++ otherExtensions
+        in action library (map cabalExtToHseExt extensions)
 
 -- | Returns list of relative paths to each module.
 modulePaths :: Path Rel Dir -> Library -> IO [Path Rel File]
