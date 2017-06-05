@@ -18,12 +18,14 @@ library
                        Importify.Cache
                        Importify.Common
                        Importify.Resolution
+                       Importify.Tree
   build-depends:       base >= 4.7 && < 5
                      , Cabal
                      , containers
                      , unordered-containers
                      , haskell-names
                      , haskell-src-exts
+                     , syb
                      , path
                      , filepath
                      , universum

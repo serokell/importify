@@ -23,9 +23,9 @@ import qualified Data.HashMap.Strict    as Map
 import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionMaps,
                                          getLibs, moduleNameToPath, readCabal)
 import           Importify.Cache        (cachePath)
-import           Importify.Common       (collectImportsList, getModuleName, importSlice,
-                                         removeIdentifiers)
+import           Importify.Common       (getModuleName, importSlice)
 import           Importify.Resolution   (collectUnusedSymbols)
+import           Importify.Tree         (removeIdentifiers)
 import           System.Directory       (createDirectory, doesDirectoryExist,
                                          doesFileExist)
 
@@ -58,8 +58,7 @@ importifySingleFile SingleFileOptions{..} = do
         let annotations  = toList annotatedAST
         let unusedIds    = collectUnusedSymbols baseEnvironment imports annotations
 
-        let importsMap = collectImportsList imports
-        let newImports = removeIdentifiers unusedIds importsMap imports
+        let newImports = removeIdentifiers unusedIds imports
 
         putText $ unlines preamble
                <> toText (unlines $ map (toText . prettyPrint) newImports)
