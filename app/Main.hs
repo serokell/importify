@@ -11,17 +11,23 @@ module Main where
 
 import           Universum
 
-import           Language.Haskell.Exts  (Module (..), fromParseResult, parseFileContents,
+import           Data.Aeson             (decode, encode)
+import           Language.Haskell.Exts  (Extension, Module (..), fromParseResult,
+                                         parseExtension, parseFileContentsWithExts,
                                          prettyPrint)
 import           Language.Haskell.Names (annotate, loadBase)
-import           System.Directory       (createDirectory, doesDirectoryExist)
 import           Turtle                 (cd, pwd, shell)
 
-import           Importify.Cabal        (getLibs, readCabal)
+import qualified Data.ByteString.Lazy   as BS
+import qualified Data.HashMap.Strict    as Map
+import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionMaps,
+                                         getLibs, moduleNameToPath, readCabal)
 import           Importify.Cache        (cachePath)
-import           Importify.Common       (collectImportsList, importSlice,
+import           Importify.Common       (collectImportsList, getModuleName, importSlice,
                                          removeIdentifiers)
 import           Importify.Resolution   (collectUnusedSymbols)
+import           System.Directory       (createDirectory, doesDirectoryExist,
+                                         doesFileExist)
 
 import           Options                (CabalCacheOptions (..), Command (..),
                                          SingleFileOptions (..), parseOptions)
@@ -36,7 +42,10 @@ main = do
 importifySingleFile :: SingleFileOptions -> IO ()
 importifySingleFile SingleFileOptions{..} = do
     fileContent <- readFile sfoFilename
-    let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContents
+    let moduleName = getModuleName fileContent
+    extensionMaps <- readExtensionMaps
+    let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
+    let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContentsWithExts exts
                                                        $ toString fileContent
 
     whenJust (importSlice imports) $ \(start, end) -> do
@@ -56,15 +65,52 @@ importifySingleFile SingleFileOptions{..} = do
                <> toText (unlines $ map (toText . prettyPrint) newImports)
                <> unlines decls
 
+getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
+getExtensions moduleName maps = do
+    (targetMap, extensionsMap) <- maps
+    let modulePath = moduleNameToPath moduleName
+    target <- Map.lookup modulePath targetMap
+    extensions <- Map.lookup target extensionsMap
+    pure $ map parseExtension extensions
+
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} = do
     cabalDesc <- readCabal ccoFilename
-    let libs   = getLibs cabalDesc
-
-    print libs
-
     unlessM (doesDirectoryExist cachePath) $ createDirectory cachePath
-
-    -- move to cache directory and download-unpack all libs there
     cd (fromString cachePath)
+
+    -- Extension maps
+    let (targetMaps, extensionMaps) = getExtensionMaps cabalDesc
+    BS.writeFile targetsMapFilename $ encode targetMaps
+    BS.writeFile extensionsMapFilename $ encode extensionMaps
+
+    -- Libraries
+    let libs = getLibs cabalDesc
+    print libs
+    -- move to cache directory and download-unpack all libs there
     forM_ libs $ \libName -> () <$ shell ("stack unpack " <> toText libName) empty
+
+    cd ".."
+
+readExtensionMaps :: IO (Maybe (TargetMap, ExtensionsMap))
+readExtensionMaps = do
+    cd (fromString cachePath)
+    targetsExist <- doesFileExist targetsMapFilename
+    extensionsExist <- doesFileExist extensionsMapFilename
+    if not (targetsExist && extensionsExist) then do
+        cd ".."
+        pure Nothing
+    else do
+        targetsFile <- BS.readFile targetsMapFilename
+        extensionsFile <- BS.readFile extensionsMapFilename
+        cd ".."
+        pure $ fmap tup (decode targetsFile) <*> (decode extensionsFile)
+  where
+    tup :: a -> b -> (a, b)
+    tup a b = (a, b)
+
+targetsMapFilename :: String
+targetsMapFilename = "targets"
+
+extensionsMapFilename :: String
+extensionsMapFilename = "extensions"
