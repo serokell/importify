@@ -7,6 +7,7 @@ module Importify.Common
        ( Identifier (..)
        , collectImportsList
        , getImportModuleName
+       , getModuleName
        , importSpecToIdentifiers
        , importSlice
        , removeIdentifiers
@@ -15,15 +16,18 @@ module Importify.Common
 
 import           Universum
 
-import           Data.List             (delete)
-import qualified Data.List.NonEmpty    as NE
-import           Data.Map.Strict       (Map)
-import qualified Data.Map.Strict       as M
+import qualified Data.List                    as L
+import qualified Data.List.NonEmpty           as NE
+import           Data.Map.Strict              (Map)
+import qualified Data.Map.Strict              as M
 
-import           Language.Haskell.Exts (CName (..), ImportDecl (..), ImportSpec (..),
-                                        ImportSpecList (..), Module, ModuleName,
-                                        Name (..), SrcSpan (..), SrcSpanInfo (..),
-                                        SrcSpanInfo, combSpanInfo)
+import           Language.Haskell.Exts        (CName (..), ImportDecl (..),
+                                               ImportSpec (..), ImportSpecList (..),
+                                               ModuleName, ModuleName (..), Name (..),
+                                               NonGreedy (..), PragmasAndModuleName (..),
+                                               SrcSpan (..), SrcSpanInfo (..),
+                                               combSpanInfo, fromParseResult, parse)
+import           Language.Haskell.Exts.Parser (ParseResult (..))
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
 getImportModuleName :: ImportDecl l -> ModuleName ()
@@ -99,8 +103,8 @@ deleteSpecThing _ _ = error "deleteSpecThing got something else than IThingWith.
 specListDelete :: Eq l => Maybe Identifier -> ImportSpec l -> ImportSpecList l -> Maybe (ImportSpecList l)
 specListDelete (Just id) spec specList@(ImportSpecList l b specs) = case deleteSpecThing id spec of
     Nothing      -> specListDelete Nothing spec specList
-    Just newSpec -> Just (ImportSpecList l b (newSpec:(delete spec specs)))
-specListDelete Nothing spec (ImportSpecList l b specs) = case delete spec specs of
+    Just newSpec -> Just (ImportSpecList l b (newSpec:(L.delete spec specs)))
+specListDelete Nothing spec (ImportSpecList l b specs) = case L.delete spec specs of
     [] -> Nothing
     sp -> Just $ ImportSpecList l b sp
 
@@ -156,3 +160,15 @@ importSlice []               = Nothing
 importSlice [ImportDecl{..}] = Just $ startAndEndLines importAnn
 importSlice (x:y:xs)         = Just $ startAndEndLines
                                     $ combSpanInfo (importAnn x) (importAnn $ NE.last (y :| xs))
+
+-- | Returns module name of the source file
+-- We can't parse the whole file to get it because default extensions are not available yet
+getModuleName :: Text -> String
+getModuleName src =
+    let parseResult :: ParseResult (NonGreedy (PragmasAndModuleName SrcSpanInfo))
+        parseResult = parse $ toString src
+        NonGreedy (PragmasAndModuleName _ _pragmas maybeModuleName) =
+            fromParseResult parseResult
+        ModuleName _ modNameStr =
+            fromMaybe (error "File doesn't have `module' declaration") maybeModuleName
+    in modNameStr

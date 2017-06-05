@@ -31,6 +31,7 @@ library
                      , path
                      , text-format
                      , universum
+                     , unordered-containers
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-orphans
 
@@ -48,9 +49,11 @@ executable importify
   hs-source-dirs:      app
   main-is:             Main.hs
   other-modules:       Options
-  build-depends:       base
-                     , importify
+  build-depends:       base, importify
+                     , aeson
+                     , bytestring
                      , containers
+                     , unordered-containers
                      , directory
                      , optparse-applicative
                      , haskell-src-exts

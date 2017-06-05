@@ -11,22 +11,31 @@ module Main where
 
 import           Universum
 
-import           Language.Haskell.Exts  (Module (..), ParseResult (..), fromParseResult,
-                                         parseFile, parseFileContents, prettyPrint)
+import           Data.Aeson             (decode, encode)
+import qualified Data.ByteString.Lazy   as BS
+import qualified Data.HashMap.Strict    as Map
+
+import           Language.Haskell.Exts  (Extension, Module (..), ParseResult (..),
+                                         fromParseResult, parseExtension, parseFile,
+                                         parseFileContents, parseFileContentsWithExts,
+                                         prettyPrint)
 import           Language.Haskell.Names (annotate, loadBase, writeSymbols)
 import           Path                   (Dir, Rel, filename, fromAbsDir, fromAbsFile,
                                          fromRelFile, parseAbsDir, parseRelDir,
                                          parseRelFile, (</>))
 import           Path.Internal          (Path (..))
 import           System.Directory       (createDirectory, createDirectoryIfMissing,
-                                         doesDirectoryExist, getCurrentDirectory,
-                                         listDirectory, removeDirectoryRecursive)
+                                         doesDirectoryExist, doesFileExist,
+                                         getCurrentDirectory, listDirectory,
+                                         removeDirectoryRecursive)
 import           Turtle                 (cd, pwd, shell)
 
-import           Importify.Cabal        (getLibs, modulePaths, readCabal, withLibrary)
+import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionMaps,
+                                         getLibs, getLibs, moduleNameToPath, modulePaths,
+                                         readCabal, readCabal, withLibrary)
 import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsDir,
                                          symbolsPath)
-import           Importify.Common       (collectImportsList, importSlice,
+import           Importify.Common       (collectImportsList, getModuleName, importSlice,
                                          removeIdentifiers)
 import           Importify.CPP          (withModuleAST)
 import           Importify.Resolution   (collectUnusedSymbols, resolveOneModule)
@@ -44,7 +53,10 @@ main = do
 importifySingleFile :: SingleFileOptions -> IO ()
 importifySingleFile SingleFileOptions{..} = do
     fileContent <- readFile sfoFilename
-    let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContents
+    let moduleName = getModuleName fileContent
+    extensionMaps <- readExtensionMaps
+    let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
+    let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContentsWithExts exts
                                                        $ toString fileContent
 
     whenJust (importSlice imports) $ \(start, end) -> do
@@ -64,10 +76,17 @@ importifySingleFile SingleFileOptions{..} = do
                <> toText (unlines $ map (toText . prettyPrint) newImports)
                <> unlines decls
 
+getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
+getExtensions moduleName maps = do
+    (targetMap, extensionsMap) <- maps
+    let modulePath = moduleNameToPath moduleName
+    target <- Map.lookup modulePath targetMap
+    extensions <- Map.lookup target extensionsMap
+    pure $ map parseExtension extensions
+
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} = do
     cabalDesc <- readCabal ccoFilename
-    let libs   = getLibs cabalDesc
 
     curDir           <- getCurrentDirectory
     projectPath      <- parseAbsDir curDir
@@ -75,8 +94,17 @@ buildCabalCache CabalCacheOptions{..} = do
     let importifyDir  = fromAbsDir importifyPath
 
     createDirectoryIfMissing True importifyDir  -- creates ./.importify
-
     cd $ fromString cacheDir    -- cd to ./.importify/
+
+    -- Extension maps
+    let (targetMaps, extensionMaps) = getExtensionMaps cabalDesc
+    BS.writeFile targetsMapFilename    $ encode targetMaps
+    BS.writeFile extensionsMapFilename $ encode extensionMaps
+
+    -- Libraries
+    let libs = getLibs cabalDesc
+    print libs
+
     -- download & unpack sources, then cache and delete
     forM_ (filter (/= "base") libs) $ \libName -> do -- TODO: temp hack
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
@@ -104,3 +132,25 @@ buildCabalCache CabalCacheOptions{..} = do
                 writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
         removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
+
+    cd ".."
+
+readExtensionMaps :: IO (Maybe (TargetMap, ExtensionsMap))
+readExtensionMaps = do
+    cd (fromString cacheDir)
+    targetsExist    <- doesFileExist targetsMapFilename
+    extensionsExist <- doesFileExist extensionsMapFilename
+    if not (targetsExist && extensionsExist) then do
+        cd ".."
+        pure Nothing
+    else do
+        targetsFile    <- BS.readFile targetsMapFilename
+        extensionsFile <- BS.readFile extensionsMapFilename
+        cd ".."
+        pure $ liftA2 (,) (decode targetsFile) (decode extensionsFile)
+
+targetsMapFilename :: String
+targetsMapFilename = "targets"
+
+extensionsMapFilename :: String
+extensionsMapFilename = "extensions"
