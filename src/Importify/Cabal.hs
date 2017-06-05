@@ -3,31 +3,39 @@
 
 module Importify.Cabal
        ( getLibs
-       , getExtensionMaps
+       , modulePaths
        , readCabal
-       , moduleNameToPath
+       , withLibrary
+
+       -- * Map for extensions
        , TargetMap
        , ExtensionsMap
+       , getExtensionMaps
+       , moduleNameToPath
        ) where
 
 import           Universum                             hiding (fromString)
 
 import qualified Data.HashMap.Strict                   as Map
-import           Data.List                             (nub)
 import           Distribution.ModuleName               (ModuleName, fromString,
                                                         toFilePath)
 import           Distribution.Package                  (Dependency (..), PackageName (..))
-import           Distribution.PackageDescription       (BuildInfo, Executable,
+import           Distribution.PackageDescription       (BuildInfo (..), CondTree,
+                                                        Executable (..),
                                                         GenericPackageDescription (..),
-                                                        Library, buildInfo,
-                                                        condExecutables, condTreeData,
-                                                        defaultExtensions, exeModules,
-                                                        libBuildInfo, libModules,
-                                                        modulePath, targetBuildDepends)
+                                                        Library (..), condTreeData,
+                                                        exeModules, libModules)
 import           Distribution.PackageDescription.Parse (readPackageDescription)
 import           Distribution.Verbosity                (normal)
-import           Language.Haskell.Extension            (Extension (..))
+import           Language.Haskell.Extension            (Extension (..),
+                                                        KnownExtension (..))
+import qualified Language.Haskell.Exts                 as HSE
+import           Path                                  (Abs, Dir, File, Path, Rel,
+                                                        fromRelFile, parseRelDir,
+                                                        parseRelFile, (</>))
+import           System.Directory                      (doesFileExist)
 import           System.FilePath.Posix                 (dropExtension)
+import           Text.Read                             (read)
 
 type TargetMap = HashMap String String
 type ExtensionsMap = HashMap String [String]
@@ -35,9 +43,15 @@ type ExtensionsMap = HashMap String [String]
 readCabal :: FilePath -> IO GenericPackageDescription
 readCabal = readPackageDescription normal
 
+getNodeLibInfo :: CondTree var deps Library -> BuildInfo
+getNodeLibInfo = libBuildInfo . condTreeData
+
+-- TODO: also collect for executables and make unique
 -- TODO: what about version bounds?
+-- | Retrieve list of all package dependencies for library of
+-- given package.
 getLibs :: GenericPackageDescription -> [String]
-getLibs = nub . concat . map (map dependencyName . targetBuildDepends) . getBuildInfos
+getLibs = ordNub . concat . map (map dependencyName . targetBuildDepends) . getBuildInfos
 
 getBuildInfos :: GenericPackageDescription -> [BuildInfo]
 getBuildInfos GenericPackageDescription{..} =
@@ -77,6 +91,57 @@ collectModuleMaps target mods exts =
 
 dependencyName :: Dependency -> String
 dependencyName (Dependency PackageName{..} _) = unPackageName
+
+cabalExtToHseExt :: Extension -> HSE.Extension
+cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show
+
+isHseExt :: Extension -> Bool
+isHseExt (EnableExtension NegativeLiterals) = False
+isHseExt (EnableExtension Unsafe)           = False
+isHseExt _                                  = True
+
+-- | Perform given action with package library 'BuilInfo'
+-- if 'Library' is present. We care only about library exposed modules
+-- because only they can be imported outside that package.
+withLibrary :: Applicative f
+            => GenericPackageDescription
+            -> (Library -> [HSE.Extension] -> f ())
+            -> f ()
+withLibrary GenericPackageDescription{..} action =
+    whenJust condLibrary $ \treeNode ->
+        let library       = condTreeData treeNode
+            BuildInfo{..} = libBuildInfo library
+            extensions    = filter isHseExt $ defaultExtensions ++ otherExtensions
+        in action library (map cabalExtToHseExt extensions)
+
+-- | Returns list of relative paths to each module.
+modulePaths :: Path Rel Dir -> Library -> IO [Path Rel File]
+modulePaths packagePath Library{..} = do
+    sourcePaths <- mapM parseRelDir $ hsSourceDirs libBuildInfo
+    collectModulePaths sourcePaths
+  where
+    exposedModulesPaths :: IO [Path Rel File]
+    exposedModulesPaths = mapM (parseRelFile . (++ ".hs") . toFilePath) exposedModules
+
+    addAbsDir :: Path Rel Dir -> [Path Rel File] -> [Path Rel File]
+    addAbsDir dir = map (dir </>)
+
+    collectModulePaths :: [Path Rel Dir] -> IO [Path Rel File]
+    collectModulePaths []   = exposedModulesPaths >>=
+        checkModuleExistence . addAbsDir packagePath
+    collectModulePaths dirs =
+        exposedModulesPaths  >>= \paths ->
+        concatForM dirs        $ \dir   ->
+          checkModuleExistence $ addAbsDir (packagePath </> dir) paths
+
+    -- TODO: rewrite with either mapM or filterM
+    checkModuleExistence :: [Path Rel File] -> IO [Path Rel File]
+    checkModuleExistence []     = return []
+    checkModuleExistence (modPath:modPaths) = do
+        modExists  <- doesFileExist $ fromRelFile modPath
+        if modExists
+        then (modPath:) <$> checkModuleExistence modPaths
+        else checkModuleExistence modPaths
 
 showExt :: Extension -> String
 showExt (EnableExtension ext)   = show ext
