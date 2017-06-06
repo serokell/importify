@@ -19,6 +19,7 @@ library
                        Importify.Common
                        Importify.CPP
                        Importify.Resolution
+                       Importify.Tree
   build-depends:       base >= 4.7 && < 5
                      , Cabal
                      , containers
@@ -29,6 +30,7 @@ library
                      , haskell-src-exts
                      , hse-cpp
                      , path
+                     , syb
                      , text-format
                      , universum
                      , unordered-containers

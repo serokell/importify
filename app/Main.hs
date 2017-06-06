@@ -15,10 +15,9 @@ import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS
 import qualified Data.HashMap.Strict    as Map
 
-import           Language.Haskell.Exts  (Extension, Module (..), ParseResult (..),
-                                         fromParseResult, parseExtension, parseFile,
-                                         parseFileContents, parseFileContentsWithExts,
-                                         prettyPrint)
+import           Language.Haskell.Exts  (Extension, Module (..), fromParseResult,
+                                         parseExtension, parseFile, parseFileContents,
+                                         parseFileContentsWithExts, prettyPrint)
 import           Language.Haskell.Names (annotate, loadBase, writeSymbols)
 import           Path                   (Dir, Rel, filename, fromAbsDir, fromAbsFile,
                                          fromRelFile, parseAbsDir, parseRelDir,
@@ -35,10 +34,10 @@ import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionM
                                          readCabal, readCabal, withLibrary)
 import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsDir,
                                          symbolsPath)
-import           Importify.Common       (collectImportsList, getModuleName, importSlice,
-                                         removeIdentifiers)
+import           Importify.Common       (getModuleName, importSlice)
 import           Importify.CPP          (withModuleAST)
 import           Importify.Resolution   (collectUnusedSymbols, resolveOneModule)
+import           Importify.Tree         (removeIdentifiers)
 
 import           Options                (CabalCacheOptions (..), Command (..),
                                          SingleFileOptions (..), parseOptions)
@@ -69,8 +68,7 @@ importifySingleFile SingleFileOptions{..} = do
         let annotations  = toList annotatedAST
         let unusedIds    = collectUnusedSymbols baseEnvironment imports annotations
 
-        let importsMap = collectImportsList imports
-        let newImports = removeIdentifiers unusedIds importsMap imports
+        let newImports = removeIdentifiers unusedIds imports
 
         putText $ unlines preamble
                <> toText (unlines $ map (toText . prettyPrint) newImports)
