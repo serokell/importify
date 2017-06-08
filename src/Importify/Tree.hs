@@ -14,11 +14,21 @@ import           Importify.Common      (Identifier, cnameToIdentifier, nameToIde
 
 -- | Remove a list of identifiers from ImportDecls.
 removeIdentifiers :: [Identifier] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
-removeIdentifiers ids =
-    cleanDecls .
-    (everywhere $ mkT $ traverseToClean) .
-    (everywhere $ mkT $ traverseToRemove ids) .
-    (everywhere $ mkT $ traverseToRemoveThing ids)
+removeIdentifiers ids decls =
+    (instanceImports ++) $
+    cleanDecls $
+    (everywhere $ mkT $ traverseToClean) $
+    (everywhere $ mkT $ traverseToRemove ids) $
+    (everywhere $ mkT $ traverseToRemoveThing ids) $
+    decls
+  where
+    instanceImports = filter isInstanceImportDecl decls
+
+-- | Returns True if the import is of the form:
+-- import Foo ()
+isInstanceImportDecl :: ImportDecl SrcSpanInfo -> Bool
+isInstanceImportDecl ImportDecl{ importSpecs = Just (ImportSpecList _ _ []) } = True
+isInstanceImportDecl _                                                        = False
 
 -- | Traverses ImportDecls to remove identifiers from IThingWith specs
 traverseToRemoveThing :: [Identifier] -> ImportSpec SrcSpanInfo -> ImportSpec SrcSpanInfo
@@ -52,5 +62,6 @@ cleanDecls :: [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
 cleanDecls = filter declNeeded
   where
     declNeeded :: ImportDecl SrcSpanInfo -> Bool
+    declNeeded (ImportDecl {importAs = Just _})     = True -- Don't touch @as@ imports for now
     declNeeded (ImportDecl {importSpecs = Nothing}) = False
     declNeeded _                                    = True

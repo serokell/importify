@@ -15,9 +15,11 @@ import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS
 import qualified Data.HashMap.Strict    as Map
 
-import           Language.Haskell.Exts  (Extension, Module (..), fromParseResult,
-                                         parseExtension, parseFile, parseFileContents,
-                                         parseFileContentsWithExts, prettyPrint)
+import           Data.Text.IO           (hPutStrLn)
+import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..), SrcSpanInfo,
+                                         fromParseResult, parseExtension, parseFile,
+                                         parseFileContents, parseFileContentsWithExts,
+                                         prettyPrint)
 import           Language.Haskell.Names (annotate, loadBase, writeSymbols)
 import           Path                   (Dir, Rel, filename, fromAbsDir, fromAbsFile,
                                          fromRelFile, parseAbsDir, parseRelDir,
@@ -34,7 +36,8 @@ import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionM
                                          readCabal, readCabal, withLibrary)
 import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsDir,
                                          symbolsPath)
-import           Importify.Common       (getModuleName, importSlice)
+import           Importify.Common       (Identifier (..), getModuleName, importSlice,
+                                         parseForImports)
 import           Importify.CPP          (withModuleAST)
 import           Importify.Resolution   (collectUnusedSymbols, resolveOneModule)
 import           Importify.Tree         (removeIdentifiers)
@@ -55,24 +58,30 @@ importifySingleFile SingleFileOptions{..} = do
     let moduleName = getModuleName fileContent
     extensionMaps <- readExtensionMaps
     let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
-    let ast@(Module _ _ _ imports _) = fromParseResult $ parseFileContentsWithExts exts
-                                                       $ toString fileContent
+    let (ast, imports) = parseForImports exts fileContent
 
     whenJust (importSlice imports) $ \(start, end) -> do
         let codeLines        = lines fileContent
         let (preamble, rest) = splitAt (start - 1) codeLines
         let (_, decls)       = splitAt (end - start + 1) rest
 
-        baseEnvironment <- loadBase
-        let annotatedAST = annotate baseEnvironment ast
-        let annotations  = toList annotatedAST
-        let unusedIds    = collectUnusedSymbols baseEnvironment imports annotations
-
+        unusedIds <- collectUnusedIds ast imports
+        if sfoPrintUnused then
+            hPutStrLn stderr $ unlines (map (toText . getIdentifier) unusedIds)
+        else
+            pure ()
         let newImports = removeIdentifiers unusedIds imports
 
         putText $ unlines preamble
                <> toText (unlines $ map (toText . prettyPrint) newImports)
                <> unlines decls
+
+collectUnusedIds :: Module SrcSpanInfo -> [ImportDecl SrcSpanInfo] -> IO ([Identifier])
+collectUnusedIds ast imports = do
+    baseEnvironment <- loadBase
+    let annotatedAST = annotate baseEnvironment ast
+    let annotations  = toList annotatedAST
+    pure $ collectUnusedSymbols baseEnvironment imports annotations
 
 getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
 getExtensions moduleName maps = do

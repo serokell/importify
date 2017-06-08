@@ -1,5 +1,3 @@
-{-# LANGUAGE Rank2Types          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Common utilities for import list processing
 
@@ -11,19 +9,19 @@ module Importify.Common
        , getModuleName
        , importSpecToIdentifiers
        , importSlice
+       , parseForImports
        ) where
 
 import           Universum
 
-import qualified Data.List.NonEmpty           as NE
+import qualified Data.List.NonEmpty    as NE
 
-import           Language.Haskell.Exts        (CName (..), ImportDecl (..),
-                                               ImportSpec (..), ModuleName,
-                                               ModuleName (..), Name (..), NonGreedy (..),
-                                               PragmasAndModuleName (..), SrcSpan (..),
-                                               SrcSpanInfo (..), combSpanInfo,
-                                               fromParseResult, parse)
-import           Language.Haskell.Exts.Parser (ParseResult (..))
+import           Language.Haskell.Exts (CName (..), Extension, ImportDecl (..),
+                                        ImportSpec (..), Module (..), ModuleName,
+                                        ModuleName (..), Name (..), NonGreedy (..),
+                                        ParseResult (..), PragmasAndModuleName (..),
+                                        SrcSpan (..), SrcSpanInfo (..), combSpanInfo,
+                                        fromParseResult, parse, parseFileContentsWithExts)
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
 getImportModuleName :: ImportDecl l -> ModuleName ()
@@ -69,3 +67,8 @@ getModuleName src =
         ModuleName _ modNameStr =
             fromMaybe (error "File doesn't have `module' declaration") maybeModuleName
     in modNameStr
+
+parseForImports :: [Extension] -> Text -> (Module SrcSpanInfo, [ImportDecl SrcSpanInfo])
+parseForImports exts fileContent = (ast, imports)
+    where ast@(Module _ _ _ imports _) =
+              fromParseResult $ parseFileContentsWithExts exts $ toString fileContent
