@@ -64,6 +64,5 @@ cleanDecls :: [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
 cleanDecls = filter declNeeded
   where
     declNeeded :: ImportDecl SrcSpanInfo -> Bool
-    declNeeded (ImportDecl {importAs = Just _})     = True -- Don't touch @as@ imports for now
     declNeeded (ImportDecl {importSpecs = Nothing}) = False
     declNeeded _                                    = True
