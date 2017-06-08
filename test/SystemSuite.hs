@@ -1,6 +1,9 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module SystemSuite where
+
+import           Universum
 
 import           Control.Exception.Base (throw)
 import           Data.List              (isPrefixOf, isSuffixOf, sort)
@@ -26,10 +29,10 @@ tests = do
             testFiles <- filter (\file ->
                                      (isPrefixOf "Test" file) &&
                                      (isSuffixOf ".hs" file))
-                            <$> (listDirectory $ T.unpack testDirectory)
-            putStrLn ""
+                            <$> (listDirectory $ toString testDirectory)
+            putText ""
             putStrLn $ "Running " ++ (show $ length testFiles) ++ " tests"
-            mapM (makeTest . (T.unpack testDirectory ++)) $ sort testFiles
+            mapM (makeTest . (toString testDirectory ++)) $ sort testFiles
         False ->
             pure $ (:[]) $ Test $ TestInstance
                 { run = pure $ Finished $ Fail $
@@ -53,22 +56,22 @@ makeTest file = do
 loadTestData :: FilePath -> IO ([Identifier], [ImportDecl SrcSpanInfo])
 loadTestData file = do
     fileContents <- readFile file
-    let unused:imports = takeWhile (isPrefixOf "-- ") $ lines fileContents
-    return (parseUnused $ T.pack unused, parseImports $ map T.pack imports)
+    let unused:imports = takeWhile (T.isPrefixOf "-- ") $ lines fileContents
+    return (parseUnused $ toText unused, parseImports $ map toText imports)
 
-parseUnused :: T.Text -> [Identifier]
-parseUnused = map (Identifier . T.unpack) . filter (/= "") . map T.strip . T.splitOn "," . uncomment
+parseUnused :: Text -> [Identifier]
+parseUnused = map (Identifier . toString) . filter (/= "") . map T.strip . T.splitOn "," . uncomment
 
-parseImports :: [T.Text] -> [ImportDecl SrcSpanInfo]
+parseImports :: [Text] -> [ImportDecl SrcSpanInfo]
 parseImports imports =
-    let src = unlines $ map (T.unpack . uncomment) imports
+    let src = unlines $ map uncomment imports
         parseResult :: ParseResult (NonGreedy (ModuleHeadAndImports SrcSpanInfo))
-        parseResult = parse src
+        parseResult = parse $ toString src
         NonGreedy (ModuleHeadAndImports _ _pragma _head importDecls) =
             fromParseResult parseResult
     in importDecls
 
-uncomment :: T.Text -> T.Text
+uncomment :: Text -> Text
 uncomment = T.drop 3
 
 executeTest :: FilePath -> [Identifier] -> [ImportDecl SrcSpanInfo] -> IO Progress
@@ -85,8 +88,10 @@ checkUnusedSymbols expectUnusedSymbols actualUnusedSymbols =
     if sort expectUnusedSymbols /= sort actualUnusedSymbols then do
         putStr $ unlines
              [ ""
-             , "Expected unused symbols: " ++ (unwords $ map getIdentifier expectUnusedSymbols)
-             , "Actual unused symbols: " ++ (unwords $ map getIdentifier actualUnusedSymbols)
+             , unwords $
+               "Expected unused symbols: ":(map (toText . getIdentifier) expectUnusedSymbols)
+             , unwords $
+               "Actual unused symbols: ":(map (toText . getIdentifier) actualUnusedSymbols)
              ]
         pure $ Finished $ Fail "Invalid unused symbols"
     else
@@ -98,28 +103,28 @@ checkUsedImports expectUsedImports actualUsedImports =
         putStr $ unlines
                 [ ""
                 , "Expected imports:"
-                , unlines $ map prettyPrint expectUsedImports
+                , unlines $ map (toText . prettyPrint) expectUsedImports
                 , "Actual imports:"
-                , unlines $ map prettyPrint actualUsedImports
+                , unlines $ map (toText . prettyPrint) actualUsedImports
                 ]
         pure $ Finished $ Fail "Invalid imports"
     else
         pure $ Finished Pass
 
-importifyFile :: FilePath -> IO (T.Text, [Identifier])
+importifyFile :: FilePath -> IO (Text, [Identifier])
 importifyFile filepath = do
-    let args = map T.pack ["file", "-U", filepath]
-    (exitCode, stdout, stderr) <- procStrictWithErr importifyBinaryName args empty
+    let args = map toText ["file", "-U", filepath]
+    (exitCode, out, err) <- procStrictWithErr importifyBinaryName args empty
     case exitCode of
-        ExitSuccess   -> pure (stdout, map (Identifier . T.unpack) $ T.words stderr)
+        ExitSuccess   -> pure (out, map (Identifier . toString) $ words err)
         ExitFailure _ -> throw $ ProcFailed { procCommand = importifyBinaryName
                                             , procArguments = args
                                             , procExitCode = exitCode
                                             }
 
 checkImportifyExists :: IO Bool
-checkImportifyExists = doesFileExist $ T.unpack importifyBinaryName
+checkImportifyExists = doesFileExist $ toString importifyBinaryName
 
-importifyBinaryName, testDirectory :: T.Text
+importifyBinaryName, testDirectory :: Text
 importifyBinaryName = "importify"
 testDirectory = "test/system/"
