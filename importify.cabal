@@ -79,7 +79,8 @@ executable importify
                        RecordWildCards
 
 test-suite importify-system
-  type:                detailed-0.9
+  type:                exitcode-stdio-1.0
+  main-is:             SystemSuite.hs
   hs-source-dirs:      test
   test-module:         SystemSuite
   build-depends:       base, importify
@@ -100,6 +101,7 @@ test-suite importify-system
     ld-options:        -fuse-ld=gold
 
   default-extensions:  GeneralizedNewtypeDeriving
+                       NoImplicitPrelude
                        OverloadedStrings
                        RecordWildCards
 

@@ -1,7 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-
-module SystemSuite where
+module Main where
 
 import           Universum
 
@@ -19,6 +16,9 @@ import           System.Directory       (doesFileExist, getCurrentDirectory,
                                          listDirectory)
 import           System.Exit            (ExitCode (..))
 import           Turtle                 (ProcFailed (..), empty, procStrictWithErr)
+
+main :: IO ()
+main = () <$ tests
 
 tests :: IO ([Test])
 tests = do
