@@ -23,7 +23,7 @@ data Command
     deriving (Show)
 
 data SingleFileOptions = SingleFileOptions
-    { sfoFilename :: !FilePath -- ^ File to apply the tool to
+    { sfoFilename    :: !FilePath -- ^ File to apply the tool to
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions

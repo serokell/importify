@@ -14,11 +14,23 @@ import           Importify.Common      (Identifier, cnameToIdentifier, nameToIde
 
 -- | Remove a list of identifiers from ImportDecls.
 removeIdentifiers :: [Identifier] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
-removeIdentifiers ids =
-    cleanDecls .
-    (everywhere $ mkT $ traverseToClean) .
-    (everywhere $ mkT $ traverseToRemove ids) .
-    (everywhere $ mkT $ traverseToRemoveThing ids)
+removeIdentifiers ids decls =
+    (volatileImports ++) $
+    cleanDecls $
+    (everywhere $ mkT $ traverseToClean) $
+    (everywhere $ mkT $ traverseToRemove ids) $
+    (everywhere $ mkT $ traverseToRemoveThing ids) $
+    decls
+  where
+    volatileImports = filter isVolatileImport decls
+
+-- | Returns True if the import is of either of the forms:
+-- import Foo ()
+-- import Foo
+isVolatileImport :: ImportDecl SrcSpanInfo -> Bool
+isVolatileImport ImportDecl{ importSpecs = Just (ImportSpecList _ _ []) } = True
+isVolatileImport ImportDecl{ importSpecs = Nothing }                      = True
+isVolatileImport _                                                        = False
 
 -- | Traverses ImportDecls to remove identifiers from IThingWith specs
 traverseToRemoveThing :: [Identifier] -> ImportSpec SrcSpanInfo -> ImportSpec SrcSpanInfo

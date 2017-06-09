@@ -30,9 +30,8 @@ import           Distribution.Verbosity                (normal)
 import           Language.Haskell.Extension            (Extension (..),
                                                         KnownExtension (..))
 import qualified Language.Haskell.Exts                 as HSE
-import           Path                                  (Abs, Dir, File, Path, Rel,
-                                                        fromRelFile, parseRelDir,
-                                                        parseRelFile, (</>))
+import           Path                                  (Dir, File, Path, Rel, fromRelFile,
+                                                        parseRelDir, parseRelFile, (</>))
 import           System.Directory                      (doesFileExist)
 import           System.FilePath.Posix                 (dropExtension)
 import           Text.Read                             (read)
@@ -51,7 +50,7 @@ getNodeLibInfo = libBuildInfo . condTreeData
 -- | Retrieve list of all package dependencies for library of
 -- given package.
 getLibs :: GenericPackageDescription -> [String]
-getLibs = ordNub . concat . map (map dependencyName . targetBuildDepends) . getBuildInfos
+getLibs = ordNub . concatMap (map dependencyName . targetBuildDepends) . getBuildInfos
 
 getBuildInfos :: GenericPackageDescription -> [BuildInfo]
 getBuildInfos GenericPackageDescription{..} =
