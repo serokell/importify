@@ -33,7 +33,7 @@ import           Importify.Resolution   (collectUnusedSymbols, resolveOneModule)
 import           Importify.Tree         (removeIdentifiers)
 
 doFile :: FilePath -> IO ()
-doFile = readFile >=> doSource >=> readFile
+doFile = readFile >=> doSource >=> putText
 
 doSource :: Text -> IO Text
 doSource src = do
