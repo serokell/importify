@@ -2,7 +2,7 @@
 
 module TestVarQualifiedNamedUnused where
 
-import qualified System.IO as IO
+import qualified Data.List as L
 
 main :: IO ()
 main = pure ()

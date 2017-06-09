@@ -2,65 +2,56 @@ module Main where
 
 import           Universum
 
-import           Control.Exception.Base (throw)
-import           Data.List              (isPrefixOf, isSuffixOf, sort)
-import qualified Data.Text              as T
-import           Distribution.TestSuite (Progress (..), Result (..), Test (..),
-                                         TestInstance (..))
-import           Importify.Common       (Identifier (..), parseForImports)
-import           Language.Haskell.Exts  (ImportDecl (..), ModuleHeadAndImports (..),
-                                         NonGreedy (..), ParseResult (..),
-                                         SrcSpanInfo (..), fromParseResult, parse,
-                                         prettyPrint)
-import           System.Directory       (doesFileExist, getCurrentDirectory,
-                                         listDirectory)
-import           System.Exit            (ExitCode (..))
-import           Turtle                 (ProcFailed (..), empty, procStrictWithErr)
+import           Data.List             (isPrefixOf, isSuffixOf, sort)
+import qualified Data.Text             as T
+import           Importify.Common      (Identifier (..), parseForImports)
+import           Importify.Main        (collectUnusedIds, doSource)
+import           Language.Haskell.Exts (ImportDecl (..), ModuleHeadAndImports (..),
+                                        NonGreedy (..), ParseResult (..),
+                                        SrcSpanInfo (..), fromParseResult, parse,
+                                        prettyPrint)
+import           System.Directory      (listDirectory)
+import           Test.Hspec            (Spec, describe, hspec, runIO, shouldBe, specify)
 
 main :: IO ()
-main = () <$ tests
+main = do
+    testFiles <- filter (\file ->
+                             (isPrefixOf "Test" file) &&
+                             (isSuffixOf ".hs" file))
+                    <$> (listDirectory $ toString testDirectory)
+    hspec $ spec testFiles
 
-tests :: IO ([Test])
-tests = do
-    importifyExists <- checkImportifyExists
-    cwd <- getCurrentDirectory
-    case importifyExists of
-        True -> do
-            testFiles <- filter (\file ->
-                                     (isPrefixOf "Test" file) &&
-                                     (isSuffixOf ".hs" file))
-                            <$> (listDirectory $ toString testDirectory)
-            putText ""
-            putStrLn $ "Running " ++ (show $ length testFiles) ++ " tests"
-            mapM (makeTest . (toString testDirectory ++)) $ sort testFiles
-        False ->
-            pure $ (:[]) $ Test $ TestInstance
-                { run = pure $ Finished $ Fail $
-                    "Importify binary not found in " ++ cwd
-                , name = "importifyBinary"
-                , tags = []
-                , options = []
-                , setOption = \_ _ -> Left "Options not supported"
-                }
+spec :: [FilePath] -> Spec
+spec testFiles = do
+    describe "importify file" $ do
+        mapM_ (makeTest . (toString testDirectory ++)) $ sort testFiles
 
-makeTest :: FilePath -> IO (Test)
+
+makeTest :: FilePath -> Spec
 makeTest file = do
-    (unusedSymbols, usedImports) <- loadTestData file
-    return $ Test $ TestInstance { run = executeTest file unusedSymbols usedImports
-                                 , name = file
-                                 , tags = []
-                                 , options = []
-                                 , setOption = \_ _ -> Left "Options not supported"
-                                 }
+    testFileContents <- runIO $ readFile file
+    let (expectedUnusedSymbols, expectedUsedImports) = loadTestData testFileContents
 
-loadTestData :: FilePath -> IO ([Identifier], [ImportDecl SrcSpanInfo])
-loadTestData file = do
-    fileContents <- readFile file
-    let unused:imports = takeWhile (T.isPrefixOf "-- ") $ lines fileContents
-    return (parseUnused $ toText unused, parseImports $ map toText imports)
+    unusedIds <- runIO $ uncurry collectUnusedIds $ parseForImports [] testFileContents
+    let actualUnusedSymbols = sort $ map getIdentifier unusedIds
+    importifiedFile <- runIO $ doSource testFileContents
+    let (_, actualUsedImports) = parseForImports [] importifiedFile
 
-parseUnused :: Text -> [Identifier]
-parseUnused = map (Identifier . toString) . filter (/= "") . map T.strip . T.splitOn "," . uncomment
+    specify (file ++ " has correct unused symbols") $
+        actualUnusedSymbols `shouldBe` expectedUnusedSymbols
+    specify (file ++ " has correct imports") $
+        makeSortedImports actualUsedImports `shouldBe` makeSortedImports expectedUsedImports
+
+loadTestData :: Text -> ([String], [ImportDecl SrcSpanInfo])
+loadTestData testFileContents =
+    let unused:imports = takeWhile (T.isPrefixOf "--") $ lines testFileContents
+    in (parseUnused $ toText unused, parseImports $ map toText imports)
+
+makeSortedImports :: [ImportDecl SrcSpanInfo] -> [Text]
+makeSortedImports = sort . map (toText . prettyPrint)
+
+parseUnused :: Text -> [String]
+parseUnused = map toString . sort . filter (/= "") . map T.strip . T.splitOn "," . uncomment
 
 parseImports :: [Text] -> [ImportDecl SrcSpanInfo]
 parseImports imports =
@@ -74,57 +65,5 @@ parseImports imports =
 uncomment :: Text -> Text
 uncomment = T.drop 3
 
-executeTest :: FilePath -> [Identifier] -> [ImportDecl SrcSpanInfo] -> IO Progress
-executeTest file expectUnusedIds expectUsedImports = do
-    (importifiedFile, unusedIds) <- importifyFile file
-    let (_, usedImports) = parseForImports [] importifiedFile
-    unusedSymbolsResult <- checkUnusedSymbols expectUnusedIds unusedIds
-    case unusedSymbolsResult of
-        Finished Pass -> checkUsedImports expectUsedImports usedImports
-        _             -> pure unusedSymbolsResult
-
-checkUnusedSymbols :: [Identifier] -> [Identifier] -> IO Progress
-checkUnusedSymbols expectUnusedSymbols actualUnusedSymbols =
-    if sort expectUnusedSymbols /= sort actualUnusedSymbols then do
-        putStr $ unlines
-             [ ""
-             , unwords $
-               "Expected unused symbols: ":(map (toText . getIdentifier) expectUnusedSymbols)
-             , unwords $
-               "Actual unused symbols: ":(map (toText . getIdentifier) actualUnusedSymbols)
-             ]
-        pure $ Finished $ Fail "Invalid unused symbols"
-    else
-        pure $ Finished $ Pass
-
-checkUsedImports :: [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo] -> IO Progress
-checkUsedImports expectUsedImports actualUsedImports =
-    if map prettyPrint expectUsedImports /= map prettyPrint actualUsedImports then do
-        putStr $ unlines
-                [ ""
-                , "Expected imports:"
-                , unlines $ map (toText . prettyPrint) expectUsedImports
-                , "Actual imports:"
-                , unlines $ map (toText . prettyPrint) actualUsedImports
-                ]
-        pure $ Finished $ Fail "Invalid imports"
-    else
-        pure $ Finished Pass
-
-importifyFile :: FilePath -> IO (Text, [Identifier])
-importifyFile filepath = do
-    let args = map toText ["file", "-U", filepath]
-    (exitCode, out, err) <- procStrictWithErr importifyBinaryName args empty
-    case exitCode of
-        ExitSuccess   -> pure (out, map (Identifier . toString) $ words err)
-        ExitFailure _ -> throw $ ProcFailed { procCommand = importifyBinaryName
-                                            , procArguments = args
-                                            , procExitCode = exitCode
-                                            }
-
-checkImportifyExists :: IO Bool
-checkImportifyExists = doesFileExist $ toString importifyBinaryName
-
-importifyBinaryName, testDirectory :: Text
-importifyBinaryName = "importify"
+testDirectory :: Text
 testDirectory = "test/system/"
