@@ -1,4 +1,4 @@
--- Bool
+--
 -- import Data.Bool (Bool(False))
 
 module TestThingWithUsedConstructor where

@@ -14,7 +14,8 @@ import qualified Data.HashMap.Strict    as Map
 
 import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..), SrcSpanInfo,
                                          parseExtension, prettyPrint)
-import           Language.Haskell.Names (annotate, loadBase, writeSymbols)
+import           Language.Haskell.Names (Environment, Scoped, annotate, loadBase,
+                                         writeSymbols)
 import           Path                   (filename, fromAbsDir, fromAbsFile, fromRelFile,
                                          parseAbsDir, parseRelDir, parseRelFile, (</>))
 import           System.Directory       (createDirectoryIfMissing, doesFileExist,
@@ -26,11 +27,12 @@ import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionM
                                          getLibs, getLibs, moduleNameToPath, modulePaths,
                                          readCabal, readCabal, withLibrary)
 import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsPath)
-import           Importify.Common       (Identifier (..), getModuleName, importSlice,
+import           Importify.Common       (Identifier, getModuleName, importSlice,
                                          parseForImports)
 import           Importify.CPP          (withModuleAST)
-import           Importify.Resolution   (collectUnusedSymbols, resolveOneModule)
-import           Importify.Tree         (removeIdentifiers)
+import           Importify.Resolution   (collectUnusedSymbols, collectUsedQuals,
+                                         resolveOneModule)
+import           Importify.Tree         (cleanQuals, removeIdentifiers)
 
 doFile :: FilePath -> IO ()
 doFile = readFile >=> doSource >=> putText
@@ -42,26 +44,36 @@ doSource src = do
     let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
     let (ast, imports) = parseForImports exts src
 
-    maybe (pure "")
-          (\(start, end) -> do
-                  let codeLines        = lines src
-                  let (preamble, rest) = splitAt (start - 1) codeLines
-                  let (_, decls)       = splitAt (end - start + 1) rest
+    case importSlice imports of
+        Just (start, end) -> do
+            let codeLines        = lines src
+            let (preamble, rest) = splitAt (start - 1) codeLines
+            let (_, decls)       = splitAt (end - start + 1) rest
 
-                  unusedIds <- collectUnusedIds ast imports
-                  let newImports = removeIdentifiers unusedIds imports
+            environment <- loadEnvironment
+            let annotations = annotateModule ast environment
+            let unusedIds = collectUnusedSymbols environment imports annotations
+            let usedQuals = collectUsedQuals imports annotations
+            let newImports = cleanQuals usedQuals $ removeIdentifiers unusedIds imports
 
-                  pure $ unlines preamble
-                      <> toText (unlines $ map (toText . prettyPrint) newImports)
-                      <> unlines decls)
-        (importSlice imports)
+            pure $ unlines preamble
+                <> toText (unlines $ map (toText . prettyPrint) newImports)
+                <> unlines decls
+        Nothing -> pure src
+
+loadEnvironment :: IO Environment
+loadEnvironment = loadBase
+
+annotateModule :: Module SrcSpanInfo -> Environment -> [Scoped SrcSpanInfo]
+annotateModule ast environment =
+    let (Module l mhead mpragmas _mimports mdecls) = annotate environment ast
+    in toList (Module l mhead mpragmas [] mdecls)
 
 collectUnusedIds :: Module SrcSpanInfo -> [ImportDecl SrcSpanInfo] -> IO ([Identifier])
 collectUnusedIds ast imports = do
-    baseEnvironment <- loadBase
-    let annotatedAST = annotate baseEnvironment ast
-    let annotations  = toList annotatedAST
-    pure $ collectUnusedSymbols baseEnvironment imports annotations
+    environment <- loadEnvironment
+    let annotations = annotateModule ast environment
+    pure $ collectUnusedSymbols environment imports annotations
 
 getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
 getExtensions moduleName maps = do

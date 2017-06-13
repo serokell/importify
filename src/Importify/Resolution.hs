@@ -2,15 +2,18 @@
 
 module Importify.Resolution
        ( collectUnusedSymbols
+       , collectUsedQuals
        , resolveOneModule
        ) where
 
 import           Universum
 
 import qualified Data.Map                           as M
+import           Data.Maybe                         (listToMaybe)
 
 import           Language.Haskell.Exts              (ImportDecl (..), ImportSpecList (..),
-                                                     Module)
+                                                     Module, ModuleName (..), QName (..),
+                                                     SrcSpanInfo)
 import           Language.Haskell.Names             (Environment, NameInfo (GlobalSymbol),
                                                      Scoped (Scoped), resolve, symbolName)
 import qualified Language.Haskell.Names             as N
@@ -20,16 +23,23 @@ import           Importify.Common                   (Identifier (..),
                                                      importSpecToIdentifiers)
 
 symbolByName :: String -> [N.Symbol] -> Maybe N.Symbol
-symbolByName name symbols = head $ do
-    symbol <- symbols
-    guard $ symbolName symbol == stringToName name
-    pure symbol
+symbolByName name =
+    listToMaybe . filter ((stringToName name ==) . symbolName)
 
-symbolUsages :: N.Symbol -> [Scoped l] -> Maybe l
-symbolUsages symbol annotations = head $ do
-    Scoped (GlobalSymbol globalSymbol _) location <- annotations
-    guard (globalSymbol == symbol)
-    pure location
+symbolUsed :: N.Symbol -> [Scoped l] -> Bool
+symbolUsed symbol annotations = any used annotations
+  where
+    used :: Scoped l -> Bool
+    used (Scoped (GlobalSymbol global@(N.Constructor smodule _sname stype) _) _) =
+        symbol == global ||
+        (N.symbolName symbol == stype && N.symbolModule symbol == smodule)
+    used (Scoped (GlobalSymbol global@(N.Selector smodule _sname stype _scons) _) _) =
+        symbol == global ||
+        (N.symbolName symbol == stype && N.symbolModule symbol == smodule)
+    used (Scoped (GlobalSymbol global _) _) =
+        symbol == global
+    used _ =
+        False
 
 collectUnusedSymbols :: Environment -> [ImportDecl l] -> [Scoped l] -> [Identifier]
 collectUnusedSymbols env decls annotations = do
@@ -39,9 +49,13 @@ collectUnusedSymbols env decls annotations = do
     Just (ImportSpecList _ _ specs) <- guarded isJust importSpecs
     spec <- specs
     id@(Identifier name) <- importSpecToIdentifiers spec
-    Just symbol <- guarded isJust $ symbolByName name moduleSymbols
-    guard $ isNothing (symbolUsages symbol annotations)
-    pure id
+    case symbolByName name moduleSymbols of
+        Just symbol -> do
+            guard $ not $ symbolUsed symbol annotations
+            pure id
+        Nothing ->
+            -- error $ toText $ "Unknown symbol " ++ name ++ ". Possible causes: Incomplete cache, invalid sources"
+            [] -- Just don't touch it
 
 -- | Gather all symbols for given module.
 resolveOneModule :: Module l -> [N.Symbol]
@@ -50,3 +64,15 @@ resolveOneModule m =
         symbolsEnv    = resolve [clearedModule] mempty
         symbols       = concat $ M.elems symbolsEnv
     in symbols
+
+collectUsedQuals :: [ImportDecl SrcSpanInfo] -> [Scoped SrcSpanInfo] -> [ModuleName SrcSpanInfo]
+collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) annotations) quals
+  where
+    quals :: [ModuleName SrcSpanInfo]
+    quals = concatMap (maybeToList . importAs) $ filter (isNothing . importSpecs) imports
+
+qualUsed :: ModuleName SrcSpanInfo -> Scoped SrcSpanInfo -> Bool
+qualUsed (ModuleName _ name) (Scoped (GlobalSymbol _ (Qual _ (ModuleName _ usedName) _)) _) =
+    name == usedName
+qualUsed _ _                                                      = False
+

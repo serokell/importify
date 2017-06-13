@@ -1,6 +1,7 @@
 
 module Importify.Tree
        ( removeIdentifiers
+       , cleanQuals
        ) where
 
 import           Universum
@@ -8,9 +9,21 @@ import           Universum
 import           Data.Generics.Aliases (mkT)
 import           Data.Generics.Schemes (everywhere)
 import           Language.Haskell.Exts (ImportDecl (..), ImportSpec (..),
-                                        ImportSpecList (..), Name (..), SrcSpanInfo)
+                                        ImportSpecList (..), ModuleName (..), Name (..),
+                                        Namespace (..), SrcSpanInfo)
 
 import           Importify.Common      (Identifier, cnameToIdentifier, nameToIdentifier)
+
+-- | Remove unused qualified renaming imports
+cleanQuals :: [ModuleName SrcSpanInfo] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
+cleanQuals usedQuals = filter (qualModNeeded usedQuals)
+
+qualModNeeded :: [ModuleName SrcSpanInfo] -> ImportDecl SrcSpanInfo -> Bool
+qualModNeeded usedQuals ImportDecl{..} =
+    case importAs of
+        Just name -> (isJust importSpecs) ||
+                     (elem name usedQuals)
+        Nothing   -> True
 
 -- | Remove a list of identifiers from ImportDecls.
 removeIdentifiers :: [Identifier] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
@@ -35,7 +48,11 @@ isVolatileImport _                                                        = Fals
 -- | Traverses ImportDecls to remove identifiers from IThingWith specs
 traverseToRemoveThing :: [Identifier] -> ImportSpec SrcSpanInfo -> ImportSpec SrcSpanInfo
 traverseToRemoveThing ids (IThingWith l name cnames) =
-    IThingWith l name (filter (\cname -> not $ elem (cnameToIdentifier cname) ids) cnames)
+    case newCnames of
+        [] -> IAbs l (NoNamespace l) name
+        _  -> IThingWith l name newCnames
+  where
+    newCnames = filter (\cname -> not $ elem (cnameToIdentifier cname) ids) cnames
 traverseToRemoveThing _ spec = spec
 
 -- | Traverses ImportDecls to remove identifiers from ImportSpecs
