@@ -64,6 +64,8 @@ doSource src = do
 loadEnvironment :: IO Environment
 loadEnvironment = loadBase
 
+-- | Annotates module but drops import annotations because they can contain GlobalSymbol
+-- annotations and collectUnusedSymbols later does its job by looking for GlobalSymbol
 annotateModule :: Module SrcSpanInfo -> Environment -> [Scoped SrcSpanInfo]
 annotateModule ast environment =
     let (Module l mhead mpragmas _mimports mdecls) = annotate environment ast

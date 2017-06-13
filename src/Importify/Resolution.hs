@@ -9,7 +9,6 @@ module Importify.Resolution
 import           Universum
 
 import qualified Data.Map                           as M
-import           Data.Maybe                         (listToMaybe)
 
 import           Language.Haskell.Exts              (ImportDecl (..), ImportSpecList (..),
                                                      Module, ModuleName (..), QName (..),
@@ -23,24 +22,28 @@ import           Importify.Common                   (Identifier (..),
                                                      importSpecToIdentifiers)
 
 symbolByName :: String -> [N.Symbol] -> Maybe N.Symbol
-symbolByName name =
-    listToMaybe . filter ((stringToName name ==) . symbolName)
+symbolByName name = find ((stringToName name ==) . symbolName)
 
 symbolUsed :: N.Symbol -> [Scoped l] -> Bool
 symbolUsed symbol annotations = any used annotations
   where
     used :: Scoped l -> Bool
+    -- Constructors are special because the whole type should be considered used
+    -- if one of its constructors is used
     used (Scoped (GlobalSymbol global@(N.Constructor smodule _sname stype) _) _) =
         symbol == global ||
         (N.symbolName symbol == stype && N.symbolModule symbol == smodule)
+    -- ditto for selectors
     used (Scoped (GlobalSymbol global@(N.Selector smodule _sname stype _scons) _) _) =
         symbol == global ||
         (N.symbolName symbol == stype && N.symbolModule symbol == smodule)
+    -- The symbol is used itself
     used (Scoped (GlobalSymbol global _) _) =
         symbol == global
     used _ =
         False
 
+-- | Collect symbols unused in annotations
 collectUnusedSymbols :: Environment -> [ImportDecl l] -> [Scoped l] -> [Identifier]
 collectUnusedSymbols env decls annotations = do
     ImportDecl{..}     <- decls
@@ -65,6 +68,9 @@ resolveOneModule m =
         symbols       = concat $ M.elems symbolsEnv
     in symbols
 
+-- | Collect list of modules used for fully qualified names.
+-- E.g. if it encounters "IO.putStrLn" it should collect ModuleName "IO"
+-- Used later to determine whether `as' import needed or not
 collectUsedQuals :: [ImportDecl SrcSpanInfo] -> [Scoped SrcSpanInfo] -> [ModuleName SrcSpanInfo]
 collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) annotations) quals
   where
