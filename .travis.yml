@@ -1,0 +1,36 @@
+sudo: required
+
+language: c
+
+cache:
+  directories:
+  - "$HOME/.stack"
+  - "$HOME/build/serokell/importify/.stack-work"
+
+addons:
+  apt:
+    packages:
+    - libgmp-dev
+
+before_install:
+  # Download and unpack the stack executable
+  - mkdir -p ~/.local/bin
+  - export PATH=$HOME/.local/bin:$PATH
+  - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+install:
+  - stack --version
+  - stack -j 2 setup --no-terminal
+  - stack ghc -- --version
+  - stack -j 2 build --test --bench --only-snapshot --no-terminal --no-run-tests --no-run-benchmarks
+
+script:
+- stack --jobs=4 build --test --no-terminal
+
+notifications:
+  email: false
+  slack:
+    rooms:
+      - serokell:JWBvWb5PKOhknocQgcoQnflZ
+    on_success: change
+    on_failure: always
