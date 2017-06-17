@@ -17,6 +17,7 @@ module Importify.Cabal
 import           Universum                             hiding (fromString)
 
 import qualified Data.HashMap.Strict                   as Map
+import           Data.List                             (partition)
 import           Distribution.ModuleName               (ModuleName, fromString,
                                                         toFilePath)
 import           Distribution.Package                  (Dependency (..), PackageName (..))
@@ -116,31 +117,34 @@ withLibrary GenericPackageDescription{..} action =
 -- | Returns list of relative paths to each module.
 modulePaths :: Path Rel Dir -> Library -> IO [Path Rel File]
 modulePaths packagePath Library{..} = do
-    sourcePaths <- mapM parseRelDir $ hsSourceDirs libBuildInfo
-    collectModulePaths sourcePaths
+    let sourceDirs = hsSourceDirs libBuildInfo
+    let (cur, others) = partition (== ".") sourceDirs
+    case (cur, others) of
+        (_here,    []) -> collectModulesHere
+        ([]   , paths) -> collectModulesThere paths
+        (_here, paths) -> liftA2 (++) collectModulesHere (collectModulesThere paths)
   where
-    exposedModulesPaths :: IO [Path Rel File]
-    exposedModulesPaths = mapM (parseRelFile . (++ ".hs") . toFilePath) exposedModules
+    exposedModulePaths :: IO [Path Rel File]
+    exposedModulePaths = mapM (parseRelFile . (++ ".hs") . toFilePath) exposedModules
 
-    addAbsDir :: Path Rel Dir -> [Path Rel File] -> [Path Rel File]
-    addAbsDir dir = map (dir </>)
+    addDir :: Path Rel Dir -> [Path Rel File] -> [Path Rel File]
+    addDir dir = map (dir </>)
 
-    collectModulePaths :: [Path Rel Dir] -> IO [Path Rel File]
-    collectModulePaths []   = exposedModulesPaths >>=
-        checkModuleExistence . addAbsDir packagePath
-    collectModulePaths dirs =
-        exposedModulesPaths  >>= \paths ->
-        concatForM dirs        $ \dir   ->
-          checkModuleExistence $ addAbsDir (packagePath </> dir) paths
+    collectModulesHere :: IO [Path Rel File]
+    collectModulesHere = do
+        paths <- exposedModulePaths
+        let packagePaths = addDir packagePath paths
+        keepExistingModules packagePaths
 
-    -- TODO: rewrite with either mapM or filterM
-    checkModuleExistence :: [Path Rel File] -> IO [Path Rel File]
-    checkModuleExistence []     = return []
-    checkModuleExistence (modPath:modPaths) = do
-        modExists  <- doesFileExist $ fromRelFile modPath
-        if modExists
-        then (modPath:) <$> checkModuleExistence modPaths
-        else checkModuleExistence modPaths
+    collectModulesThere :: [FilePath] -> IO [Path Rel File]
+    collectModulesThere dirs = do
+        dirPaths <- mapM parseRelDir dirs
+        modPaths <- exposedModulePaths
+        concatForM dirPaths $ \dir ->
+          keepExistingModules $ addDir (packagePath </> dir) modPaths
+
+    keepExistingModules :: [Path Rel File] -> IO [Path Rel File]
+    keepExistingModules = filterM (doesFileExist . fromRelFile)
 
 showExt :: Extension -> String
 showExt (EnableExtension ext)   = show ext

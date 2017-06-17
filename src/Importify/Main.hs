@@ -1,4 +1,3 @@
-
 module Importify.Main
        ( doFile
        , doSource
@@ -85,6 +84,7 @@ getExtensions moduleName maps = do
     extensions <- Map.lookup target extensionsMap
     pure $ map parseExtension extensions
 
+-- | Caches packages information into local .importify directory.
 doCache :: FilePath -> IO ()
 doCache filepath = do
     cabalDesc <- readCabal filepath
@@ -107,7 +107,8 @@ doCache filepath = do
     print libs
 
     -- download & unpack sources, then cache and delete
-    forM_ (filter (/= "base") libs) $ \libName -> do -- TODO: temp hack
+    -- TODO: remove temp hacks
+    forM_ (filter (\p -> p /= "base" && p /= "importify") libs) $ \libName -> do
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
         localPackages        <- listDirectory importifyDir
         let maybePackage      = find (libName `isPrefixOf`) localPackages
@@ -121,6 +122,7 @@ doCache filepath = do
 
         let symbolsCachePath = importifyPath </> symbolsPath
         withLibrary packageCabalDesc $ \library cabalExtensions -> do
+            print packagePath
             modPaths <- modulePaths packagePath library
             forM_ modPaths $ \modPath -> withModuleAST modPath cabalExtensions $ \moduleAST -> do
                 let resolvedSymbols  = resolveOneModule moduleAST
