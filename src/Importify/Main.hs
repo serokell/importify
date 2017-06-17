@@ -1,4 +1,3 @@
-
 module Importify.Main
        ( doFile
        , doSource
@@ -27,8 +26,8 @@ import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionM
                                          getLibs, getLibs, moduleNameToPath, modulePaths,
                                          readCabal, readCabal, withLibrary)
 import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsPath)
-import           Importify.Common       (Identifier, getModuleName, importSlice,
-                                         parseForImports)
+import           Importify.Common       (Identifier, getModuleName, getSourceModuleName,
+                                         importSlice, parseForImports)
 import           Importify.CPP          (withModuleAST)
 import           Importify.Resolution   (collectUnusedSymbols, collectUsedQuals,
                                          resolveOneModule)
@@ -39,7 +38,7 @@ doFile = readFile >=> doSource >=> putText
 
 doSource :: Text -> IO Text
 doSource src = do
-    let moduleName = getModuleName src
+    let moduleName = getSourceModuleName src
     extensionMaps <- readExtensionMaps
     let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
     let (ast, imports) = parseForImports exts src
@@ -85,6 +84,7 @@ getExtensions moduleName maps = do
     extensions <- Map.lookup target extensionsMap
     pure $ map parseExtension extensions
 
+-- | Caches packages information into local .importify directory.
 doCache :: FilePath -> IO ()
 doCache filepath = do
     cabalDesc <- readCabal filepath
@@ -107,7 +107,8 @@ doCache filepath = do
     print libs
 
     -- download & unpack sources, then cache and delete
-    forM_ (filter (/= "base") libs) $ \libName -> do -- TODO: temp hack
+    -- TODO: remove temp hacks
+    forM_ (filter (\p -> p /= "base" && p /= "importify") libs) $ \libName -> do
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
         localPackages        <- listDirectory importifyDir
         let maybePackage      = find (libName `isPrefixOf`) localPackages
@@ -121,16 +122,19 @@ doCache filepath = do
 
         let symbolsCachePath = importifyPath </> symbolsPath
         withLibrary packageCabalDesc $ \library cabalExtensions -> do
-            modPaths <- modulePaths packagePath library
-            forM_ modPaths $ \modPath -> withModuleAST modPath cabalExtensions $ \moduleAST -> do
-                let resolvedSymbols  = resolveOneModule moduleAST
-                modSymbolsPath      <- parseRelFile $ fromRelFile (filename modPath) ++ ".symbols"
-                let packageCachePath = symbolsCachePath </> packagePath
-                let moduleCachePath  = packageCachePath </> modSymbolsPath
+            -- creates ./.importify/symbols/<package>/
+            let packageCachePath = symbolsCachePath </> packagePath
+            createDirectoryIfMissing True $ fromAbsDir packageCachePath
 
-                -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
-                createDirectoryIfMissing True $ fromAbsDir packageCachePath
-                writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
+            modPaths <- modulePaths packagePath library
+            forM_ modPaths $ \modPath -> withModuleAST modPath cabalExtensions $ \moduleAST ->
+                whenJust (getModuleName moduleAST) $ \moduleName -> do
+                    modSymbolsPath     <- parseRelFile $ moduleName ++ ".symbols"
+                    let moduleCachePath = packageCachePath </> modSymbolsPath
+                    let resolvedSymbols = resolveOneModule moduleAST
+
+                    -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
+                    writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
         removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
 
