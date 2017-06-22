@@ -20,6 +20,7 @@ import           Path                   (filename, fromAbsDir, fromAbsFile, from
 import           System.Directory       (createDirectoryIfMissing, doesFileExist,
                                          getCurrentDirectory, listDirectory,
                                          removeDirectoryRecursive)
+import           System.FilePath        (dropExtension, takeFileName)
 import           Turtle                 (cd, shell)
 
 import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionMaps,
@@ -107,8 +108,8 @@ doCache filepath preserve = do
     print libs
 
     -- download & unpack sources, then cache and delete
-    -- TODO: remove temp hacks
-    forM_ (filter (\p -> p /= "base" && p /= "importify") libs) $ \libName -> do
+    let projectName = dropExtension $ takeFileName filepath
+    forM_ (filter (\p -> p /= "base" && p /= projectName) libs) $ \libName -> do
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
         localPackages        <- listDirectory importifyDir
         let maybePackage      = find (libName `isPrefixOf`) localPackages
