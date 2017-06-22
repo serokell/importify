@@ -29,4 +29,4 @@ importifySingleFile SingleFileOptions{..} =
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =
-    doCache ccoFilename
+    doCache ccoFilename ccoPreserve
