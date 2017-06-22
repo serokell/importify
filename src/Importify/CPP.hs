@@ -5,8 +5,8 @@
 -- @-XCPP@ extension in files.
 
 module Importify.CPP
-       ( parseWithCPP
-       , withModuleAST
+       ( parseModuleFile
+       , parseWithCPP
        ) where
 
 import           Universum
@@ -38,9 +38,11 @@ parseWithCPP pathToModule cabalExtensions = do
                                 (defaultParseMode { extensions = cabalExtensions })
                                 moduleFile
 
--- | Perform action with module AST if it parses successfully.
-withModuleAST :: Path Rel File -> [Extension] -> (Module SrcSpanInfo -> IO ()) -> IO ()
-withModuleAST pathToModule cabalExtensions action =
+-- | Parse 'Module' by given 'Path' with given 'Extension's converting
+-- parser errors into human readable text.
+parseModuleFile :: [Extension] -> Path Rel File -> IO $ Either Text $ Module SrcSpanInfo
+parseModuleFile cabalExtensions pathToModule =
     parseWithCPP pathToModule cabalExtensions >>= \case
-        ParseOk (moduleAST, _) -> action moduleAST
-        ParseFailed loc reason -> putText $ "Ignoring module cache := "#|MPE loc reason|#""
+        ParseOk (moduleAST, _) -> return $ Right moduleAST
+        ParseFailed loc reason -> return $ Left
+                                         $ "Ignoring module cache := "#|MPE loc reason|#""

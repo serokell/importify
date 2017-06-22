@@ -11,8 +11,9 @@ import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS
 import qualified Data.HashMap.Strict    as Map
 
-import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..), SrcSpanInfo,
-                                         parseExtension, prettyPrint)
+import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..),
+                                         ModuleName (..), SrcSpanInfo, parseExtension,
+                                         prettyPrint)
 import           Language.Haskell.Names (Environment, Scoped, annotate, loadBase,
                                          writeSymbols)
 import           Path                   (filename, fromAbsDir, fromAbsFile, fromRelFile,
@@ -25,13 +26,14 @@ import           Turtle                 (cd, shell)
 
 import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionMaps,
                                          getLibs, getLibs, moduleNameToPath, modulePaths,
-                                         readCabal, readCabal, withLibrary)
+                                         readCabal, readCabal, splitOnExposedAndOther,
+                                         withLibrary)
 import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsPath)
-import           Importify.Common       (Identifier, getModuleName, getSourceModuleName,
+import           Importify.Common       (Identifier, getModuleTitle, getSourceModuleName,
                                          importSlice, parseForImports)
-import           Importify.CPP          (withModuleAST)
+import           Importify.CPP          (parseModuleFile)
 import           Importify.Resolution   (collectUnusedSymbols, collectUsedQuals,
-                                         resolveOneModule)
+                                         resolveModules)
 import           Importify.Tree         (cleanQuals, removeIdentifiers)
 
 doFile :: FilePath -> IO ()
@@ -109,7 +111,7 @@ doCache filepath preserve = do
 
     -- download & unpack sources, then cache and delete
     let projectName = dropExtension $ takeFileName filepath
-    forM_ (filter (\p -> p /= "base" && p /= projectName) libs) $ \libName -> do
+    for_ (filter (\p -> p /= "base" && p /= projectName) libs) $ \libName -> do
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
         localPackages        <- listDirectory importifyDir
         let maybePackage      = find (libName `isPrefixOf`) localPackages
@@ -127,15 +129,23 @@ doCache filepath preserve = do
             let packageCachePath = symbolsCachePath </> packagePath
             createDirectoryIfMissing True $ fromAbsDir packageCachePath
 
-            modPaths <- modulePaths packagePath library
-            forM_ modPaths $ \modPath -> withModuleAST modPath cabalExtensions $ \moduleAST ->
-                whenJust (getModuleName moduleAST) $ \moduleName -> do
-                    modSymbolsPath     <- parseRelFile $ moduleName ++ ".symbols"
-                    let moduleCachePath = packageCachePath </> modSymbolsPath
-                    let resolvedSymbols = resolveOneModule moduleAST
+            modPaths   <- modulePaths packagePath library
+            modEithers <- mapM (parseModuleFile cabalExtensions) modPaths
+            let (errors, libModules) = partitionEithers modEithers
 
-                    -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
-                    writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
+            whenNotNull errors $ \messages -> do
+                putText $ " * Next errors occured during caching of package: " <> toText libName
+                for_ messages putText
+
+            let (exposedModules, otherModules) = splitOnExposedAndOther library libModules
+            let resolvedModules = resolveModules exposedModules otherModules
+
+            for_ resolvedModules $ \(ModuleName () moduleTitle, resolvedSymbols) -> do
+                modSymbolsPath     <- parseRelFile $ moduleTitle ++ ".symbols"
+                let moduleCachePath = packageCachePath </> modSymbolsPath
+
+                -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
+                writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
         unless preserve $ removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
 
