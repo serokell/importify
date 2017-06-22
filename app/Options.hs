@@ -14,8 +14,8 @@ module Options
 import           Universum
 
 import           Options.Applicative (Parser, ParserInfo, argument, command, execParser,
-                                      fullDesc, help, helper, info, metavar, progDesc,
-                                      str, subparser)
+                                      fullDesc, help, helper, info, long, metavar,
+                                      progDesc, short, str, subparser, switch)
 
 data Command
     = SingleFile SingleFileOptions
@@ -28,6 +28,7 @@ data SingleFileOptions = SingleFileOptions
 
 data CabalCacheOptions = CabalCacheOptions
     { ccoFilename :: !FilePath -- ^ Path to .cabal file
+    , ccoPreserve :: !Bool     -- ^ Don't delete downloaded package cache
     } deriving (Show)
 
 optionsParser :: Parser Command
@@ -50,6 +51,10 @@ cacheParser = do
     ccoFilename <- argument str $
         metavar "FILE" <>
         help "Path to .cabal file"
+    ccoPreserve <- switch $
+        long "preserve" <>
+        short 'p' <>
+        help "Don't remove downloaded package cache"
     pure $ CabalCache CabalCacheOptions{..}
 
 optsInfo :: ParserInfo Command

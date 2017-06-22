@@ -85,8 +85,8 @@ getExtensions moduleName maps = do
     pure $ map parseExtension extensions
 
 -- | Caches packages information into local .importify directory.
-doCache :: FilePath -> IO ()
-doCache filepath = do
+doCache :: FilePath -> Bool -> IO ()
+doCache filepath preserve = do
     cabalDesc <- readCabal filepath
 
     curDir           <- getCurrentDirectory
@@ -136,7 +136,7 @@ doCache filepath = do
                     -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
                     writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
-        removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
+        unless preserve $ removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
 
     cd ".."
 
