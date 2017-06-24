@@ -116,16 +116,18 @@ isHseExt _                                  = True
 -- | Perform given action with package library 'BuilInfo'
 -- if 'Library' is present. We care only about library exposed modules
 -- because only they can be imported outside that package.
-withLibrary :: Applicative f
+withLibrary :: (Applicative f, Monoid m)
             => GenericPackageDescription
-            -> (Library -> [HSE.Extension] -> f ())
-            -> f ()
+            -> (Library -> [HSE.Extension] -> f m)
+            -> f m
 withLibrary GenericPackageDescription{..} action =
-    whenJust condLibrary $ \treeNode ->
-        let library       = condTreeData treeNode
-            BuildInfo{..} = libBuildInfo library
-            extensions    = filter isHseExt $ defaultExtensions ++ otherExtensions
-        in action library (map cabalExtToHseExt extensions)
+    maybe (pure mempty)
+          (\treeNode -> let library       = condTreeData treeNode
+                            BuildInfo{..} = libBuildInfo library
+                            extensions    = filter isHseExt $ defaultExtensions ++ otherExtensions
+                        in action library (map cabalExtToHseExt extensions)
+          )
+          condLibrary
 
 -- | Returns list of relative paths to both /exposed/ and /other/ modules.
 modulePaths :: Path Rel Dir -> Library -> IO [Path Rel File]

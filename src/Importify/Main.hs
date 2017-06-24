@@ -97,6 +97,7 @@ doCache filepath preserve = do
     let importifyPath = projectPath </> cachePath
     let importifyDir  = fromAbsDir importifyPath
 
+    -- TODO: error if not inside project directory?
     createDirectoryIfMissing True importifyDir  -- creates ./.importify
     cd $ fromString cacheDir    -- cd to ./.importify/
 
@@ -111,7 +112,7 @@ doCache filepath preserve = do
 
     -- download & unpack sources, then cache and delete
     let projectName = dropExtension $ takeFileName filepath
-    for_ (filter (\p -> p /= "base" && p /= projectName) libs) $ \libName -> do
+    modulesToPackage <- forM (filter (\p -> p /= "base" && p /= projectName) libs) $ \libName -> do
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
         localPackages        <- listDirectory importifyDir
         let maybePackage      = find (libName `isPrefixOf`) localPackages
@@ -124,7 +125,7 @@ doCache filepath preserve = do
                                       $ importifyPath </> packagePath </> cabalFileName
 
         let symbolsCachePath = importifyPath </> symbolsPath
-        withLibrary packageCabalDesc $ \library cabalExtensions -> do
+        packageModules <- withLibrary packageCabalDesc $ \library cabalExtensions -> do
             -- creates ./.importify/symbols/<package>/
             let packageCachePath = symbolsCachePath </> packagePath
             createDirectoryIfMissing True $ fromAbsDir packageCachePath
@@ -140,14 +141,22 @@ doCache filepath preserve = do
             let (exposedModules, otherModules) = splitOnExposedAndOther library libModules
             let resolvedModules = resolveModules exposedModules otherModules
 
-            for_ resolvedModules $ \(ModuleName () moduleTitle, resolvedSymbols) -> do
+            forM resolvedModules $ \(ModuleName () moduleTitle, resolvedSymbols) -> do
                 modSymbolsPath     <- parseRelFile $ moduleTitle ++ ".symbols"
                 let moduleCachePath = packageCachePath </> modSymbolsPath
 
                 -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
                 writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
-        unless preserve $ removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
+                pure (moduleTitle, downloadedPackage)
+
+        unless preserve $  -- TODO: use bracket here
+            removeDirectoryRecursive downloadedPackage
+
+        pure $ Map.fromList packageModules
+
+    let importsMap = Map.unions modulesToPackage
+    BS.writeFile importsMapFilename $ encode importsMap
 
     cd ".."
 
@@ -170,3 +179,6 @@ targetsMapFilename = "targets"
 
 extensionsMapFilename :: String
 extensionsMapFilename = "extensions"
+
+importsMapFilename :: String
+importsMapFilename = "imports"
