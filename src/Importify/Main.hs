@@ -9,13 +9,14 @@ import           Universum
 
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS
-import qualified Data.HashMap.Strict    as Map
+import qualified Data.HashMap.Strict    as HM
+import qualified Data.Map               as Map
 
 import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..),
                                          ModuleName (..), SrcSpanInfo, parseExtension,
                                          prettyPrint)
 import           Language.Haskell.Names (Environment, Scoped, annotate, loadBase,
-                                         writeSymbols)
+                                         readSymbols, writeSymbols)
 import           Path                   (filename, fromAbsDir, fromAbsFile, fromRelFile,
                                          parseAbsDir, parseRelDir, parseRelFile, (</>))
 import           System.Directory       (createDirectoryIfMissing, doesFileExist,
@@ -28,7 +29,8 @@ import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionM
                                          getLibs, getLibs, moduleNameToPath, modulePaths,
                                          readCabal, readCabal, splitOnExposedAndOther,
                                          withLibrary)
-import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsPath)
+import           Importify.Cache        (cacheDir, cachePath, guessCabalName, modulesFile,
+                                         modulesPath, symbolsPath)
 import           Importify.Common       (Identifier, getModuleTitle, getSourceModuleName,
                                          importSlice, parseForImports)
 import           Importify.CPP          (parseModuleFile)
@@ -64,7 +66,30 @@ doSource src = do
         Nothing -> pure src
 
 loadEnvironment :: IO Environment
-loadEnvironment = loadBase
+loadEnvironment = do
+    base <- loadBase
+
+    -- TODO: change after refactoring files variables
+    let cacheModuleFile = fromRelFile $ cachePath </> modulesPath
+    isImportsExist <- doesFileExist cacheModuleFile
+
+    packages <- if isImportsExist then do
+                  importsMap    <- decode <$> BS.readFile cacheModuleFile
+                  let mapEntries = HM.toList $ fromMaybe (error "imports decoding failed")
+                                                          importsMap
+                  forM mapEntries $ \(moduleName, package) -> do
+                      packagePath <- parseRelDir package
+                      modulePath  <- parseRelFile $ moduleName ++ ".symbols"
+                      let pathToSymbols = cachePath
+                                      </> symbolsPath
+                                      </> packagePath
+                                      </> modulePath
+                      moduleSymbols <- readSymbols (fromRelFile pathToSymbols)
+                      pure (ModuleName () moduleName, moduleSymbols)
+                else
+                  pure mempty
+
+    return $ Map.union base (Map.fromList packages)
 
 -- | Annotates module but drops import annotations because they can contain GlobalSymbol
 -- annotations and collectUnusedSymbols later does its job by looking for GlobalSymbol
@@ -83,8 +108,8 @@ getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
 getExtensions moduleName maps = do
     (targetMap, extensionsMap) <- maps
     let modulePath = moduleNameToPath moduleName
-    target <- Map.lookup modulePath targetMap
-    extensions <- Map.lookup target extensionsMap
+    target <- HM.lookup modulePath targetMap
+    extensions <- HM.lookup target extensionsMap
     pure $ map parseExtension extensions
 
 -- | Caches packages information into local .importify directory.
@@ -156,7 +181,7 @@ doCache filepath preserve = do
         pure $ Map.fromList packageModules
 
     let importsMap = Map.unions modulesToPackage
-    BS.writeFile importsMapFilename $ encode importsMap
+    BS.writeFile modulesFile $ encode importsMap
 
     cd ".."
 
@@ -179,6 +204,3 @@ targetsMapFilename = "targets"
 
 extensionsMapFilename :: String
 extensionsMapFilename = "extensions"
-
-importsMapFilename :: String
-importsMapFilename = "imports"
