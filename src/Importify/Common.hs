@@ -17,13 +17,11 @@ module Importify.Common
 import           Universum
 
 import qualified Data.List.NonEmpty                 as NE
-
 import           Language.Haskell.Exts              (CName (..), Extension,
                                                      ImportDecl (..), ImportSpec (..),
-                                                     Module (..), ModuleHead (..),
-                                                     ModuleName, ModuleName (..),
-                                                     Name (..), NonGreedy (..),
-                                                     ParseResult (..),
+                                                     Module (..), ModuleName,
+                                                     ModuleName (..), Name (..),
+                                                     NonGreedy (..), ParseResult (..),
                                                      PragmasAndModuleName (..),
                                                      SrcSpan (..), SrcSpanInfo (..),
                                                      combSpanInfo, fromParseResult, parse,

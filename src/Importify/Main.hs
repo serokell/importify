@@ -17,7 +17,7 @@ import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..),
                                          prettyPrint)
 import           Language.Haskell.Names (Environment, Scoped, annotate, loadBase,
                                          readSymbols, writeSymbols)
-import           Path                   (filename, fromAbsDir, fromAbsFile, fromRelFile,
+import           Path                   (fromAbsDir, fromAbsFile, fromRelFile,
                                          parseAbsDir, parseRelDir, parseRelFile, (</>))
 import           System.Directory       (createDirectoryIfMissing, doesFileExist,
                                          getCurrentDirectory, listDirectory,
