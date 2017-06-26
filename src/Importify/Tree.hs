@@ -1,4 +1,3 @@
-
 module Importify.Tree
        ( removeIdentifiers
        , cleanQuals
@@ -12,7 +11,7 @@ import           Language.Haskell.Exts (ImportDecl (..), ImportSpec (..),
                                         ImportSpecList (..), ModuleName (..), Name (..),
                                         Namespace (..), SrcSpanInfo)
 
-import           Importify.Common      (Identifier, cnameToIdentifier, nameToIdentifier)
+import           Importify.Syntax      (Identifier, cnameToIdentifier, nameToIdentifier)
 
 -- | Remove unused qualified renaming imports
 cleanQuals :: [ModuleName SrcSpanInfo] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]

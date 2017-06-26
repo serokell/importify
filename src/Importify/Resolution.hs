@@ -19,7 +19,7 @@ import           Language.Haskell.Names             (Environment, NameInfo (Glob
 import qualified Language.Haskell.Names             as N
 import           Language.Haskell.Names.SyntaxUtils (getModuleName, stringToName)
 
-import           Importify.Common                   (Identifier (..),
+import           Importify.Syntax                   (Identifier (..),
                                                      importSpecToIdentifiers)
 
 symbolByName :: String -> [N.Symbol] -> Maybe N.Symbol

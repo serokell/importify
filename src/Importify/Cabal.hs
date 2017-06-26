@@ -39,7 +39,7 @@ import           System.Directory                      (doesFileExist)
 import           System.FilePath.Posix                 (dropExtension)
 import           Text.Read                             (read)
 
-import           Importify.Common                      (getModuleTitle)
+import           Importify.Syntax                      (getModuleTitle)
 
 type TargetMap = HashMap String String
 type ExtensionsMap = HashMap String [String]

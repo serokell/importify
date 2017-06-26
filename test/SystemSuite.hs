@@ -4,14 +4,15 @@ import           Universum
 
 import           Data.List             (isPrefixOf, isSuffixOf, sort)
 import qualified Data.Text             as T
-import           Importify.Common      (Identifier (..), parseForImports)
-import           Importify.Main        (collectUnusedIds, doSource)
 import           Language.Haskell.Exts (ImportDecl (..), ModuleHeadAndImports (..),
                                         NonGreedy (..), ParseResult (..),
                                         SrcSpanInfo (..), fromParseResult, parse,
                                         prettyPrint)
 import           System.Directory      (listDirectory)
 import           Test.Hspec            (Spec, describe, hspec, runIO, shouldBe, specify)
+
+import           Importify.Main        (collectUnusedIds, doSource)
+import           Importify.Syntax      (Identifier (..), parseForImports)
 
 main :: IO ()
 main = do
