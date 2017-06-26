@@ -6,7 +6,8 @@ module Importify.Cache
        ( -- * Predefined directories
          cacheDir
        , cachePath
---       , libsDir
+       , modulesFile
+       , modulesPath
        , symbolsDir
        , symbolsPath
 
@@ -16,24 +17,25 @@ module Importify.Cache
 
 import           Universum
 
-import           Path            (Dir, File, Rel, fromRelDir, reldir)
+import           Path            (Dir, File, Rel, fromRelDir, fromRelFile, reldir,
+                                  relfile)
 import           Path.Internal   (Path (..))
 import           System.FilePath ((<.>))
 
 cachePath :: Path Rel Dir
 cachePath = [reldir|.importify/|]
 
--- TODO: do we need to store downloaded sources? Probably not.
--- libsPath :: Path Rel Dir
--- libsPath = importifyCachePath </> [reldir|libs|]
-
 symbolsPath :: Path Rel Dir
-symbolsPath = [reldir|symbols|]
+symbolsPath = [reldir|symbols/|]
 
-cacheDir, symbolsDir :: FilePath
-cacheDir   = fromRelDir cachePath
--- libsDir    = toFilePath libsPath
-symbolsDir = fromRelDir symbolsPath
+-- | Path to file that stores mapping from module names to their packages.
+modulesPath :: Path Rel File
+modulesPath = [relfile|modules|]
+
+cacheDir, modulesFile, symbolsDir :: FilePath
+cacheDir    = fromRelDir  cachePath
+modulesFile = fromRelFile modulesPath
+symbolsDir  = fromRelDir  symbolsPath
 
 -- TODO: probably not reliable, instead file with
 -- .cabal extension should be searched

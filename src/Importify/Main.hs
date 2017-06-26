@@ -9,28 +9,33 @@ import           Universum
 
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS
-import qualified Data.HashMap.Strict    as Map
+import qualified Data.HashMap.Strict    as HM
+import qualified Data.Map               as Map
 
-import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..), SrcSpanInfo,
-                                         parseExtension, prettyPrint)
+import           Language.Haskell.Exts  (Extension, ImportDecl, Module (..),
+                                         ModuleName (..), SrcSpanInfo, parseExtension,
+                                         prettyPrint)
 import           Language.Haskell.Names (Environment, Scoped, annotate, loadBase,
-                                         writeSymbols)
-import           Path                   (filename, fromAbsDir, fromAbsFile, fromRelFile,
+                                         readSymbols, writeSymbols)
+import           Path                   (fromAbsDir, fromAbsFile, fromRelFile,
                                          parseAbsDir, parseRelDir, parseRelFile, (</>))
 import           System.Directory       (createDirectoryIfMissing, doesFileExist,
                                          getCurrentDirectory, listDirectory,
                                          removeDirectoryRecursive)
+import           System.FilePath        (dropExtension, takeFileName)
 import           Turtle                 (cd, shell)
 
 import           Importify.Cabal        (ExtensionsMap, TargetMap, getExtensionMaps,
                                          getLibs, getLibs, moduleNameToPath, modulePaths,
-                                         readCabal, readCabal, withLibrary)
-import           Importify.Cache        (cacheDir, cachePath, guessCabalName, symbolsPath)
-import           Importify.Common       (Identifier, getModuleName, getSourceModuleName,
+                                         readCabal, readCabal, splitOnExposedAndOther,
+                                         withLibrary)
+import           Importify.Cache        (cacheDir, cachePath, guessCabalName, modulesFile,
+                                         modulesPath, symbolsPath)
+import           Importify.Common       (Identifier, getModuleTitle, getSourceModuleName,
                                          importSlice, parseForImports)
-import           Importify.CPP          (withModuleAST)
+import           Importify.CPP          (parseModuleFile)
 import           Importify.Resolution   (collectUnusedSymbols, collectUsedQuals,
-                                         resolveOneModule)
+                                         resolveModules)
 import           Importify.Tree         (cleanQuals, removeIdentifiers)
 
 doFile :: FilePath -> IO ()
@@ -61,7 +66,30 @@ doSource src = do
         Nothing -> pure src
 
 loadEnvironment :: IO Environment
-loadEnvironment = loadBase
+loadEnvironment = do
+    base <- loadBase
+
+    -- TODO: change after refactoring files variables
+    let cacheModuleFile = fromRelFile $ cachePath </> modulesPath
+    isImportsExist <- doesFileExist cacheModuleFile
+
+    packages <- if isImportsExist then do
+                  importsMap    <- decode <$> BS.readFile cacheModuleFile
+                  let mapEntries = HM.toList $ fromMaybe (error "imports decoding failed")
+                                                          importsMap
+                  forM mapEntries $ \(moduleName, package) -> do
+                      packagePath <- parseRelDir package
+                      modulePath  <- parseRelFile $ moduleName ++ ".symbols"
+                      let pathToSymbols = cachePath
+                                      </> symbolsPath
+                                      </> packagePath
+                                      </> modulePath
+                      moduleSymbols <- readSymbols (fromRelFile pathToSymbols)
+                      pure (ModuleName () moduleName, moduleSymbols)
+                else
+                  pure mempty
+
+    return $ Map.union base (Map.fromList packages)
 
 -- | Annotates module but drops import annotations because they can contain GlobalSymbol
 -- annotations and collectUnusedSymbols later does its job by looking for GlobalSymbol
@@ -80,8 +108,8 @@ getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
 getExtensions moduleName maps = do
     (targetMap, extensionsMap) <- maps
     let modulePath = moduleNameToPath moduleName
-    target <- Map.lookup modulePath targetMap
-    extensions <- Map.lookup target extensionsMap
+    target <- HM.lookup modulePath targetMap
+    extensions <- HM.lookup target extensionsMap
     pure $ map parseExtension extensions
 
 -- | Caches packages information into local .importify directory.
@@ -94,6 +122,7 @@ doCache filepath preserve = do
     let importifyPath = projectPath </> cachePath
     let importifyDir  = fromAbsDir importifyPath
 
+    -- TODO: error if not inside project directory?
     createDirectoryIfMissing True importifyDir  -- creates ./.importify
     cd $ fromString cacheDir    -- cd to ./.importify/
 
@@ -107,8 +136,8 @@ doCache filepath preserve = do
     print libs
 
     -- download & unpack sources, then cache and delete
-    -- TODO: remove temp hacks
-    forM_ (filter (\p -> p /= "base" && p /= "importify") libs) $ \libName -> do
+    let projectName = dropExtension $ takeFileName filepath
+    modulesToPackage <- forM (filter (\p -> p /= "base" && p /= projectName) libs) $ \libName -> do
         _exitCode            <- shell ("stack unpack " <> toText libName) empty
         localPackages        <- listDirectory importifyDir
         let maybePackage      = find (libName `isPrefixOf`) localPackages
@@ -121,22 +150,38 @@ doCache filepath preserve = do
                                       $ importifyPath </> packagePath </> cabalFileName
 
         let symbolsCachePath = importifyPath </> symbolsPath
-        withLibrary packageCabalDesc $ \library cabalExtensions -> do
+        packageModules <- withLibrary packageCabalDesc $ \library cabalExtensions -> do
             -- creates ./.importify/symbols/<package>/
             let packageCachePath = symbolsCachePath </> packagePath
             createDirectoryIfMissing True $ fromAbsDir packageCachePath
 
-            modPaths <- modulePaths packagePath library
-            forM_ modPaths $ \modPath -> withModuleAST modPath cabalExtensions $ \moduleAST ->
-                whenJust (getModuleName moduleAST) $ \moduleName -> do
-                    modSymbolsPath     <- parseRelFile $ moduleName ++ ".symbols"
-                    let moduleCachePath = packageCachePath </> modSymbolsPath
-                    let resolvedSymbols = resolveOneModule moduleAST
+            modPaths   <- modulePaths packagePath library
+            modEithers <- mapM (parseModuleFile cabalExtensions) modPaths
+            let (errors, libModules) = partitionEithers modEithers
 
-                    -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
-                    writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
+            whenNotNull errors $ \messages -> do
+                putText $ " * Next errors occured during caching of package: " <> toText libName
+                for_ messages putText
 
-        unless preserve $ removeDirectoryRecursive downloadedPackage -- TODO: use bracket here
+            let (exposedModules, otherModules) = splitOnExposedAndOther library libModules
+            let resolvedModules = resolveModules exposedModules otherModules
+
+            forM resolvedModules $ \(ModuleName () moduleTitle, resolvedSymbols) -> do
+                modSymbolsPath     <- parseRelFile $ moduleTitle ++ ".symbols"
+                let moduleCachePath = packageCachePath </> modSymbolsPath
+
+                -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
+                writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
+
+                pure (moduleTitle, downloadedPackage)
+
+        unless preserve $  -- TODO: use bracket here
+            removeDirectoryRecursive downloadedPackage
+
+        pure $ Map.fromList packageModules
+
+    let importsMap = Map.unions modulesToPackage
+    BS.writeFile modulesFile $ encode importsMap
 
     cd ".."
 

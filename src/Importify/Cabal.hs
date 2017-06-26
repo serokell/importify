@@ -5,6 +5,7 @@ module Importify.Cabal
        ( getLibs
        , modulePaths
        , readCabal
+       , splitOnExposedAndOther
        , withLibrary
 
        -- * Map for extensions
@@ -20,6 +21,7 @@ import qualified Data.HashMap.Strict                   as Map
 import           Data.List                             (partition)
 import           Distribution.ModuleName               (ModuleName, fromString,
                                                         toFilePath)
+import qualified Distribution.ModuleName               as Cabal
 import           Distribution.Package                  (Dependency (..), PackageName (..))
 import           Distribution.PackageDescription       (BuildInfo (..), CondTree,
                                                         Executable (..),
@@ -37,14 +39,16 @@ import           System.Directory                      (doesFileExist)
 import           System.FilePath.Posix                 (dropExtension)
 import           Text.Read                             (read)
 
+import           Importify.Common                      (getModuleTitle)
+
 type TargetMap = HashMap String String
 type ExtensionsMap = HashMap String [String]
 
 readCabal :: FilePath -> IO GenericPackageDescription
 readCabal = readPackageDescription normal
 
-getNodeLibInfo :: CondTree var deps Library -> BuildInfo
-getNodeLibInfo = libBuildInfo . condTreeData
+-- getNodeLibInfo :: CondTree var deps Library -> BuildInfo
+-- getNodeLibInfo = libBuildInfo . condTreeData
 
 -- TODO: also collect for executables and make unique
 -- TODO: what about version bounds?
@@ -92,6 +96,15 @@ collectModuleMaps target mods exts =
 dependencyName :: Dependency -> String
 dependencyName (Dependency PackageName{..} _) = unPackageName
 
+-- | Split list of modules into /exposed/ modules and /other/ modules for given library.
+-- __First__ element of pair represents /exposed/ modules.
+-- __Second__ element of paris represents /other/ modules.
+splitOnExposedAndOther :: Library
+                       -> [HSE.Module HSE.SrcSpanInfo]
+                       -> ([HSE.Module HSE.SrcSpanInfo], [HSE.Module HSE.SrcSpanInfo])
+splitOnExposedAndOther Library{..} =
+    partition ((`elem` exposedModules) . Cabal.fromString . getModuleTitle)
+
 cabalExtToHseExt :: Extension -> HSE.Extension
 cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show
 
@@ -103,18 +116,20 @@ isHseExt _                                  = True
 -- | Perform given action with package library 'BuilInfo'
 -- if 'Library' is present. We care only about library exposed modules
 -- because only they can be imported outside that package.
-withLibrary :: Applicative f
+withLibrary :: (Applicative f, Monoid m)
             => GenericPackageDescription
-            -> (Library -> [HSE.Extension] -> f ())
-            -> f ()
+            -> (Library -> [HSE.Extension] -> f m)
+            -> f m
 withLibrary GenericPackageDescription{..} action =
-    whenJust condLibrary $ \treeNode ->
-        let library       = condTreeData treeNode
-            BuildInfo{..} = libBuildInfo library
-            extensions    = filter isHseExt $ defaultExtensions ++ otherExtensions
-        in action library (map cabalExtToHseExt extensions)
+    maybe (pure mempty)
+          (\treeNode -> let library       = condTreeData treeNode
+                            BuildInfo{..} = libBuildInfo library
+                            extensions    = filter isHseExt $ defaultExtensions ++ otherExtensions
+                        in action library (map cabalExtToHseExt extensions)
+          )
+          condLibrary
 
--- | Returns list of relative paths to each module.
+-- | Returns list of relative paths to both /exposed/ and /other/ modules.
 modulePaths :: Path Rel Dir -> Library -> IO [Path Rel File]
 modulePaths packagePath Library{..} = do
     let sourceDirs = hsSourceDirs libBuildInfo
@@ -124,22 +139,25 @@ modulePaths packagePath Library{..} = do
         ([]   , paths) -> collectModulesThere paths
         (_here, paths) -> liftA2 (++) collectModulesHere (collectModulesThere paths)
   where
-    exposedModulePaths :: IO [Path Rel File]
-    exposedModulePaths = mapM (parseRelFile . (++ ".hs") . toFilePath) exposedModules
+    thisLibModules :: [ModuleName]
+    thisLibModules = exposedModules ++ otherModules libBuildInfo
+
+    libModulePaths :: IO [Path Rel File]
+    libModulePaths = mapM (parseRelFile . (++ ".hs") . toFilePath) thisLibModules
 
     addDir :: Path Rel Dir -> [Path Rel File] -> [Path Rel File]
     addDir dir = map (dir </>)
 
     collectModulesHere :: IO [Path Rel File]
     collectModulesHere = do
-        paths <- exposedModulePaths
+        paths <- libModulePaths
         let packagePaths = addDir packagePath paths
         keepExistingModules packagePaths
 
     collectModulesThere :: [FilePath] -> IO [Path Rel File]
     collectModulesThere dirs = do
         dirPaths <- mapM parseRelDir dirs
-        modPaths <- exposedModulePaths
+        modPaths <- libModulePaths
         concatForM dirPaths $ \dir ->
           keepExistingModules $ addDir (packagePath </> dir) modPaths
 

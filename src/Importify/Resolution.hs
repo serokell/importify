@@ -3,11 +3,12 @@
 module Importify.Resolution
        ( collectUnusedSymbols
        , collectUsedQuals
-       , resolveOneModule
+       , resolveModules
        ) where
 
 import           Universum
 
+import           Data.Data                          (Data)
 import qualified Data.Map                           as M
 
 import           Language.Haskell.Exts              (ImportDecl (..), ImportSpecList (..),
@@ -16,7 +17,7 @@ import           Language.Haskell.Exts              (ImportDecl (..), ImportSpec
 import           Language.Haskell.Names             (Environment, NameInfo (GlobalSymbol),
                                                      Scoped (Scoped), resolve, symbolName)
 import qualified Language.Haskell.Names             as N
-import           Language.Haskell.Names.SyntaxUtils (stringToName)
+import           Language.Haskell.Names.SyntaxUtils (getModuleName, stringToName)
 
 import           Importify.Common                   (Identifier (..),
                                                      importSpecToIdentifiers)
@@ -60,13 +61,18 @@ collectUnusedSymbols env decls annotations = do
             -- error $ toText $ "Unknown symbol " ++ name ++ ". Possible causes: Incomplete cache, invalid sources"
             [] -- Just don't touch it
 
--- | Gather all symbols for given module.
-resolveOneModule :: Module l -> [N.Symbol]
-resolveOneModule m =
-    let clearedModule = () <$ m
-        symbolsEnv    = resolve [clearedModule] mempty
-        symbols       = concat $ M.elems symbolsEnv
-    in symbols
+-- | Gather all symbols for given list of 'Module's. In reality those
+-- modules represents all /exposed/ and /other/ modules for one package
+-- returning only list of symbols for /exposed/ modules.
+resolveModules :: (Data l, Eq l) => [Module l] -> [Module l] -> [(ModuleName (), [N.Symbol])]
+resolveModules exposedModules otherModules =
+    let symbolsEnv     = resolve (exposedModules ++ otherModules) mempty -- TODO: optimize?
+        otherCleared   = map ((() <$) . getModuleName) otherModules
+
+        -- remove @otherModules@ from environment because only @exposed@ can be imported
+        exposedEnv     = foldl' (flip M.delete) symbolsEnv otherCleared
+        exposedSymbols = M.assocs exposedEnv
+    in exposedSymbols
 
 -- | Collect list of modules used for fully qualified names.
 -- E.g. if it encounters "IO.putStrLn" it should collect ModuleName "IO"
@@ -81,4 +87,3 @@ qualUsed :: ModuleName SrcSpanInfo -> Scoped SrcSpanInfo -> Bool
 qualUsed (ModuleName _ name) (Scoped (GlobalSymbol _ (Qual _ (ModuleName _ usedName) _)) _) =
     name == usedName
 qualUsed _ _                                                      = False
-

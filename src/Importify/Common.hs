@@ -1,10 +1,12 @@
+{-# LANGUAGE ViewPatterns #-}
+
 -- | Common utilities for import list processing
 
 module Importify.Common
        ( Identifier (..)
        , cnameToIdentifier
        , getImportModuleName
-       , getModuleName
+       , getModuleTitle
        , getSourceModuleName
        , importSpecToIdentifiers
        , importSlice
@@ -14,15 +16,17 @@ module Importify.Common
 
 import           Universum
 
-import qualified Data.List.NonEmpty    as NE
-
-import           Language.Haskell.Exts (CName (..), Extension, ImportDecl (..),
-                                        ImportSpec (..), Module (..), ModuleHead (..),
-                                        ModuleName, ModuleName (..), Name (..),
-                                        NonGreedy (..), ParseResult (..),
-                                        PragmasAndModuleName (..), SrcSpan (..),
-                                        SrcSpanInfo (..), combSpanInfo, fromParseResult,
-                                        parse, parseFileContentsWithExts)
+import qualified Data.List.NonEmpty                 as NE
+import           Language.Haskell.Exts              (CName (..), Extension,
+                                                     ImportDecl (..), ImportSpec (..),
+                                                     Module (..), ModuleName,
+                                                     ModuleName (..), Name (..),
+                                                     NonGreedy (..), ParseResult (..),
+                                                     PragmasAndModuleName (..),
+                                                     SrcSpan (..), SrcSpanInfo (..),
+                                                     combSpanInfo, fromParseResult, parse,
+                                                     parseFileContentsWithExts)
+import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
 getImportModuleName :: ImportDecl l -> ModuleName ()
@@ -75,7 +79,6 @@ parseForImports exts fileContent = (ast, imports)
     where ast@(Module _ _ _ imports _) =
               fromParseResult $ parseFileContentsWithExts exts $ toString fileContent
 
--- | Maybe returns name of module.
-getModuleName :: Module l -> Maybe String
-getModuleName (Module _ (Just (ModuleHead _ (ModuleName _ name) _ _)) _ _ _) = Just name
-getModuleName _                                                              = Nothing
+-- | Returns name of 'Module' as a 'String'.
+getModuleTitle :: Module l -> String
+getModuleTitle (getModuleName -> ModuleName _ name) = name
