@@ -2,7 +2,7 @@
 
 -- | Common utilities for import list processing
 
-module Importify.Common
+module Importify.Syntax
        ( Identifier (..)
        , cnameToIdentifier
        , getImportModuleName

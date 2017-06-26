@@ -39,7 +39,7 @@ import           System.Directory                      (doesFileExist)
 import           System.FilePath.Posix                 (dropExtension)
 import           Text.Read                             (read)
 
-import           Importify.Common                      (getModuleTitle)
+import           Importify.Syntax                      (getModuleTitle)
 
 type TargetMap = HashMap String String
 type ExtensionsMap = HashMap String [String]
@@ -82,7 +82,7 @@ collectLibraryMaps lib =
 collectExecutableMaps :: String -> Executable -> (TargetMap, ExtensionsMap)
 collectExecutableMaps exeName exe =
     collectModuleMaps ("executable " ++ exeName)
-                      (exePath:(map toFilePath $ exeModules exe))
+                      (exePath:map toFilePath (exeModules exe))
                       (defaultExtensions $ buildInfo exe)
   where
     exePath = dropExtension $ modulePath exe

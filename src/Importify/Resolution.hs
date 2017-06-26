@@ -19,7 +19,7 @@ import           Language.Haskell.Names             (Environment, NameInfo (Glob
 import qualified Language.Haskell.Names             as N
 import           Language.Haskell.Names.SyntaxUtils (getModuleName, stringToName)
 
-import           Importify.Common                   (Identifier (..),
+import           Importify.Syntax                   (Identifier (..),
                                                      importSpecToIdentifiers)
 
 symbolByName :: String -> [N.Symbol] -> Maybe N.Symbol
@@ -81,7 +81,7 @@ collectUsedQuals :: [ImportDecl SrcSpanInfo] -> [Scoped SrcSpanInfo] -> [ModuleN
 collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) annotations) quals
   where
     quals :: [ModuleName SrcSpanInfo]
-    quals = concatMap (maybeToList . importAs) $ filter (isNothing . importSpecs) imports
+    quals = mapMaybe importAs $ filter (isNothing . importSpecs) imports
 
 qualUsed :: ModuleName SrcSpanInfo -> Scoped SrcSpanInfo -> Bool
 qualUsed (ModuleName _ name) (Scoped (GlobalSymbol _ (Qual _ (ModuleName _ usedName) _)) _) =

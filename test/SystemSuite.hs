@@ -4,8 +4,6 @@ import           Universum
 
 import           Data.List             (isPrefixOf, isSuffixOf, sort)
 import qualified Data.Text             as T
-import           Importify.Common      (Identifier (..), parseForImports)
-import           Importify.Main        (collectUnusedIds, doSource)
 import           Language.Haskell.Exts (ImportDecl (..), ModuleHeadAndImports (..),
                                         NonGreedy (..), ParseResult (..),
                                         SrcSpanInfo (..), fromParseResult, parse,
@@ -13,18 +11,20 @@ import           Language.Haskell.Exts (ImportDecl (..), ModuleHeadAndImports (.
 import           System.Directory      (listDirectory)
 import           Test.Hspec            (Spec, describe, hspec, runIO, shouldBe, specify)
 
+import           Importify.Main        (collectUnusedIds, doSource)
+import           Importify.Syntax      (Identifier (..), parseForImports)
+
 main :: IO ()
 main = do
     testFiles <- filter (\file ->
-                             (isPrefixOf "Test" file) &&
-                             (isSuffixOf ".hs" file))
-                    <$> (listDirectory $ toString testDirectory)
+                             "Test" `isPrefixOf` file &&
+                             ".hs"  `isSuffixOf` file)
+                    <$> listDirectory (toString testDirectory)
     hspec $ spec testFiles
 
 spec :: [FilePath] -> Spec
-spec testFiles = do
-    describe "importify file" $ do
-        mapM_ (makeTest . (toString testDirectory ++)) $ sort testFiles
+spec testFiles = describe "importify file" $
+    mapM_ (makeTest . (toString testDirectory ++)) $ sort testFiles
 
 
 makeTest :: FilePath -> Spec

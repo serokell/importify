@@ -15,16 +15,20 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Importify.Cabal
-                       Importify.Cache
-                       Importify.Common
                        Importify.CPP
+                       Importify.Paths
                        Importify.Resolution
+                       Importify.Syntax
                        Importify.Tree
+
+                       -- Main functions used by commands
                        Importify.Main
+                       Importify.Main.Cache
+                       Importify.Main.File
   build-depends:       base >= 4.7 && < 5
                      , aeson
-                     , Cabal
                      , bytestring
+                     , Cabal
                      , containers
                      , directory
                      , filepath
@@ -40,7 +44,7 @@ library
                      , universum
                      , unordered-containers
   default-language:    Haskell2010
-  ghc-options:         -Wall -fno-warn-orphans
+  ghc-options:         -Wall
 
   -- linker speed up for linux
   if os(linux)
