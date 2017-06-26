@@ -82,7 +82,7 @@ collectLibraryMaps lib =
 collectExecutableMaps :: String -> Executable -> (TargetMap, ExtensionsMap)
 collectExecutableMaps exeName exe =
     collectModuleMaps ("executable " ++ exeName)
-                      (exePath:(map toFilePath $ exeModules exe))
+                      (exePath:map toFilePath (exeModules exe))
                       (defaultExtensions $ buildInfo exe)
   where
     exePath = dropExtension $ modulePath exe

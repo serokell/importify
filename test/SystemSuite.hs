@@ -17,15 +17,14 @@ import           Importify.Syntax      (Identifier (..), parseForImports)
 main :: IO ()
 main = do
     testFiles <- filter (\file ->
-                             (isPrefixOf "Test" file) &&
-                             (isSuffixOf ".hs" file))
-                    <$> (listDirectory $ toString testDirectory)
+                             "Test" `isPrefixOf` file &&
+                             ".hs"  `isSuffixOf` file)
+                    <$> listDirectory (toString testDirectory)
     hspec $ spec testFiles
 
 spec :: [FilePath] -> Spec
-spec testFiles = do
-    describe "importify file" $ do
-        mapM_ (makeTest . (toString testDirectory ++)) $ sort testFiles
+spec testFiles = describe "importify file" $
+    mapM_ (makeTest . (toString testDirectory ++)) $ sort testFiles
 
 
 makeTest :: FilePath -> Spec

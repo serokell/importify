@@ -91,7 +91,7 @@ annotateModule ast environment =
     let (Module l mhead mpragmas _mimports mdecls) = annotate environment ast
     in toList (Module l mhead mpragmas [] mdecls)
 
-collectUnusedIds :: Module SrcSpanInfo -> [ImportDecl SrcSpanInfo] -> IO ([Identifier])
+collectUnusedIds :: Module SrcSpanInfo -> [ImportDecl SrcSpanInfo] -> IO [Identifier]
 collectUnusedIds ast imports = do
     environment <- loadEnvironment
     let annotations = annotateModule ast environment

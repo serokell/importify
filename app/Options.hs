@@ -22,8 +22,8 @@ data Command
     | CabalCache CabalCacheOptions
     deriving (Show)
 
-data SingleFileOptions = SingleFileOptions
-    { sfoFilename    :: !FilePath -- ^ File to apply the tool to
+newtype SingleFileOptions = SingleFileOptions
+    { sfoFilename    :: FilePath -- ^ File to apply the tool to
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
