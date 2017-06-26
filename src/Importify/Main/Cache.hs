@@ -6,26 +6,31 @@ module Importify.Main.Cache
 
 import           Universum
 
-import           Data.Aeson             (encode)
-import qualified Data.ByteString.Lazy   as BS
-import qualified Data.Map               as Map
+import           Data.Aeson                      (encode)
+import qualified Data.ByteString.Lazy            as BS
+import qualified Data.Map                        as Map
 
-import           Language.Haskell.Exts  (ModuleName (..))
-import           Language.Haskell.Names (writeSymbols)
-import           Path                   (fromAbsDir, fromAbsFile, parseAbsDir,
-                                         parseRelDir, parseRelFile, (</>))
-import           System.Directory       (createDirectoryIfMissing, getCurrentDirectory,
-                                         listDirectory, removeDirectoryRecursive)
-import           System.FilePath        (dropExtension, takeFileName)
-import           Turtle                 (cd, shell)
+import           Distribution.PackageDescription (Library)
+import           Language.Haskell.Exts           (Extension, Module, ModuleName (..),
+                                                  SrcSpanInfo)
+import           Language.Haskell.Names          (writeSymbols)
+import           Path                            (Dir, Path, Rel, fromAbsDir, fromAbsFile,
+                                                  parseAbsDir, parseRelDir, parseRelFile,
+                                                  (</>))
+import           System.Directory                (createDirectoryIfMissing,
+                                                  getCurrentDirectory, listDirectory,
+                                                  removeDirectoryRecursive)
+import           System.FilePath                 (dropExtension, takeFileName)
+import           Turtle                          (cd, shell)
 
-import           Importify.Cabal        (getExtensionMaps, getLibs, getLibs, modulePaths,
-                                         readCabal, splitOnExposedAndOther, withLibrary)
-import           Importify.CPP          (parseModuleFile)
-import           Importify.Paths        (cacheDir, cachePath, extensionsFile,
-                                         guessCabalName, modulesFile, symbolsPath,
-                                         targetsFile)
-import           Importify.Resolution   (resolveModules)
+import           Importify.Cabal                 (getExtensionMaps, getLibs, getLibs,
+                                                  modulePaths, readCabal,
+                                                  splitOnExposedAndOther, withLibrary)
+import           Importify.CPP                   (parseModuleFile)
+import           Importify.Paths                 (cacheDir, cachePath, extensionsFile,
+                                                  guessCabalName, modulesFile,
+                                                  symbolsPath, targetsFile)
+import           Importify.Resolution            (resolveModules)
 
 -- | Caches packages information into local .importify directory.
 doCache :: FilePath -> Bool -> IO ()
@@ -70,13 +75,10 @@ doCache filepath preserve = do
             let packageCachePath = symbolsCachePath </> packagePath
             createDirectoryIfMissing True $ fromAbsDir packageCachePath
 
-            modPaths   <- modulePaths packagePath library
-            modEithers <- mapM (parseModuleFile cabalExtensions) modPaths
-            let (errors, libModules) = partitionEithers modEithers
-
-            whenNotNull errors $ \messages -> do
-                putText $ " * Next errors occured during caching of package: " <> toText libName
-                for_ messages putText
+            (errors, libModules) <- parsedModulesWithErrors packagePath
+                                                            library
+                                                            cabalExtensions
+            reportErrorsIfAny errors libName
 
             let (exposedModules, otherModules) = splitOnExposedAndOther library libModules
             let resolvedModules = resolveModules exposedModules otherModules
@@ -99,3 +101,17 @@ doCache filepath preserve = do
     BS.writeFile modulesFile $ encode importsMap
 
     cd ".."
+
+parsedModulesWithErrors :: Path Rel Dir
+                        -> Library
+                        -> [Extension]
+                        -> IO ([Text], [Module SrcSpanInfo])
+parsedModulesWithErrors packagePath library cabalExtensions = do
+    modPaths   <- modulePaths packagePath library
+    modEithers <- mapM (parseModuleFile cabalExtensions) modPaths
+    pure $ partitionEithers modEithers
+
+reportErrorsIfAny :: [Text] -> String -> IO ()
+reportErrorsIfAny errors libName = whenNotNull errors $ \messages -> do
+    putText $ " * Next errors occured during caching of package: " <> toText libName
+    forM_ messages putText
