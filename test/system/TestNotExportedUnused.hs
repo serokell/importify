@@ -1,7 +1,7 @@
--- bool
+-- not
 module TestNotExportedUnused where
 
-import           Data.Bool (bool)
+import           Data.Bool (not)
 
 main :: IO ()
 main = pure ()

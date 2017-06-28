@@ -11,11 +11,13 @@ import           Language.Haskell.Exts (ImportDecl (..), ModuleHeadAndImports (.
 import           System.Directory      (listDirectory)
 import           Test.Hspec            (Spec, describe, hspec, runIO, shouldBe, specify)
 
-import           Importify.Main        (collectUnusedIds, doSource)
+import           Importify.Main        (collectUnusedIds, doCache, doSource)
 import           Importify.Syntax      (Identifier (..), parseForImports)
 
 main :: IO ()
 main = do
+    doCache "importify.cabal"  -- TODO: temporal workaround to make tests work;
+            False              --       to be removed after enhancing test system
     testFiles <- filter (\file ->
                              "Test" `isPrefixOf` file &&
                              ".hs"  `isSuffixOf` file)
