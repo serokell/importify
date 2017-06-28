@@ -1,8 +1,8 @@
--- &&, ||, otherwise, bool
+-- &&, ||, otherwise
 -- import Data.Bool (not)
 module TestLongSpec where
 
-import Data.Bool (bool, not, otherwise, (&&), (||))
+import           Data.Bool (not, otherwise, (&&), (||))
 
 func = not
 
