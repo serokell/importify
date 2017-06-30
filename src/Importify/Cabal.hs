@@ -33,7 +33,8 @@ import           Distribution.Verbosity                (normal)
 import           Language.Haskell.Extension            (Extension (..),
                                                         KnownExtension (..))
 import qualified Language.Haskell.Exts                 as HSE
-import           Path                                  (Dir, File, Path, Rel, fromRelFile,
+import           Path                                  (Abs, Dir, File, Path, Rel,
+                                                        fromAbsFile, fromRelFile,
                                                         parseRelDir, parseRelFile, (</>))
 import           System.Directory                      (doesFileExist)
 import           System.FilePath.Posix                 (dropExtension)
@@ -130,7 +131,7 @@ withLibrary GenericPackageDescription{..} action =
           condLibrary
 
 -- | Returns list of relative paths to both /exposed/ and /other/ modules.
-modulePaths :: Path Rel Dir -> Library -> IO [Path Rel File]
+modulePaths :: Path Abs Dir -> Library -> IO [Path Abs File]
 modulePaths packagePath Library{..} = do
     let sourceDirs = hsSourceDirs libBuildInfo
     let (cur, others) = partition (== ".") sourceDirs
@@ -145,24 +146,24 @@ modulePaths packagePath Library{..} = do
     libModulePaths :: IO [Path Rel File]
     libModulePaths = mapM (parseRelFile . (++ ".hs") . toFilePath) thisLibModules
 
-    addDir :: Path Rel Dir -> [Path Rel File] -> [Path Rel File]
+    addDir :: Path Abs Dir -> [Path Rel File] -> [Path Abs File]
     addDir dir = map (dir </>)
 
-    collectModulesHere :: IO [Path Rel File]
+    collectModulesHere :: IO [Path Abs File]
     collectModulesHere = do
         paths <- libModulePaths
         let packagePaths = addDir packagePath paths
         keepExistingModules packagePaths
 
-    collectModulesThere :: [FilePath] -> IO [Path Rel File]
+    collectModulesThere :: [FilePath] -> IO [Path Abs File]
     collectModulesThere dirs = do
         dirPaths <- mapM parseRelDir dirs
         modPaths <- libModulePaths
         concatForM dirPaths $ \dir ->
           keepExistingModules $ addDir (packagePath </> dir) modPaths
 
-    keepExistingModules :: [Path Rel File] -> IO [Path Rel File]
-    keepExistingModules = filterM (doesFileExist . fromRelFile)
+    keepExistingModules :: [Path Abs File] -> IO [Path Abs File]
+    keepExistingModules = filterM (doesFileExist . fromAbsFile)
 
 showExt :: Extension -> String
 showExt (EnableExtension ext)   = show ext
