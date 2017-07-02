@@ -15,7 +15,8 @@ import           Universum
 
 import           Options.Applicative (Parser, ParserInfo, argument, command, execParser,
                                       fullDesc, help, helper, info, long, metavar,
-                                      progDesc, short, str, subparser, switch)
+                                      progDesc, short, str, strArgument, strOption,
+                                      subparser, switch)
 
 data Command
     = SingleFile SingleFileOptions
@@ -27,8 +28,9 @@ newtype SingleFileOptions = SingleFileOptions
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
-    { ccoFilename :: !FilePath -- ^ Path to .cabal file
-    , ccoPreserve :: !Bool     -- ^ Don't delete downloaded package cache
+    { ccoFilename     :: !FilePath -- ^ Path to .cabal file
+    , ccoPreserve     :: !Bool     -- ^ Don't delete downloaded package cache
+    , ccoDependencies :: ![String] -- ^ Use specified dependencies overriding .cabal ones
     } deriving (Show)
 
 optionsParser :: Parser Command
@@ -41,20 +43,25 @@ optionsParser = subparser $
 
 fileParser :: Parser Command
 fileParser = do
-    sfoFilename <- argument str $
+    sfoFilename <- strArgument $
         metavar "FILE" <>
         help "File to importify"
     pure $ SingleFile SingleFileOptions{..}
 
 cacheParser :: Parser Command
 cacheParser = do
-    ccoFilename <- argument str $
+    ccoFilename <- strArgument $
         metavar "FILE" <>
         help "Path to .cabal file"
     ccoPreserve <- switch $
         long "preserve" <>
         short 'p' <>
         help "Don't remove downloaded package cache"
+    ccoDependencies <- many $ strOption $
+        metavar "STRING" <>
+        long "dependency" <>
+        short 'd' <>
+        help "List of manually specified dependencies that should be used instead of .cabal file"
     pure $ CabalCache CabalCacheOptions{..}
 
 optsInfo :: ParserInfo Command

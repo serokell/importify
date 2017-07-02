@@ -18,6 +18,7 @@ main :: IO ()
 main = do
     doCache "importify.cabal"  -- TODO: temporal workaround to make tests work;
             False              --       to be removed after enhancing test system
+            []
     testFiles <- filter (\file ->
                              "Test" `isPrefixOf` file &&
                              ".hs"  `isSuffixOf` file)
