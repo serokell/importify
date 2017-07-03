@@ -37,6 +37,7 @@ library
                      , haskell-src-exts
                      , hse-cpp
                      , path
+                     , pretty-show
                      , syb
                      , text
                      , text-format

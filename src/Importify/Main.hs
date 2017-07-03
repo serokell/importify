@@ -1,8 +1,6 @@
 module Importify.Main
-       ( doFile
-       , doSource
-       , doCache
-       , collectUnusedIds
+       ( module Importify.Main.Cache
+       , module Importify.Main.File
        ) where
 
 import           Importify.Main.Cache
