@@ -1,7 +1,7 @@
 {-| Tool for managing import sections.
 
     Remove redundant imports algorithm (current version):
-      1. For every import declaration that in @baseEnvironment@
+      1. For every import declaration that in @loadEnvironment@
          traverse list of import names and collect those that are not in module.
       2. Remove every name from corresponding imports lists.
       3. Print new modified version of file with imports changed.
@@ -29,4 +29,4 @@ importifySingleFile SingleFileOptions{..} =
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =
-    doCache ccoFilename ccoPreserve
+    doCache ccoFilename ccoPreserve ccoDependencies

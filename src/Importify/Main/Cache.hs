@@ -37,8 +37,8 @@ import           Importify.Paths                 (cacheDir, cachePath, extension
 import           Importify.Resolution            (resolveModules)
 
 -- | Caches packages information into local .importify directory.
-doCache :: FilePath -> Bool -> IO ()
-doCache filepath preserve = do
+doCache :: FilePath -> Bool -> [String] -> IO ()
+doCache filepath preserve overrideDependencies = do
     projectCabalDesc <- readCabal filepath
 
     curDir           <- getCurrentDirectory
@@ -57,7 +57,10 @@ doCache filepath preserve = do
 
     -- Libraries
     let projectName = dropExtension $ takeFileName filepath
-    let libs = filter (\p -> p /= "base" && p /= projectName) $ getLibs projectCabalDesc
+    let fetchedLibs = filter (\p -> p /= "base" && p /= projectName) $ getLibs projectCabalDesc
+    let libs        = if null overrideDependencies
+                      then fetchedLibs
+                      else overrideDependencies
     print libs
 
     -- download & unpack sources, then cache and delete

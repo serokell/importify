@@ -1,18 +1,22 @@
+{-# LANGUAGE ViewPatterns #-}
+
 module Importify.Tree
-       ( removeIdentifiers
-       , cleanQuals
+       ( cleanQuals
+       , removeSymbols
        ) where
 
 import           Universum
 
-import           Data.Generics.Aliases (mkT)
-import           Data.Generics.Schemes (everywhere)
-import           Data.List             (notElem)
-import           Language.Haskell.Exts (ImportDecl (..), ImportSpec (..),
-                                        ImportSpecList (..), ModuleName (..), Name (..),
-                                        Namespace (..), SrcSpanInfo)
+import           Data.Generics.Aliases  (mkT)
+import           Data.Generics.Schemes  (everywhere)
+import           Data.List              (notElem)
+import           Language.Haskell.Exts  (CName, ImportDecl (..), ImportSpec (..),
+                                         ImportSpecList (..), ModuleName (..), Name (..),
+                                         Namespace (..), SrcSpanInfo)
+import           Language.Haskell.Names (NameInfo (..), Scoped (..))
+import qualified Language.Haskell.Names as N
 
-import           Importify.Syntax      (Identifier, cnameToIdentifier, nameToIdentifier)
+import           Importify.Syntax       (InScoped, pullScopedInfo)
 
 -- | Remove unused qualified renaming imports
 cleanQuals :: [ModuleName SrcSpanInfo] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
@@ -25,61 +29,101 @@ qualModNeeded usedQuals ImportDecl{..} =
                      name `elem` usedQuals
         Nothing   -> True
 
--- | Remove a list of identifiers from ImportDecls.
-removeIdentifiers :: [Identifier] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
-removeIdentifiers ids decls =
+-- | Remove a list of identifiers from 'ImportDecl's.
+-- Next algorithm is used:
+--
+-- 1. Remove all identifiers inside specified list of types.
+--    If list becomes empty then only type left.
+-- @
+--   import Module.Name (Type (HERE)) ⇒ import Module.Name (Type)
+-- @
+--
+-- 2. Traverse every 'ImportSpec's and check matching with symbols.
+-- @
+--   import Module.Name (Type (something), HERE) ⇒ import Module.Name (Type (something))
+-- @
+--
+-- 3. Translate empty imports into implicit import.
+-- @
+--    import Module.Name () ⇒ import Module.Name
+-- @
+--
+-- 4. Remove all implicit imports preserving only initially implicit or empty.
+--
+removeSymbols :: [N.Symbol]            -- ^ List of symbols which should be removed
+              -> [InScoped ImportDecl] -- ^ Imports to be purified
+              -> [InScoped ImportDecl]
+removeSymbols symbols decls =
     (volatileImports ++) $
     cleanDecls $
     everywhere (mkT traverseToClean) $
-    everywhere (mkT $ traverseToRemove ids) $
-    everywhere (mkT $ traverseToRemoveThing ids)
+    everywhere (mkT $ traverseToRemove symbols) $
+    everywhere (mkT $ traverseToRemoveThing symbols)
     decls
   where
     volatileImports = filter isVolatileImport decls
 
--- | Returns True if the import is of either of the forms:
--- import Foo ()
--- import Foo
-isVolatileImport :: ImportDecl SrcSpanInfo -> Bool
+-- | Returns 'True' if the import is of either of the forms:
+-- @
+--   import Foo ()
+--   import Foo
+-- @
+--
+isVolatileImport :: InScoped ImportDecl -> Bool
 isVolatileImport ImportDecl{ importSpecs = Just (ImportSpecList _ _ []) } = True
 isVolatileImport ImportDecl{ importSpecs = Nothing }                      = True
 isVolatileImport _                                                        = False
 
--- | Traverses ImportDecls to remove identifiers from IThingWith specs
-traverseToRemoveThing :: [Identifier] -> ImportSpec SrcSpanInfo -> ImportSpec SrcSpanInfo
-traverseToRemoveThing ids (IThingWith l name cnames) =
+-- | Traverses 'ImportDecl's to remove symbols from 'IThingWith' specs.
+traverseToRemoveThing :: [N.Symbol]
+                      -> InScoped ImportSpec
+                      -> InScoped ImportSpec
+traverseToRemoveThing symbols (IThingWith l name cnames) =
     case newCnames of
         [] -> IAbs l (NoNamespace l) name
         _  -> IThingWith l name newCnames
   where
-    newCnames = filter (\cname -> cnameToIdentifier cname `notElem` ids) cnames
+    newCnames = filter isCNameNotInSymbols cnames
+
+    isCNameNotInSymbols :: InScoped CName -> Bool
+    isCNameNotInSymbols (pullScopedInfo -> GlobalSymbol symbol _) = symbol `notElem` symbols
+    isCNameNotInSymbols _                                         = False
 traverseToRemoveThing _ spec = spec
 
 -- | Traverses ImportDecls to remove identifiers from ImportSpecs
-traverseToRemove :: [Identifier] -> ImportSpecList SrcSpanInfo -> ImportSpecList SrcSpanInfo
+traverseToRemove :: [N.Symbol]
+                 -> InScoped ImportSpecList
+                 -> InScoped ImportSpecList
 traverseToRemove _ specs@(ImportSpecList _ True _) = specs -- Don't touch @hiding@ imports
-traverseToRemove ids     (ImportSpecList l False specs) =
-    ImportSpecList l False (filter (specNeeded ids) specs)
+traverseToRemove symbols (ImportSpecList l False specs) =
+    ImportSpecList l False (filter (isSpecNeeded symbols) specs)
 
-specNeeded :: [Identifier] -> ImportSpec SrcSpanInfo -> Bool
-specNeeded ids (IVar _ name)          = idElem name ids
-specNeeded ids (IAbs _ _ name)        = idElem name ids
-specNeeded ids (IThingAll _ name)     = idElem name ids
-specNeeded ids (IThingWith _ name []) = idElem name ids
-specNeeded _   (IThingWith _ _ (_:_)) = True -- Do not remove if cnames list is not empty
+-- | Returns 'False' if 'ImportSpec' is not needed.
+isSpecNeeded :: [N.Symbol] -> InScoped ImportSpec -> Bool
+isSpecNeeded symbols (IVar _ name)          = isNameNeeded name symbols
+isSpecNeeded symbols (IAbs _ _ name)        = isNameNeeded name symbols
+isSpecNeeded symbols (IThingAll _ name)     = isNameNeeded name symbols
+isSpecNeeded symbols (IThingWith _ name []) = isNameNeeded name symbols
+isSpecNeeded _       (IThingWith _ _ (_:_)) = True -- Do not remove if cnames list is not empty
 
-idElem :: Name SrcSpanInfo -> [Identifier] -> Bool
-idElem name = notElem (nameToIdentifier name)
+-- | Returns 'False' if 'Name' is not needed. On top level
+-- elements inside 'ImportSpec' annotated by 'ImportPart'. But
+-- this constructor contains list of symbols. So it's needed if
+-- at least one element inside list is needed.
+isNameNeeded :: InScoped Name -> [N.Symbol] -> Bool
+isNameNeeded (pullScopedInfo -> ImportPart symbols) unusedSymbols =
+    any (`notElem` unusedSymbols) symbols
+isNameNeeded _  _                                    =
+    True
 
 -- | Traverses ImportDecls to remove empty import specs
-traverseToClean :: ImportDecl SrcSpanInfo -> ImportDecl SrcSpanInfo
+traverseToClean :: InScoped ImportDecl -> InScoped ImportDecl
 traverseToClean decl@ImportDecl{ importSpecs = Just (ImportSpecList _ _ []) } =
     decl { importSpecs = Nothing }
 traverseToClean decl = decl
 
-cleanDecls :: [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
+cleanDecls :: [InScoped ImportDecl] -> [InScoped ImportDecl]
 cleanDecls = filter declNeeded
   where
-    declNeeded :: ImportDecl SrcSpanInfo -> Bool
-    declNeeded ImportDecl{importSpecs = Nothing} = False
-    declNeeded _                                 = True
+    declNeeded :: InScoped ImportDecl -> Bool
+    declNeeded = isJust . importSpecs

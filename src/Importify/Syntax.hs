@@ -1,54 +1,47 @@
+{-# LANGUAGE LambdaCase   #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Common utilities for import list processing
 
 module Importify.Syntax
-       ( Identifier (..)
-       , cnameToIdentifier
+       ( InScoped
        , getImportModuleName
+       , getModuleNameId
        , getModuleTitle
        , getSourceModuleName
-       , importSpecToIdentifiers
        , importSlice
-       , nameToIdentifier
        , parseForImports
+       , pullScopedInfo
+       , scopedNameInfo
+       , unscope
+
+       , debugAST
        ) where
 
 import           Universum
 
 import qualified Data.List.NonEmpty                 as NE
-import           Language.Haskell.Exts              (CName (..), Extension,
-                                                     ImportDecl (..), ImportSpec (..),
-                                                     Module (..), ModuleName,
-                                                     ModuleName (..), Name (..),
-                                                     NonGreedy (..), ParseResult (..),
+import           Language.Haskell.Exts              (Annotated (ann), CName (..),
+                                                     Extension, ImportDecl (..),
+                                                     ImportSpec (..), Module (..),
+                                                     ModuleName, ModuleName (..),
+                                                     Name (..), NonGreedy (..),
+                                                     ParseResult (..),
                                                      PragmasAndModuleName (..),
                                                      SrcSpan (..), SrcSpanInfo (..),
                                                      combSpanInfo, fromParseResult, parse,
                                                      parseFileContentsWithExts)
+import           Language.Haskell.Names             (NameInfo, Scoped (..))
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
+import           Text.Show.Pretty                   (ppShow)
+
+-- | Short wrapper for types annotated by @Scoped SrcSpanInfo@.
+-- For example, use @InScoped ImportDecl@ instead of @ImportDecl (Scoped SrcSpanInfo)@.
+type InScoped t = t (Scoped SrcSpanInfo)
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
 getImportModuleName :: ImportDecl l -> ModuleName ()
 getImportModuleName ImportDecl{..} = () <$ importModule
-
--- | Data type that represents function, operator, type or constructor identifier.
-newtype Identifier = Identifier { getIdentifier :: String }
-    deriving (Show, Eq, Ord)
-
-nameToIdentifier :: Name l -> Identifier
-nameToIdentifier (Ident  _ name) = Identifier name
-nameToIdentifier (Symbol _ name) = Identifier name
-
-cnameToIdentifier :: CName l -> Identifier
-cnameToIdentifier (VarName _ name) = nameToIdentifier name
-cnameToIdentifier (ConName _ name) = nameToIdentifier name
-
-importSpecToIdentifiers :: ImportSpec l -> [Identifier]
-importSpecToIdentifiers (IVar _ name)              = [nameToIdentifier name]
-importSpecToIdentifiers (IAbs _ _ name)            = [nameToIdentifier name]
-importSpecToIdentifiers (IThingAll _ name)         = [nameToIdentifier name]
-importSpecToIdentifiers (IThingWith _ name cnames) = nameToIdentifier name:map cnameToIdentifier cnames
 
 startAndEndLines :: SrcSpanInfo -> (Int, Int)
 startAndEndLines (SrcSpanInfo SrcSpan{..} _) = (srcSpanStartLine, srcSpanEndLine)
@@ -82,3 +75,27 @@ parseForImports exts fileContent = (ast, imports)
 -- | Returns name of 'Module' as a 'String'.
 getModuleTitle :: Module l -> String
 getModuleTitle (getModuleName -> ModuleName _ name) = name
+
+-- | Get name of module by dropping annonation.
+getModuleNameId :: ModuleName l -> String
+getModuleNameId (ModuleName _ id) = id
+
+-- | Retrive 'NameInfo' from 'Scoped'.
+scopedNameInfo :: Scoped l -> NameInfo l
+scopedNameInfo (Scoped info _) = info
+
+-- | Retrive 'NameInfo' from something annotated by 'Scoped'.
+pullScopedInfo :: Annotated ast => ast (Scoped l) -> NameInfo l
+pullScopedInfo = scopedNameInfo . ann
+
+-- | Drop 'Scoped' annotation from 'Functor' type.
+unscope :: Functor f => f (Scoped l) -> f l
+unscope = fmap $ \case Scoped _ l -> l
+
+-- | Helper function to debug different parts of AST processing.
+-- TODO: remove when logging appear.
+{-# WARNING debugAST "'debugAST' remains in code" #-}
+debugAST :: Show a => Text -> a -> IO ()
+debugAST header msg = do
+    putText $ "-------------------- // " <> header <> " // --------------------"
+    putText $ toText $ ppShow msg

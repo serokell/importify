@@ -20,5 +20,6 @@ cabal.project.local
 .HTF/
 
 *~
-haskell-names-0.8.0/
 .importify/
+temp.txt
+test/ManualTestForDebugging.hs
