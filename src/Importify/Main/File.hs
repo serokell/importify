@@ -36,6 +36,7 @@ import           Importify.Cabal                    (ExtensionsMap, TargetMap,
 import           Importify.Paths                    (cacheDir, cachePath, extensionsFile,
                                                      modulesPath, symbolsPath,
                                                      targetsFile)
+import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedSymbols,
                                                      removeUnusedQualifiedAsImports)
 import           Importify.Syntax                   (debugAST, getModuleNameId,
@@ -57,12 +58,13 @@ doSource src = do
         Just (start, end) -> do
             let codeLines        = lines src
             let (preamble, rest) = splitAt (start - 1) codeLines
-            let (_, decls)       = splitAt (end - start + 1) rest
+            let (impText, decls) = splitAt (end - start + 1) rest
 
-            newImports <- collectAndRemoveUnusedSymbols ast imports
+            newImports          <- collectAndRemoveUnusedSymbols ast imports
+            let printedImports   = printLovelyImports start end impText newImports
 
             pure $ unlines preamble
-                <> toText (unlines $ map (toText . prettyPrint) newImports)
+                <> unlines printedImports
                 <> unlines decls
 
         Nothing -> pure src

@@ -17,6 +17,7 @@ library
   exposed-modules:     Importify.Cabal
                        Importify.CPP
                        Importify.Paths
+                       Importify.Pretty
                        Importify.Resolution
                        Importify.Syntax
                        Importify.Tree
