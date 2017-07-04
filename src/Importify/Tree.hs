@@ -1,8 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Importify.Tree
-       ( cleanQuals
-       , removeSymbols
+       ( removeSymbols
        ) where
 
 import           Universum
@@ -17,17 +16,6 @@ import           Language.Haskell.Names (NameInfo (..), Scoped (..))
 import qualified Language.Haskell.Names as N
 
 import           Importify.Syntax       (InScoped, pullScopedInfo)
-
--- | Remove unused qualified renaming imports
-cleanQuals :: [ModuleName SrcSpanInfo] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
-cleanQuals usedQuals = filter (qualModNeeded usedQuals)
-
-qualModNeeded :: [ModuleName SrcSpanInfo] -> ImportDecl SrcSpanInfo -> Bool
-qualModNeeded usedQuals ImportDecl{..} =
-    case importAs of
-        Just name -> isJust importSpecs ||
-                     name `elem` usedQuals
-        Nothing   -> True
 
 -- | Remove a list of identifiers from 'ImportDecl's.
 -- Next algorithm is used:

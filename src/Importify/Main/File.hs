@@ -11,12 +11,15 @@ import           Universum
 import           Data.Aeson                         (decode)
 import qualified Data.ByteString.Lazy               as BS
 import qualified Data.HashMap.Strict                as HM
+import           Data.List                          ((\\))
 import qualified Data.Map                           as Map
+import           Data.Maybe                         (fromJust)
 
 import           Language.Haskell.Exts              (Extension, ImportDecl (importModule, importSpecs),
                                                      Module (..), ModuleName (..),
                                                      Name (..), QName (..), SrcSpanInfo,
-                                                     parseExtension, prettyPrint)
+                                                     exactPrint, parseExtension,
+                                                     prettyPrint)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols, symbolName)
 
@@ -34,11 +37,11 @@ import           Importify.Paths                    (cacheDir, cachePath, extens
                                                      modulesPath, symbolsPath,
                                                      targetsFile)
 import           Importify.Resolution               (collectUnusedSymbols,
-                                                     collectUsedQuals)
+                                                     removeUnusedQualifiedAsImports)
 import           Importify.Syntax                   (debugAST, getModuleNameId,
                                                      getSourceModuleName, importSlice,
                                                      parseForImports, unscope)
-import           Importify.Tree                     (cleanQuals, removeSymbols)
+import           Importify.Tree                     (removeSymbols)
 
 doFile :: FilePath -> IO ()
 doFile = readFile >=> doSource >=> putText
@@ -56,7 +59,7 @@ doSource src = do
             let (preamble, rest) = splitAt (start - 1) codeLines
             let (_, decls)       = splitAt (end - start + 1) rest
 
-            (_, newImports) <- collectAndRemoveUnusedSymbols ast imports
+            newImports <- collectAndRemoveUnusedSymbols ast imports
 
             pure $ unlines preamble
                 <> toText (unlines $ map (toText . prettyPrint) newImports)
@@ -90,7 +93,7 @@ readExtensionMaps = do
 collectAndRemoveUnusedSymbols
     :: Module SrcSpanInfo        -- ^ Module where symbols should be removed
     -> [ImportDecl SrcSpanInfo]  -- ^ Imports from module
-    -> IO ([N.Symbol], [ImportDecl SrcSpanInfo])
+    -> IO [ImportDecl SrcSpanInfo]
 collectAndRemoveUnusedSymbols ast imports = do
     environment       <- loadEnvironment
     let table          = importTable environment ast
@@ -99,13 +102,12 @@ collectAndRemoveUnusedSymbols ast imports = do
 
     -- ordNub needed because name can occur as Qual and as UnQual
     -- but we don't care about qualification
-    let unusedSymbols = ordNub $ collectUnusedSymbols annotations table
-    let withoutUnusedSymbols = removeSymbols unusedSymbols annotatedDecls
-    -- let usedQuals  = collectUsedQuals imports annotations
-    {- cleanQuals usedQuals $ -}
-    let newImports = map unscope withoutUnusedSymbols
+    let unusedSymbols        = ordNub $ collectUnusedSymbols annotations table
+    let withoutUnusedSymbols = map unscope $ removeSymbols unusedSymbols annotatedDecls
+    let withoutUnusedQualsAs = removeUnusedQualifiedAsImports withoutUnusedSymbols
+                                                              annotations
 
-    return (unusedSymbols, newImports)
+    return withoutUnusedQualsAs
 
 loadEnvironment :: IO Environment
 loadEnvironment = do
