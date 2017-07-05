@@ -26,6 +26,8 @@ library
                        Importify.Main
                        Importify.Main.Cache
                        Importify.Main.File
+  other-modules:       Extended.Data.List
+
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , bytestring

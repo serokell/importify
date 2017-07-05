@@ -8,10 +8,11 @@ import           Universum
 
 import           Data.Generics.Aliases  (mkT)
 import           Data.Generics.Schemes  (everywhere)
-import           Data.List              (notElem)
+import           Data.List              (notElem, partition)
+import           Extended.Data.List     (removeAtMultiple)
 import           Language.Haskell.Exts  (CName, ImportDecl (..), ImportSpec (..),
                                          ImportSpecList (..), ModuleName (..), Name (..),
-                                         Namespace (..), SrcSpanInfo)
+                                         Namespace (..), SrcSpanInfo (..))
 import           Language.Haskell.Names (NameInfo (..), Scoped (..))
 import qualified Language.Haskell.Names as N
 
@@ -83,8 +84,19 @@ traverseToRemove :: [N.Symbol]
                  -> InScoped ImportSpecList
                  -> InScoped ImportSpecList
 traverseToRemove _ specs@(ImportSpecList _ True _) = specs -- Don't touch @hiding@ imports
-traverseToRemove symbols (ImportSpecList l False specs) =
-    ImportSpecList l False (filter (isSpecNeeded symbols) specs)
+traverseToRemove symbols
+                 (ImportSpecList (Scoped ni SrcSpanInfo{..}) notHiding specs)
+  =
+    let indexedSpecs = zip [1..] specs
+        (neededSpecs, unusedSpecs) = partition (isSpecNeeded symbols . snd)
+                                               indexedSpecs
+        pointsCount = length srcInfoPoints
+        unusedIds   = filter (< pointsCount)  -- don't remove index of ')'
+                    $ map fst unusedSpecs
+        newPoints   = removeAtMultiple unusedIds srcInfoPoints
+    in ImportSpecList (Scoped ni (SrcSpanInfo srcInfoSpan newPoints))
+                      notHiding
+                      (map snd neededSpecs)
 
 -- | Returns 'False' if 'ImportSpec' is not needed.
 isSpecNeeded :: [N.Symbol] -> InScoped ImportSpec -> Bool
