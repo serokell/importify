@@ -1,33 +1,22 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Importify.Tree
-       ( cleanQuals
-       , removeSymbols
+       ( removeSymbols
        ) where
 
 import           Universum
 
 import           Data.Generics.Aliases  (mkT)
 import           Data.Generics.Schemes  (everywhere)
-import           Data.List              (notElem)
+import           Data.List              (notElem, partition)
+import           Extended.Data.List     (removeAtMultiple)
 import           Language.Haskell.Exts  (CName, ImportDecl (..), ImportSpec (..),
                                          ImportSpecList (..), ModuleName (..), Name (..),
-                                         Namespace (..), SrcSpanInfo)
+                                         Namespace (..), SrcSpanInfo (..))
 import           Language.Haskell.Names (NameInfo (..), Scoped (..))
 import qualified Language.Haskell.Names as N
 
 import           Importify.Syntax       (InScoped, pullScopedInfo)
-
--- | Remove unused qualified renaming imports
-cleanQuals :: [ModuleName SrcSpanInfo] -> [ImportDecl SrcSpanInfo] -> [ImportDecl SrcSpanInfo]
-cleanQuals usedQuals = filter (qualModNeeded usedQuals)
-
-qualModNeeded :: [ModuleName SrcSpanInfo] -> ImportDecl SrcSpanInfo -> Bool
-qualModNeeded usedQuals ImportDecl{..} =
-    case importAs of
-        Just name -> isJust importSpecs ||
-                     name `elem` usedQuals
-        Nothing   -> True
 
 -- | Remove a list of identifiers from 'ImportDecl's.
 -- Next algorithm is used:
@@ -78,12 +67,23 @@ isVolatileImport _                                                        = Fals
 traverseToRemoveThing :: [N.Symbol]
                       -> InScoped ImportSpec
                       -> InScoped ImportSpec
-traverseToRemoveThing symbols (IThingWith l name cnames) =
+traverseToRemoveThing
+    symbols
+    (IThingWith (Scoped ni srcSpan@SrcSpanInfo{..}) name cnames)
+  =
     case newCnames of
-        [] -> IAbs l (NoNamespace l) name
-        _  -> IThingWith l name newCnames
+        [] -> IAbs (toScope emptySpan) (NoNamespace $ toScope emptySpan) name
+        _  -> IThingWith (toScope newSpanInfo) name newCnames
   where
-    newCnames = filter isCNameNotInSymbols cnames
+    emptySpan :: SrcSpanInfo
+    emptySpan = SrcSpanInfo srcInfoSpan []
+
+    toScope :: SrcSpanInfo -> Scoped SrcSpanInfo
+    toScope = Scoped ni
+
+    (newCnames, newSpanInfo) = removeSrcSpanInfoPoints isCNameNotInSymbols
+                                                       cnames
+                                                       srcSpan
 
     isCNameNotInSymbols :: InScoped CName -> Bool
     isCNameNotInSymbols (pullScopedInfo -> GlobalSymbol symbol _) = symbol `notElem` symbols
@@ -95,8 +95,29 @@ traverseToRemove :: [N.Symbol]
                  -> InScoped ImportSpecList
                  -> InScoped ImportSpecList
 traverseToRemove _ specs@(ImportSpecList _ True _) = specs -- Don't touch @hiding@ imports
-traverseToRemove symbols (ImportSpecList l False specs) =
-    ImportSpecList l False (filter (isSpecNeeded symbols) specs)
+traverseToRemove symbols
+                 (ImportSpecList (Scoped ni oldSpanInfo) notHiding specs)
+  = let (neededSpecs, newSpanInfo) = removeSrcSpanInfoPoints (isSpecNeeded symbols)
+                                                             specs
+                                                             oldSpanInfo
+    in ImportSpecList (Scoped ni newSpanInfo)
+                      notHiding
+                      neededSpecs
+
+-- | Removes 'SrcSpanInfo' points of deleted elements.
+removeSrcSpanInfoPoints :: (a -> Bool)  -- ^ Keep entitity?
+                        -> [a]          -- ^ List of entities
+                        -> SrcSpanInfo  -- ^ Span info with points
+                        -> ([a], SrcSpanInfo) -- ^ Kept entities and info w/o points
+removeSrcSpanInfoPoints shouldKeepEntity entities SrcSpanInfo{..} =
+    let indexedEntities = zip [1..] entities
+        (neededEntities, unusedEntities) = partition (shouldKeepEntity . snd)
+                                                     indexedEntities
+        pointsCount = length srcInfoPoints
+        unusedIds   = filter (< pointsCount)  -- don't remove index of ')'
+                    $ map fst unusedEntities
+        newPoints   = removeAtMultiple unusedIds srcInfoPoints
+    in (map snd neededEntities, SrcSpanInfo srcInfoSpan newPoints)
 
 -- | Returns 'False' if 'ImportSpec' is not needed.
 isSpecNeeded :: [N.Symbol] -> InScoped ImportSpec -> Bool

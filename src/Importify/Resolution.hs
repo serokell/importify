@@ -3,6 +3,7 @@
 module Importify.Resolution
        ( collectUnusedSymbols
        , collectUsedQuals
+       , removeUnusedQualifiedAsImports
        , resolveModules
        ) where
 
@@ -94,8 +95,19 @@ resolveModules exposedModules otherModules =
         exposedSymbols = M.assocs exposedEnv
     in exposedSymbols
 
+-- | Remove unused qualified as imports, i.e. in the next form:
+-- @
+--   import qualified Data.List as L
+-- @
+removeUnusedQualifiedAsImports :: [ImportDecl SrcSpanInfo]
+                               -> [Scoped SrcSpanInfo]
+                               -> [ImportDecl SrcSpanInfo]
+removeUnusedQualifiedAsImports imports annotations =
+    let usedQuals = collectUsedQuals imports annotations
+    in filter (qualifiedAsImportNeeded usedQuals) imports
+
 -- | Collect list of modules used for fully qualified names.
--- E.g. if it encounters "IO.putStrLn" it should collect ModuleName "IO"
+-- E.g. if it encounters "IO.putStrLn" it should collect @ModuleName "IO"@
 -- Used later to determine whether `as' import needed or not
 collectUsedQuals :: [ImportDecl SrcSpanInfo] -> [Scoped SrcSpanInfo] -> [ModuleName SrcSpanInfo]
 collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) annotations) quals
@@ -104,6 +116,16 @@ collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) anno
     quals = mapMaybe importAs $ filter (isNothing . importSpecs) imports
 
 qualUsed :: ModuleName SrcSpanInfo -> Scoped SrcSpanInfo -> Bool
-qualUsed (ModuleName _ name) (Scoped (GlobalSymbol _ (Qual _ (ModuleName _ usedName) _)) _) =
-    name == usedName
-qualUsed _ _                                                      = False
+qualUsed (ModuleName _ name)
+         (Scoped (GlobalSymbol _ (Qual _ (ModuleName _ usedName) _)) _)
+  = name == usedName
+qualUsed _ _ = False
+
+qualifiedAsImportNeeded :: [ModuleName SrcSpanInfo]
+                        -> ImportDecl SrcSpanInfo
+                        -> Bool
+qualifiedAsImportNeeded usedQuals ImportDecl{..} =
+    case importAs of
+        Just name -> isJust importSpecs
+                  || name `elem` usedQuals
+        Nothing   -> True
