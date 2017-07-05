@@ -67,12 +67,23 @@ isVolatileImport _                                                        = Fals
 traverseToRemoveThing :: [N.Symbol]
                       -> InScoped ImportSpec
                       -> InScoped ImportSpec
-traverseToRemoveThing symbols (IThingWith l name cnames) =
+traverseToRemoveThing
+    symbols
+    (IThingWith (Scoped ni srcSpan@SrcSpanInfo{..}) name cnames)
+  =
     case newCnames of
-        [] -> IAbs l (NoNamespace l) name
-        _  -> IThingWith l name newCnames
+        [] -> IAbs (toScope emptySpan) (NoNamespace $ toScope emptySpan) name
+        _  -> IThingWith (toScope newSpanInfo) name newCnames
   where
-    newCnames = filter isCNameNotInSymbols cnames
+    emptySpan :: SrcSpanInfo
+    emptySpan = SrcSpanInfo srcInfoSpan []
+
+    toScope :: SrcSpanInfo -> Scoped SrcSpanInfo
+    toScope = Scoped ni
+
+    (newCnames, newSpanInfo) = removeSrcSpanInfoPoints isCNameNotInSymbols
+                                                       cnames
+                                                       srcSpan
 
     isCNameNotInSymbols :: InScoped CName -> Bool
     isCNameNotInSymbols (pullScopedInfo -> GlobalSymbol symbol _) = symbol `notElem` symbols
@@ -85,18 +96,28 @@ traverseToRemove :: [N.Symbol]
                  -> InScoped ImportSpecList
 traverseToRemove _ specs@(ImportSpecList _ True _) = specs -- Don't touch @hiding@ imports
 traverseToRemove symbols
-                 (ImportSpecList (Scoped ni SrcSpanInfo{..}) notHiding specs)
-  =
-    let indexedSpecs = zip [1..] specs
-        (neededSpecs, unusedSpecs) = partition (isSpecNeeded symbols . snd)
-                                               indexedSpecs
+                 (ImportSpecList (Scoped ni oldSpanInfo) notHiding specs)
+  = let (neededSpecs, newSpanInfo) = removeSrcSpanInfoPoints (isSpecNeeded symbols)
+                                                             specs
+                                                             oldSpanInfo
+    in ImportSpecList (Scoped ni newSpanInfo)
+                      notHiding
+                      neededSpecs
+
+-- | Removes 'SrcSpanInfo' points of deleted elements.
+removeSrcSpanInfoPoints :: (a -> Bool)  -- ^ Keep entitity?
+                        -> [a]          -- ^ List of entities
+                        -> SrcSpanInfo  -- ^ Span info with points
+                        -> ([a], SrcSpanInfo) -- ^ Kept entities and info w/o points
+removeSrcSpanInfoPoints shouldKeepEntity entities SrcSpanInfo{..} =
+    let indexedEntities = zip [1..] entities
+        (neededEntities, unusedEntities) = partition (shouldKeepEntity . snd)
+                                                     indexedEntities
         pointsCount = length srcInfoPoints
         unusedIds   = filter (< pointsCount)  -- don't remove index of ')'
-                    $ map fst unusedSpecs
+                    $ map fst unusedEntities
         newPoints   = removeAtMultiple unusedIds srcInfoPoints
-    in ImportSpecList (Scoped ni (SrcSpanInfo srcInfoSpan newPoints))
-                      notHiding
-                      (map snd neededSpecs)
+    in (map snd neededEntities, SrcSpanInfo srcInfoSpan newPoints)
 
 -- | Returns 'False' if 'ImportSpec' is not needed.
 isSpecNeeded :: [N.Symbol] -> InScoped ImportSpec -> Bool
