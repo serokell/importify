@@ -13,6 +13,8 @@ import           Data.Text             (strip)
 import           Language.Haskell.Exts (ImportDecl (..), SrcSpanInfo (..), exactPrint,
                                         srcSpanStartLine)
 
+import           Importify.Syntax      (stripEndLineComment)
+
 -- | This function takes range of origin text for import and
 -- AST of imports without unused entinties and then converts
 -- import declarations into list of lines that should be printed.
@@ -29,7 +31,8 @@ printLovelyImports start end importsText importDecls =
         -- find indexes of empty lines
         indexedTextLines  = zip [start..end] importsText
         emptyLinesIndexes = map fst
-                          $ filter (null . strip . snd) indexedTextLines
+                          $ filter (null . strip . stripEndLineComment . snd)
+                                   indexedTextLines
 
         -- add empty lines to result map
         importsMapWithEmptyLines = foldl' (\dict i -> IM.insert i [""] dict)

@@ -12,6 +12,7 @@ module Importify.Syntax
        , importSlice
        , pullScopedInfo
        , scopedNameInfo
+       , stripEndLineComment
        , unscope
 
        , debugAST
@@ -20,6 +21,7 @@ module Importify.Syntax
 import           Universum
 
 import qualified Data.List.NonEmpty                 as NE
+import qualified Data.Text                          as T
 import           Language.Haskell.Exts              (Annotated (ann), CName (..),
                                                      Extension, ImportDecl (..),
                                                      ImportSpec (..), Module (..),
@@ -85,6 +87,12 @@ pullScopedInfo = scopedNameInfo . ann
 -- | Drop 'Scoped' annotation from 'Functor' type.
 unscope :: Functor f => f (Scoped l) -> f l
 unscope = fmap $ \case Scoped _ l -> l
+
+-- | This functions strips out trailing single line comment.
+stripEndLineComment :: Text -> Text
+stripEndLineComment line = case T.breakOnAll "--" line of
+    []               -> line
+    ((stripped,_):_) -> stripped
 
 -- | Helper function to debug different parts of AST processing.
 -- TODO: remove when logging appear.
