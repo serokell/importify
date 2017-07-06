@@ -47,8 +47,14 @@ import           Importify.Syntax                   (debugAST, getModuleNameId,
                                                      unscope)
 import           Importify.Tree                     (removeSymbols)
 
-doFile :: FilePath -> IO ()
-doFile = readFile >=> doSource >=> putText
+doFile :: Bool -> FilePath -> IO ()
+doFile inPlace filePath = do
+    src         <- readFile filePath
+    modifiedSrc <- doSource src
+
+    if inPlace
+    then writeFile filePath modifiedSrc
+    else putText modifiedSrc
 
 doSource :: Text -> IO Text
 doSource src = do

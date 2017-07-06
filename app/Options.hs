@@ -23,8 +23,9 @@ data Command
     | CabalCache CabalCacheOptions
     deriving (Show)
 
-newtype SingleFileOptions = SingleFileOptions
-    { sfoFilename    :: FilePath -- ^ File to apply the tool to
+data SingleFileOptions = SingleFileOptions
+    { sfoFilename :: !FilePath -- ^ File to apply the tool to
+    , sfoInPlace  :: !Bool     -- ^ if 'True' then modify file in place
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
@@ -46,6 +47,10 @@ fileParser = do
     sfoFilename <- strArgument $
         metavar "FILE" <>
         help "File to importify"
+    sfoInPlace <- switch $
+        long "in-place" <>
+        short 'i' <>
+        help "Write changes directly to file"
     pure $ SingleFile SingleFileOptions{..}
 
 cacheParser :: Parser Command
