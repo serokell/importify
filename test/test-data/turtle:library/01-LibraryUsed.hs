@@ -1,11 +1,5 @@
--- 
--- import Turtle (cd)
-
-module LibraryUsed where
-
-import Turtle (cd)
-
-func = cd
-
-main :: IO ()
-main = pure ()
+module LibraryUsed where  -- module LibraryUsed where
+                          --
+import Turtle (cd)        -- import Turtle (cd)
+                          --
+func = cd                 -- func = cd

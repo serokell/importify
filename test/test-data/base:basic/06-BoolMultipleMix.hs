@@ -1,10 +1,5 @@
--- &&, ||, otherwise
--- import Data.Bool (not)
-module BoolMultipleMix where
-
-import           Data.Bool (not, otherwise, (&&), (||))
-
-func = not
-
-main :: IO ()
-main = pure ()
+module BoolMultipleMix where                   -- module BoolMultipleMix where
+                                               --
+import Data.Bool (not, otherwise, (&&), (||))  -- import Data.Bool (not)
+                                               --
+func = not                                     -- func = not

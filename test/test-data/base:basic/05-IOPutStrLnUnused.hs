@@ -1,7 +1,6 @@
--- putStrLn
-module IOPutStrLnUnused where
-
+module IOPutStrLnUnused where  -- module IOPutStrLnUnused where
+                               --
 import System.IO (putStrLn)
-
-main :: IO ()
-main = pure ()
+                               --
+main :: IO ()                 -- main :: IO ()
+main = pure ()                -- main = pure ()

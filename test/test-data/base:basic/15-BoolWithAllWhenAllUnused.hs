@@ -1,8 +1,2 @@
--- Bool
-
-module BoolWithAllWhenAllUnused where
-
+module BoolWithAllWhenAllUnused where  -- module BoolWithAllWhenAllUnused where
 import Data.Bool (Bool(..))
-
-main :: IO ()
-main = pure ()

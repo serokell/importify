@@ -1,8 +1,6 @@
--- 
--- import System.IO (putStrLn)
-module IOPutStrLnUsed where
-
-import System.IO (putStrLn)
-
-main :: IO ()
-main = putStrLn "test"
+module IOPutStrLnUsed where  -- module IOPutStrLnUsed where
+                             --
+import System.IO (putStrLn)  -- import System.IO (putStrLn)
+                             --
+main :: IO ()                -- main :: IO ()
+main = putStrLn "test"       -- main = putStrLn "test"

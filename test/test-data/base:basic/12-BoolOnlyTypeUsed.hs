@@ -1,12 +1,6 @@
--- False
--- import Data.Bool (Bool)
-
-module BoolOnlyTypeUsed where
-
-import Data.Bool (Bool(False))
-
-func :: Bool
-func = undefined
-
-main :: IO ()
-main = pure ()
+module BoolOnlyTypeUsed where   -- module BoolOnlyTypeUsed where
+                                --
+import Data.Bool (Bool(False))  -- import Data.Bool (Bool       )
+                                --
+func :: Bool                    -- func :: Bool
+func = undefined                -- func = undefined

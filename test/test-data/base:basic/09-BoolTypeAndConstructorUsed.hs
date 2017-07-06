@@ -1,12 +1,6 @@
--- 
--- import Data.Bool (Bool(False))
-
-module BoolTypeAndConstructorUsed where
-
-import Data.Bool (Bool(False))
-
-func :: Bool
-func = False
-
-main :: IO ()
-main = pure ()
+module BoolTypeAndConstructorUsed where  -- module BoolTypeAndConstructorUsed where
+                                         --
+import Data.Bool (Bool(False))           -- import Data.Bool (Bool(False))
+                                         --
+func :: Bool                             -- func :: Bool
+func = False                             -- func = False

@@ -38,7 +38,7 @@ spec testDir = do
     let testFilesPath = testDataPath </> testDirPath
     testFiles        <- runIO $ sort <$> listDirectory (fromRelDir testFilesPath)
 
-    describe ("importify folder: " ++ testDir) $ mapM_ (makeTest testFilesPath) testFiles
+    describe ("folder: " ++ testDir) $ mapM_ (makeTest testFilesPath) testFiles
 
 makeTest :: Path Rel Dir -> FilePath -> Spec
 makeTest testDirPath testCaseFile = do
