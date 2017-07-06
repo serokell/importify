@@ -23,9 +23,9 @@ import Importify.Syntax (debugAST)
 
 main :: IO ()
 main = do
-    doCache "importify.cabal"  -- TODO: temporal workaround to make tests work;
-            False              --       to be removed after enhancing test system
-            []
+--    doCache "importify.cabal"  -- TODO: temporal workaround to make tests work;
+--            False              --       to be removed after enhancing test system
+--            []
     testFolders <- listDirectory (fromRelDir testDataPath)
     hspec $ mapM_ spec testFolders
 
@@ -42,8 +42,10 @@ spec testDir = do
 
 makeTest :: Path Rel Dir -> FilePath -> Spec
 makeTest testDirPath testCaseFile = do
+  if testCaseFile `elem` ["07-BigMix.hs"] then do
     diff <- runIO $ loadTestDataDiff testDirPath testCaseFile
     it testCaseFile $ diff `shouldBe` []
+  else pure ()
 
 loadTestDataDiff :: Path Rel Dir -> FilePath -> IO [Diff Text]
 loadTestDataDiff testDirPath testCaseFile = do
@@ -51,12 +53,17 @@ loadTestDataDiff testDirPath testCaseFile = do
     let pathToTestCase   = testDirPath </> testCaseFilePath
 
     testCaseFileContent <- readFile (fromRelFile pathToTestCase)
+    putText testCaseFileContent
     let (ast, comments)  = fromParseResult
                          $ parseFileContentsWithComments defaultParseMode
                                                          (toString testCaseFileContent)
     processedSources    <- doAst testCaseFileContent ast
+    putText "---------------------------------"
+    putText processedSources
     let testSources      = stripComments processedSources
     let extractedSources = getResultSourcesFromComments comments
+    debugAST "SRIPPED"  testSources
+    debugAST "COMMENTS" extractedSources
 
     return $ filter isDivergent $ getDiff testSources extractedSources
 
