@@ -12,23 +12,18 @@ import           Universum
 import           Data.Aeson                         (decode)
 import qualified Data.ByteString.Lazy               as BS
 import qualified Data.HashMap.Strict                as HM
-import           Data.List                          ((\\))
 import qualified Data.Map                           as Map
-import           Data.Maybe                         (fromJust)
 
-import           Language.Haskell.Exts              (Extension, ImportDecl (importModule, importSpecs),
-                                                     Module (..), ModuleName (..),
-                                                     Name (..), QName (..), SrcSpanInfo,
+import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
+                                                     ModuleName (..), SrcSpanInfo,
                                                      exactPrint, fromParseResult,
                                                      parseExtension,
-                                                     parseFileContentsWithExts,
-                                                     prettyPrint)
+                                                     parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
-                                                     loadBase, readSymbols, symbolName)
+                                                     loadBase, readSymbols)
 
-import qualified Language.Haskell.Names             as N
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
-import           Language.Haskell.Names.SyntaxUtils (getModuleName, stringToName)
+import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Path                               (fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
 import           System.Directory                   (doesFileExist)
@@ -42,8 +37,7 @@ import           Importify.Paths                    (cacheDir, cachePath, extens
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedSymbols,
                                                      removeUnusedQualifiedAsImports)
-import           Importify.Syntax                   (debugAST, getModuleNameId,
-                                                     getSourceModuleName, importSlice,
+import           Importify.Syntax                   (getSourceModuleName, importSlice,
                                                      unscope)
 import           Importify.Tree                     (removeSymbols)
 

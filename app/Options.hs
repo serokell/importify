@@ -13,10 +13,9 @@ module Options
 
 import           Universum
 
-import           Options.Applicative (Parser, ParserInfo, argument, command, execParser,
-                                      fullDesc, help, helper, info, long, metavar,
-                                      progDesc, short, str, strArgument, strOption,
-                                      subparser, switch)
+import           Options.Applicative (Parser, ParserInfo, command, execParser, fullDesc,
+                                      help, helper, info, long, metavar, progDesc, short,
+                                      strArgument, strOption, subparser, switch)
 
 data Command
     = SingleFile SingleFileOptions

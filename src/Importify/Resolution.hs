@@ -12,17 +12,15 @@ import           Universum
 import           Data.Data                                (Data)
 import qualified Data.Map.Strict                          as M
 
-import           Language.Haskell.Exts                    (ImportDecl (..),
-                                                           ImportSpecList (..), Module,
+import           Language.Haskell.Exts                    (ImportDecl (..), Module,
                                                            ModuleName (..), QName (..),
                                                            SrcSpanInfo)
-import           Language.Haskell.Names                   (Environment,
-                                                           NameInfo (GlobalSymbol),
+import           Language.Haskell.Names                   (NameInfo (GlobalSymbol),
                                                            Scoped (Scoped), resolve,
                                                            symbolName)
 import qualified Language.Haskell.Names                   as N
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
-import           Language.Haskell.Names.SyntaxUtils       (getModuleName, stringToName)
+import           Language.Haskell.Names.SyntaxUtils       (getModuleName)
 
 import           Importify.Syntax                         (scopedNameInfo)
 

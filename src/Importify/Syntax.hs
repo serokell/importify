@@ -22,16 +22,13 @@ import           Universum
 
 import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Text                          as T
-import           Language.Haskell.Exts              (Annotated (ann), CName (..),
-                                                     Extension, ImportDecl (..),
-                                                     ImportSpec (..), Module (..),
-                                                     ModuleName, ModuleName (..),
-                                                     Name (..), NonGreedy (..),
+import           Language.Haskell.Exts              (Annotated (ann), ImportDecl (..),
+                                                     Module (..), ModuleName,
+                                                     ModuleName (..), NonGreedy (..),
                                                      ParseResult (..),
                                                      PragmasAndModuleName (..),
                                                      SrcSpan (..), SrcSpanInfo (..),
-                                                     combSpanInfo, fromParseResult, parse,
-                                                     parseFileContentsWithExts)
+                                                     combSpanInfo, fromParseResult, parse)
 import           Language.Haskell.Names             (NameInfo, Scoped (..))
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Text.Show.Pretty                   (ppShow)

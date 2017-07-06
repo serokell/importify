@@ -17,14 +17,13 @@ import           Distribution.PackageDescription (GenericPackageDescription (pac
 import           Language.Haskell.Exts           (Extension, Module, ModuleName (..),
                                                   SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
-import           Path                            (Abs, Dir, Path, Rel, fromAbsDir,
-                                                  fromAbsFile, parseAbsDir, parseRelDir,
-                                                  parseRelFile, (</>))
+import           Path                            (Abs, Dir, Path, fromAbsDir, fromAbsFile,
+                                                  parseAbsDir, parseRelDir, parseRelFile,
+                                                  (</>))
 import           System.Directory                (createDirectoryIfMissing,
                                                   getCurrentDirectory, listDirectory,
                                                   removeDirectoryRecursive)
-import           System.FilePath                 (dropExtension, dropFileName,
-                                                  takeFileName)
+import           System.FilePath                 (dropExtension, takeFileName)
 import           Turtle                          (cd, shell)
 
 import           Importify.Cabal                 (getExtensionMaps, getLibs, getLibs,
