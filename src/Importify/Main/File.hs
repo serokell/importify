@@ -2,6 +2,7 @@
 
 module Importify.Main.File
        ( collectAndRemoveUnusedSymbols
+       , doAst
        , doFile
        , doSource
        ) where
@@ -11,21 +12,18 @@ import           Universum
 import           Data.Aeson                         (decode)
 import qualified Data.ByteString.Lazy               as BS
 import qualified Data.HashMap.Strict                as HM
-import           Data.List                          ((\\))
 import qualified Data.Map                           as Map
-import           Data.Maybe                         (fromJust)
 
-import           Language.Haskell.Exts              (Extension, ImportDecl (importModule, importSpecs),
-                                                     Module (..), ModuleName (..),
-                                                     Name (..), QName (..), SrcSpanInfo,
-                                                     exactPrint, parseExtension,
-                                                     prettyPrint)
+import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
+                                                     ModuleName (..), SrcSpanInfo,
+                                                     exactPrint, fromParseResult,
+                                                     parseExtension,
+                                                     parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
-                                                     loadBase, readSymbols, symbolName)
+                                                     loadBase, readSymbols)
 
-import qualified Language.Haskell.Names             as N
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
-import           Language.Haskell.Names.SyntaxUtils (getModuleName, stringToName)
+import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Path                               (fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
 import           System.Directory                   (doesFileExist)
@@ -39,21 +37,37 @@ import           Importify.Paths                    (cacheDir, cachePath, extens
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedSymbols,
                                                      removeUnusedQualifiedAsImports)
-import           Importify.Syntax                   (debugAST, getModuleNameId,
-                                                     getSourceModuleName, importSlice,
-                                                     parseForImports, unscope)
+import           Importify.Syntax                   (getSourceModuleName, importSlice,
+                                                     unscope)
 import           Importify.Tree                     (removeSymbols)
 
-doFile :: FilePath -> IO ()
-doFile = readFile >=> doSource >=> putText
+doFile :: Bool -> FilePath -> IO ()
+doFile inPlace filePath = do
+    src         <- readFile filePath
+    modifiedSrc <- doSource src
+
+    if inPlace
+    then writeFile filePath modifiedSrc
+    else putText modifiedSrc
 
 doSource :: Text -> IO Text
 doSource src = do
     let moduleName = getSourceModuleName src
     extensionMaps <- readExtensionMaps
-    let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
-    let (ast, imports) = parseForImports exts src
 
+    let exts       = fromMaybe []
+                   $ getExtensions moduleName extensionMaps
+
+    let ast        = fromParseResult
+                   $ parseFileContentsWithExts exts
+                   $ toString src
+
+    doAst src ast
+
+-- Meeeh, ugly code ;(
+-- TODO: use MaybeT IO Text here?
+doAst :: Text -> Module SrcSpanInfo -> IO Text
+doAst src ast@(Module _ _ _ imports _) =
     case importSlice imports of
         Just (start, end) -> do
             let codeLines        = lines src
@@ -68,6 +82,7 @@ doSource src = do
                 <> unlines decls
 
         Nothing -> pure src
+doAst _ _ = error "Source file is not Language.Haskell.Exts.Module(Module)"
 
 getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
 getExtensions moduleName maps = do

@@ -11,8 +11,8 @@ import           Data.Generics.Schemes  (everywhere)
 import           Data.List              (notElem, partition)
 import           Extended.Data.List     (removeAtMultiple)
 import           Language.Haskell.Exts  (CName, ImportDecl (..), ImportSpec (..),
-                                         ImportSpecList (..), ModuleName (..), Name (..),
-                                         Namespace (..), SrcSpanInfo (..))
+                                         ImportSpecList (..), Name (..), Namespace (..),
+                                         SrcSpanInfo (..))
 import           Language.Haskell.Names (NameInfo (..), Scoped (..))
 import qualified Language.Haskell.Names as N
 

@@ -10,9 +10,9 @@ module Importify.Syntax
        , getModuleTitle
        , getSourceModuleName
        , importSlice
-       , parseForImports
        , pullScopedInfo
        , scopedNameInfo
+       , stripEndLineComment
        , unscope
 
        , debugAST
@@ -21,16 +21,14 @@ module Importify.Syntax
 import           Universum
 
 import qualified Data.List.NonEmpty                 as NE
-import           Language.Haskell.Exts              (Annotated (ann), CName (..),
-                                                     Extension, ImportDecl (..),
-                                                     ImportSpec (..), Module (..),
-                                                     ModuleName, ModuleName (..),
-                                                     Name (..), NonGreedy (..),
+import qualified Data.Text                          as T
+import           Language.Haskell.Exts              (Annotated (ann), ImportDecl (..),
+                                                     Module (..), ModuleName,
+                                                     ModuleName (..), NonGreedy (..),
                                                      ParseResult (..),
                                                      PragmasAndModuleName (..),
                                                      SrcSpan (..), SrcSpanInfo (..),
-                                                     combSpanInfo, fromParseResult, parse,
-                                                     parseFileContentsWithExts)
+                                                     combSpanInfo, fromParseResult, parse)
 import           Language.Haskell.Names             (NameInfo, Scoped (..))
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Text.Show.Pretty                   (ppShow)
@@ -67,11 +65,6 @@ getSourceModuleName src =
             fromMaybe (error "File doesn't have `module' declaration") maybeModuleName
     in modNameStr
 
-parseForImports :: [Extension] -> Text -> (Module SrcSpanInfo, [ImportDecl SrcSpanInfo])
-parseForImports exts fileContent = (ast, imports)
-    where ast@(Module _ _ _ imports _) =
-              fromParseResult $ parseFileContentsWithExts exts $ toString fileContent
-
 -- | Returns name of 'Module' as a 'String'.
 getModuleTitle :: Module l -> String
 getModuleTitle (getModuleName -> ModuleName _ name) = name
@@ -91,6 +84,12 @@ pullScopedInfo = scopedNameInfo . ann
 -- | Drop 'Scoped' annotation from 'Functor' type.
 unscope :: Functor f => f (Scoped l) -> f l
 unscope = fmap $ \case Scoped _ l -> l
+
+-- | This functions strips out trailing single line comment.
+stripEndLineComment :: Text -> Text
+stripEndLineComment line = case T.breakOnAll "--" line of
+    []               -> line
+    ((stripped,_):_) -> stripped
 
 -- | Helper function to debug different parts of AST processing.
 -- TODO: remove when logging appear.

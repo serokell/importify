@@ -34,7 +34,7 @@ import           Language.Haskell.Extension            (Extension (..),
                                                         KnownExtension (..))
 import qualified Language.Haskell.Exts                 as HSE
 import           Path                                  (Abs, Dir, File, Path, Rel,
-                                                        fromAbsFile, fromRelFile,
+                                                        fromAbsFile,
                                                         parseRelDir, parseRelFile, (</>))
 import           System.Directory                      (doesFileExist)
 import           System.FilePath.Posix                 (dropExtension)
