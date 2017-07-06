@@ -1,10 +1,8 @@
---
--- import Data.Bool (bool)
-module BoolBoolUsed where
-
-import           Data.Bool (bool)
-
-func = bool
-
-main :: IO ()
-main = pure ()
+module BoolBoolUsed where          -- module BoolBoolUsed where
+                                   --
+import           Data.Bool (bool)  -- import           Data.Bool (bool)
+                                   --
+func = bool                        -- func = bool
+                                   --
+main :: IO ()                      -- main :: IO ()
+main = pure ()                     -- main = pure ()

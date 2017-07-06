@@ -2,6 +2,7 @@
 
 module Importify.Main.File
        ( collectAndRemoveUnusedSymbols
+       , doAst
        , doFile
        , doSource
        ) where
@@ -18,7 +19,9 @@ import           Data.Maybe                         (fromJust)
 import           Language.Haskell.Exts              (Extension, ImportDecl (importModule, importSpecs),
                                                      Module (..), ModuleName (..),
                                                      Name (..), QName (..), SrcSpanInfo,
-                                                     exactPrint, parseExtension,
+                                                     exactPrint, fromParseResult,
+                                                     parseExtension,
+                                                     parseFileContentsWithExts,
                                                      prettyPrint)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols, symbolName)
@@ -41,7 +44,7 @@ import           Importify.Resolution               (collectUnusedSymbols,
                                                      removeUnusedQualifiedAsImports)
 import           Importify.Syntax                   (debugAST, getModuleNameId,
                                                      getSourceModuleName, importSlice,
-                                                     parseForImports, unscope)
+                                                     unscope)
 import           Importify.Tree                     (removeSymbols)
 
 doFile :: FilePath -> IO ()
@@ -51,9 +54,20 @@ doSource :: Text -> IO Text
 doSource src = do
     let moduleName = getSourceModuleName src
     extensionMaps <- readExtensionMaps
-    let exts = fromMaybe [] $ getExtensions moduleName extensionMaps
-    let (ast, imports) = parseForImports exts src
 
+    let exts       = fromMaybe []
+                   $ getExtensions moduleName extensionMaps
+
+    let ast        = fromParseResult
+                   $ parseFileContentsWithExts exts
+                   $ toString src
+
+    doAst src ast
+
+-- Meeeh, ugly code ;(
+-- TODO: use MaybeT IO Text here?
+doAst :: Text -> Module SrcSpanInfo -> IO Text
+doAst src ast@(Module _ _ _ imports _) =
     case importSlice imports of
         Just (start, end) -> do
             let codeLines        = lines src
@@ -68,6 +82,7 @@ doSource src = do
                 <> unlines decls
 
         Nothing -> pure src
+doAst _ _ = error "Source file is not Language.Haskell.Exts.Module(Module)"
 
 getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
 getExtensions moduleName maps = do

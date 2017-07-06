@@ -81,18 +81,19 @@ executable importify
                        OverloadedStrings
                        RecordWildCards
 
-test-suite importify-system
+test-suite importify-test
   type:                exitcode-stdio-1.0
-  main-is:             SystemSuite.hs
+  main-is:             TestSuiteRunner.hs
   hs-source-dirs:      test
   build-depends:       base, importify
                      , Cabal
+                     , Diff
                      , directory
                      , filepath
                      , haskell-src-exts
                      , hspec
+                     , path
                      , text
-                     , turtle
                      , universum
   default-language:    Haskell2010
 

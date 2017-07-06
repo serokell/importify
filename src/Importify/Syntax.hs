@@ -10,7 +10,6 @@ module Importify.Syntax
        , getModuleTitle
        , getSourceModuleName
        , importSlice
-       , parseForImports
        , pullScopedInfo
        , scopedNameInfo
        , unscope
@@ -66,11 +65,6 @@ getSourceModuleName src =
         ModuleName _ modNameStr =
             fromMaybe (error "File doesn't have `module' declaration") maybeModuleName
     in modNameStr
-
-parseForImports :: [Extension] -> Text -> (Module SrcSpanInfo, [ImportDecl SrcSpanInfo])
-parseForImports exts fileContent = (ast, imports)
-    where ast@(Module _ _ _ imports _) =
-              fromParseResult $ parseFileContentsWithExts exts $ toString fileContent
 
 -- | Returns name of 'Module' as a 'String'.
 getModuleTitle :: Module l -> String
