@@ -7,11 +7,8 @@ import           Universum
 import           Data.Algorithm.Diff   (Diff (Both), getDiff)
 import           Data.List             (sort)
 import qualified Data.Text             as T
-import           Language.Haskell.Exts (Comment (..), ImportDecl (..),
-                                        ModuleHeadAndImports (..), NonGreedy (..),
-                                        ParseResult (..), SrcSpanInfo (..),
-                                        defaultParseMode, fromParseResult, parse,
-                                        parseFileContentsWithComments, prettyPrint)
+import           Language.Haskell.Exts (Comment (..), defaultParseMode, fromParseResult,
+                                        parseFileContentsWithComments)
 import           Path                  (Dir, Path, Rel, fromRelDir, fromRelFile, mkRelDir,
                                         parseRelDir, parseRelFile, (</>))
 import           System.Directory      (listDirectory)
@@ -19,7 +16,7 @@ import           System.Directory      (listDirectory)
 import           Test.Hspec            (Spec, describe, hspec, it, runIO, shouldBe)
 
 import           Importify.Main        (doAst, doCache)
-import           Importify.Syntax      (debugAST, stripEndLineComment)
+import           Importify.Syntax      (stripEndLineComment)
 
 main :: IO ()
 main = do

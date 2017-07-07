@@ -16,17 +16,26 @@ library
   hs-source-dirs:      src
   exposed-modules:     Importify.Cabal
                        Importify.CPP
+                       Importify.Main
                        Importify.Paths
                        Importify.Pretty
                        Importify.Resolution
                        Importify.Syntax
                        Importify.Tree
 
+  other-modules:
+                       -- Different utilities extending functionality
+                       -- of other libs
+                       Extended.Data.List
+
+                       -- Functions to work with .cabal files
+                       Importify.Cabal.Module
+                       Importify.Cabal.Package
+                       Importify.Cabal.Target
+
                        -- Main functions used by commands
-                       Importify.Main
                        Importify.Main.Cache
                        Importify.Main.File
-  other-modules:       Extended.Data.List
 
   build-depends:       base >= 4.7 && < 5
                      , aeson
