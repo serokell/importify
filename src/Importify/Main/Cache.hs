@@ -26,8 +26,8 @@ import           System.Directory                (createDirectoryIfMissing,
 import           System.FilePath                 (dropExtension, takeFileName)
 import           Turtle                          (cd, shell)
 
-import           Importify.Cabal                 (getExtensionMaps, getLibs, getLibs,
-                                                  modulePaths, readCabal,
+import           Importify.Cabal                 (getExtensionMaps, modulePaths,
+                                                  packageDependencies, readCabal,
                                                   splitOnExposedAndOther, withLibrary)
 import           Importify.CPP                   (parseModuleFile)
 import           Importify.Paths                 (cacheDir, cachePath, extensionsFile,
@@ -56,7 +56,8 @@ doCache filepath preserve overrideDependencies = do
 
     -- Libraries
     let projectName = dropExtension $ takeFileName filepath
-    let fetchedLibs = filter (\p -> p /= "base" && p /= projectName) $ getLibs projectCabalDesc
+    let fetchedLibs = filter (\p -> p /= "base" && p /= projectName)
+                    $ packageDependencies projectCabalDesc
     let libs        = if null overrideDependencies
                       then fetchedLibs
                       else overrideDependencies

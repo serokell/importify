@@ -2,8 +2,7 @@
 -- other miscellaneous stuff in .cabal files.
 
 module Importify.Cabal.Package
-       ( getBuildInfos
-       , getLibs
+       ( packageDependencies
        , readCabal
        , withLibrary
        ) where
@@ -16,11 +15,14 @@ import           Distribution.ModuleName               (ModuleName, fromString,
                                                         toFilePath)
 import qualified Distribution.ModuleName               as Cabal
 import           Distribution.Package                  (Dependency (..), PackageName (..))
-import           Distribution.PackageDescription       (BuildInfo (..), CondTree,
+import           Distribution.PackageDescription       (Benchmark (benchmarkBuildInfo),
+                                                        BuildInfo (..), CondTree,
                                                         Executable (..),
                                                         GenericPackageDescription (..),
-                                                        Library (..), condTreeData,
-                                                        exeModules, libModules)
+                                                        Library (..),
+                                                        TestSuite (testBuildInfo),
+                                                        condTreeData, exeModules,
+                                                        libModules)
 import           Distribution.PackageDescription.Parse (readPackageDescription)
 import           Distribution.Verbosity                (normal)
 import           Language.Haskell.Extension            (Extension (..),
@@ -65,17 +67,26 @@ isHseExt _                                  = True
 dependencyName :: Dependency -> String
 dependencyName (Dependency PackageName{..} _) = unPackageName
 
--- | Retrieve list of all package dependencies for library of
+-- | Retrieve list of unique names for all package dependencies inside
+-- library, all executables, all test suites and all benchmarks for a
 -- given package.
 --
 -- TODO: what about version bounds?
-getLibs :: GenericPackageDescription -> [String]
-getLibs = ordNub . concatMap (map dependencyName . targetBuildDepends) . getBuildInfos
+packageDependencies :: GenericPackageDescription -> [String]
+packageDependencies = ordNub
+                    . concatMap (map dependencyName . targetBuildDepends)
+                    . allBuildInfos
 
-getBuildInfos :: GenericPackageDescription -> [BuildInfo]
-getBuildInfos GenericPackageDescription{..} =
-    maybe [] ((:[]) . libBuildInfo . condTreeData) condLibrary ++
-    map (buildInfo . condTreeData . snd) condExecutables
+allBuildInfos :: GenericPackageDescription -> [BuildInfo]
+allBuildInfos GenericPackageDescription{..} = concat
+    [ maybe [] (one . libBuildInfo . condTreeData) condLibrary
+    , collectBuildInfos          buildInfo condExecutables
+    , collectBuildInfos      testBuildInfo condTestSuites
+    , collectBuildInfos benchmarkBuildInfo condBenchmarks
+    ]
+
+collectBuildInfos :: (t -> BuildInfo) -> [(String, CondTree v c t)] -> [BuildInfo]
+collectBuildInfos extractor = map (extractor . condTreeData . snd)
 
 -- This function works but isn't used anywhere
 {-
