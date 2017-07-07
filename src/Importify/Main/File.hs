@@ -29,8 +29,7 @@ import           Path                               (fromRelFile, parseRelDir,
 import           System.Directory                   (doesFileExist)
 import           Turtle                             (cd)
 
-import           Importify.Cabal                    (ExtensionsMap, TargetMap,
-                                                     moduleNameToPath)
+import           Importify.Cabal                    (MapBundle)
 import           Importify.Paths                    (cacheDir, cachePath, extensionsFile,
                                                      modulesPath, symbolsPath,
                                                      targetsFile)
@@ -84,27 +83,30 @@ doAst src ast@(Module _ _ _ imports _) =
         Nothing -> pure src
 doAst _ _ = error "Source file is not Language.Haskell.Exts.Module(Module)"
 
-getExtensions :: String -> Maybe (TargetMap, ExtensionsMap) -> Maybe [Extension]
+getExtensions :: String -> Maybe MapBundle -> Maybe [Extension]
 getExtensions moduleName maps = do
     (targetMap, extensionsMap) <- maps
-    let modulePath = moduleNameToPath moduleName
-    target <- HM.lookup modulePath targetMap
+    target     <- HM.lookup moduleName targetMap
     extensions <- HM.lookup target extensionsMap
     pure $ map parseExtension extensions
 
-readExtensionMaps :: IO (Maybe (TargetMap, ExtensionsMap))
-readExtensionMaps = do
-    cd (fromString cacheDir)
-    targetsExist    <- doesFileExist targetsFile
-    extensionsExist <- doesFileExist extensionsFile
-    if not (targetsExist && extensionsExist) then do
-        cd ".."
-        pure Nothing
-    else do
-        targetsMap    <- BS.readFile targetsFile
-        extensionsMap <- BS.readFile extensionsFile
-        cd ".."
-        pure $ liftA2 (,) (decode targetsMap) (decode extensionsMap)
+readExtensionMaps :: IO (Maybe MapBundle)
+readExtensionMaps = bracket_ stepIn
+                             stepOut
+                             readMapBundle
+  where
+    stepIn  = cd (fromString cacheDir)
+    stepOut = cd ".."
+
+    readMapBundle = do
+        targetsExist    <- doesFileExist targetsFile
+        extensionsExist <- doesFileExist extensionsFile
+        if not (targetsExist && extensionsExist) then
+            pure Nothing
+        else do
+            targetsMap    <- BS.readFile targetsFile
+            extensionsMap <- BS.readFile extensionsFile
+            pure $ liftA2 (,) (decode targetsMap) (decode extensionsMap)
 
 -- | Collect all unused entities in given module from given list of imports.
 collectAndRemoveUnusedSymbols

@@ -2,8 +2,7 @@
 -- parts of .cabal file.
 
 module Importify.Cabal.Module
-       ( moduleNameToPath
-       , modulePaths
+       ( modulePaths
        , splitOnExposedAndOther
        ) where
 
@@ -77,10 +76,3 @@ modulePaths packagePath Library{..} = do
 
     keepExistingModules :: [Path Abs File] -> IO [Path Abs File]
     keepExistingModules = filterM (doesFileExist . fromAbsFile)
-
-
-moduleNameToPath :: String -> String
-moduleNameToPath modNameStr = toFilePath modName
-  where
-    modName :: ModuleName
-    modName = fromString modNameStr

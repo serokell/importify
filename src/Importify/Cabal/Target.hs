@@ -1,26 +1,34 @@
+{-# LANGUAGE TupleSections #-}
+
 -- | Functions to retrieve and store mapping from modules to their
 -- targets and extensions.
 
 module Importify.Cabal.Target
-       ( TargetMap
-       , ExtensionsMap
+       ( ExtensionsMap
+       , TargetsMap
+       , MapBundle
        , getExtensionMaps
        ) where
 
 import           Universum                             hiding (fromString)
 
-import qualified Data.HashMap.Strict                   as Map
+import qualified Data.HashMap.Strict                   as HM
 import           Data.List                             (partition)
 import           Distribution.ModuleName               (ModuleName, fromString,
                                                         toFilePath)
 import qualified Distribution.ModuleName               as Cabal
 import           Distribution.Package                  (Dependency (..), PackageName (..))
-import           Distribution.PackageDescription       (BuildInfo (..), CondTree,
-                                                        Executable (..),
+import           Distribution.PackageDescription       (Benchmark (benchmarkBuildInfo),
+                                                        BuildInfo (..), CondTree,
+                                                        Executable (buildInfo),
                                                         GenericPackageDescription (..),
-                                                        Library (..), condTreeData,
-                                                        exeModules, libModules)
+                                                        Library (..),
+                                                        TestSuite (testBuildInfo),
+                                                        benchmarkModules, condTreeData,
+                                                        exeModules, libModules,
+                                                        testModules)
 import           Distribution.PackageDescription.Parse (readPackageDescription)
+import           Distribution.Text                     (display)
 import           Distribution.Verbosity                (normal)
 import           Language.Haskell.Extension            (Extension (..),
                                                         KnownExtension (..))
@@ -34,38 +42,70 @@ import           Text.Read                             (read)
 
 import           Importify.Syntax                      (getModuleTitle)
 
-type TargetMap = HashMap String String
+type    TargetsMap = HashMap String String
 type ExtensionsMap = HashMap String [String]
+type MapBundle     = (TargetsMap, ExtensionsMap)
 
-getExtensionMaps :: GenericPackageDescription -> (TargetMap, ExtensionsMap)
+data TargetId = LibraryId
+              | ExecutableId String
+              | TestSuiteId  String
+              | BenchmarkId  String
+
+cabalTargetId :: TargetId -> String
+cabalTargetId LibraryId               = "library"
+cabalTargetId (ExecutableId exeName)  = "executable " ++ exeName
+cabalTargetId (TestSuiteId testName)  = "test-suite " ++ testName
+cabalTargetId (BenchmarkId benchName) = "benchmark "  ++ benchName
+
+getExtensionMaps :: GenericPackageDescription -> MapBundle
 getExtensionMaps GenericPackageDescription{..} =
-    ( Map.unions $ libTargetsMaps ++ exeTargetsMaps
-    , Map.unions $ libExtensionsMaps ++ exeExtensionsMaps)
+    ( HM.unions $ libTM : exeTMs ++ testTMs ++ benchTMs
+    , HM.unions $ libEM : exeEMs ++ testEMs ++ benchEMs
+    )
   where
-    (libTargetsMaps, libExtensionsMaps) = unzip $
-        map (collectLibraryMaps . condTreeData) $ maybeToList condLibrary
-    (exeTargetsMaps, exeExtensionsMaps) = unzip $ do
-        (name, condTree) <- condExecutables
-        pure $ collectExecutableMaps name $ condTreeData condTree
+    (libTM, libEM) =
+        maybe mempty (collectLibraryMaps . condTreeData) condLibrary
 
-collectLibraryMaps :: Library -> (TargetMap, ExtensionsMap)
-collectLibraryMaps lib =
-    collectModuleMaps "library"
-                      (map toFilePath $ libModules lib)
-                      (defaultExtensions $ libBuildInfo lib)
+    (exeTMs, exeEMs) =
+        collectTargetsListMaps condExecutables
+                               ExecutableId
+                               (collectTargetMaps exeModules buildInfo)
 
-collectExecutableMaps :: String -> Executable -> (TargetMap, ExtensionsMap)
-collectExecutableMaps exeName exe =
-    collectModuleMaps ("executable " ++ exeName)
-                      (exePath:map toFilePath (exeModules exe))
-                      (defaultExtensions $ buildInfo exe)
-  where
-    exePath = dropExtension $ modulePath exe
+    (testTMs, testEMs) =
+        collectTargetsListMaps condTestSuites
+                               TestSuiteId
+                               (collectTargetMaps testModules testBuildInfo)
 
-collectModuleMaps :: String -> [String] -> [Extension] -> (TargetMap, ExtensionsMap)
-collectModuleMaps target mods exts =
-    ( Map.fromList $ zip mods (repeat target)
-    , one (target, map showExt exts)
+    (benchTMs, benchEMs) =
+        collectTargetsListMaps condBenchmarks
+                               BenchmarkId
+                               (collectTargetMaps benchmarkModules benchmarkBuildInfo)
+
+collectLibraryMaps :: Library -> MapBundle
+collectLibraryMaps = collectTargetMaps libModules libBuildInfo LibraryId
+
+collectTargetsListMaps :: [(String, CondTree v c target)]
+                       -> (String -> TargetId)
+                       -> (TargetId -> target -> MapBundle)
+                       -> ([TargetsMap], [ExtensionsMap])
+collectTargetsListMaps treeList idConstructor mapBundler = unzip $ do
+    (name, condTree) <- treeList
+    pure $ mapBundler (idConstructor name) $ condTreeData condTree
+
+collectTargetMaps :: (target -> [ModuleName])
+                  -> (target -> BuildInfo)
+                  -> TargetId
+                  -> target
+                  -> MapBundle
+collectTargetMaps modulesExtractor buildInfoExtractor id target =
+    collectModuleMaps (cabalTargetId id)
+                      (map display $ modulesExtractor target)
+                      (defaultExtensions $ buildInfoExtractor target)
+
+collectModuleMaps :: String -> [String] -> [Extension] -> MapBundle
+collectModuleMaps targetName modules extensions =
+    ( HM.fromList $ map (, targetName) modules
+    , one (targetName, map showExt extensions)
     )
 
 showExt :: Extension -> String
