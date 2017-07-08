@@ -1,7 +1,7 @@
 -- | Contains implementation of @importify file@ command.
 
 module Importify.Main.File
-       ( collectAndRemoveUnusedSymbols
+       ( OutputOptions (..)
        , doAst
        , doFile
        , doSource
@@ -40,14 +40,22 @@ import           Importify.Syntax                   (getSourceModuleName, import
                                                      unscope)
 import           Importify.Tree                     (removeSymbols)
 
-doFile :: Bool -> FilePath -> IO ()
-doFile inPlace filePath = do
-    src         <- readFile filePath
+-- | This data type dictates how output of @importify@ should be
+-- outputed.
+data OutputOptions = ToConsole        -- ^ Print to console
+                   | InPlace          -- ^ Change file in-place
+                   | ToFile FilePath  -- ^ Print to specified file
+                   deriving (Show)
+
+doFile :: OutputOptions -> FilePath -> IO ()
+doFile options srcPath = do
+    src         <- readFile srcPath
     modifiedSrc <- doSource src
 
-    if inPlace
-    then writeFile filePath modifiedSrc
-    else putText modifiedSrc
+    case options of
+        ToConsole -> putText modifiedSrc
+        InPlace   -> writeFile srcPath modifiedSrc
+        ToFile to -> writeFile to      modifiedSrc
 
 doSource :: Text -> IO Text
 doSource src = do

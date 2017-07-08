@@ -4,66 +4,52 @@ module Main where
 
 import           Universum
 
-import           Data.Algorithm.Diff   (Diff (Both), getDiff)
-import           Data.List             (sort)
-import qualified Data.Text             as T
-import           Language.Haskell.Exts (Comment (..), defaultParseMode, fromParseResult,
-                                        parseFileContentsWithComments)
-import           Path                  (Dir, Path, Rel, fromRelDir, fromRelFile, mkRelDir,
-                                        parseRelDir, parseRelFile, (</>))
-import           System.Directory      (listDirectory)
+import           Data.Algorithm.Diff (Diff (Both), getDiff)
+import           Data.List           (sort)
+import           Path                (Dir, File, Path, Rel, fileExtension, fromRelDir,
+                                      fromRelFile, parseRelDir, parseRelFile, (-<.>),
+                                      (</>))
+import           System.Directory    (listDirectory)
 
-import           Test.Hspec            (Spec, describe, hspec, it, runIO, shouldBe)
+import           Test.Hspec          (Spec, describe, hspec, it, runIO, shouldBe)
 
-import           Importify.Main        (doAst, doCache)
-import           Importify.Syntax      (stripEndLineComment)
+import           Importify.Main      (doCache, doSource)
+import           Importify.Paths     (testDataPath)
 
 main :: IO ()
 main = do
-    doCache "importify.cabal"  -- TODO: temporal workaround to make tests work;
-            False              --       to be removed after enhancing test system
-            []
+    -- TODO: temporal workaround to make tests work;
+    --       to be removed after enhancing test system
+    doCache "importify.cabal" False []
     testFolders <- listDirectory (fromRelDir testDataPath)
-    hspec $ mapM_ spec testFolders
+    hspec $ mapM_ makeTestGroup testFolders
 
-testDataPath :: Path Rel Dir
-testDataPath = $(mkRelDir "test/test-data/")
-
-spec :: FilePath -> Spec
-spec testDir = do
+makeTestGroup :: FilePath -> Spec
+makeTestGroup testDir = do
     testDirPath      <- runIO $ parseRelDir testDir
-    let testFilesPath = testDataPath </> testDirPath
-    testFiles        <- runIO $ sort <$> listDirectory (fromRelDir testFilesPath)
+    let testCasesPath = testDataPath </> testDirPath
+    testDirPaths     <- runIO $ mapM parseRelFile =<<
+                                listDirectory (fromRelDir testCasesPath)
+    let testHsOnly = sort $ filter ((== ".hs") . fileExtension) testDirPaths
 
-    describe ("folder: " ++ testDir) $ mapM_ (makeTest testFilesPath) testFiles
+    describe ("subfolder: " ++ testDir) $ mapM_ (makeTest testCasesPath) testHsOnly
 
-makeTest :: Path Rel Dir -> FilePath -> Spec
-makeTest testDirPath testCaseFile = do
-    diff <- runIO $ loadTestDataDiff testDirPath testCaseFile
-    it testCaseFile $ diff `shouldBe` []
+makeTest :: Path Rel Dir -> Path Rel File -> Spec
+makeTest testDirPath testCasePath = do
+    diff <- runIO $ loadTestDataDiff testDirPath testCasePath
+    it (fromRelFile testCasePath) $ diff `shouldBe` []
 
-loadTestDataDiff :: Path Rel Dir -> FilePath -> IO [Diff Text]
-loadTestDataDiff testDirPath testCaseFile = do
-    testCaseFilePath    <- parseRelFile testCaseFile
-    let pathToTestCase   = testDirPath </> testCaseFilePath
+loadTestDataDiff :: Path Rel Dir -> Path Rel File -> IO [Diff Text]
+loadTestDataDiff testDirPath testCasePath = do
+    let fullPathToTest = testDirPath </> testCasePath
+    goldenExamplePath <- fullPathToTest -<.> ".golden"
 
-    testCaseFileContent <- readFile (fromRelFile pathToTestCase)
-    let (ast, comments)  = fromParseResult
-                         $ parseFileContentsWithComments defaultParseMode
-                                                         (toString testCaseFileContent)
-    processedSources    <- doAst testCaseFileContent ast
-    let testSources      = stripComments processedSources
-    let extractedSources = getResultSourcesFromComments comments
+    testCasePathContent <- readFile (fromRelFile fullPathToTest)
+    importifiedSrc      <- doSource testCasePathContent
+    goldenExampleSrc    <- readFile (fromRelFile goldenExamplePath)
 
-    return $ filter isDivergent $ getDiff testSources extractedSources
-
-stripComments :: Text -> [Text]
-stripComments = map (T.strip . stripEndLineComment) . lines
-
-getResultSourcesFromComments :: [Comment] -> [Text]
-getResultSourcesFromComments = map (T.strip . toText . extractComment)
-  where
-    extractComment (Comment _ _ comment) = comment
+    return $ filter isDivergent $ getDiff (lines importifiedSrc)
+                                          (lines goldenExampleSrc)
 
 isDivergent :: Diff Text -> Bool
 isDivergent (Both _ _) = False

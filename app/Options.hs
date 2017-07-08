@@ -13,9 +13,12 @@ module Options
 
 import           Universum
 
-import           Options.Applicative (Parser, ParserInfo, command, execParser, fullDesc,
-                                      help, helper, info, long, metavar, progDesc, short,
-                                      strArgument, strOption, subparser, switch)
+import           Options.Applicative (Parser, ParserInfo, command, execParser, flag',
+                                      fullDesc, help, helper, info, long, metavar,
+                                      progDesc, short, strArgument, strOption, subparser,
+                                      switch)
+
+import           Importify.Main      (OutputOptions (..))
 
 data Command
     = SingleFile SingleFileOptions
@@ -23,8 +26,8 @@ data Command
     deriving (Show)
 
 data SingleFileOptions = SingleFileOptions
-    { sfoFilename :: !FilePath -- ^ File to apply the tool to
-    , sfoInPlace  :: !Bool     -- ^ if 'True' then modify file in place
+    { sfoFilename :: !FilePath      -- ^ File to apply the tool to
+    , sfoOutput   :: !OutputOptions -- ^ Options for @importify file@ output
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
@@ -46,11 +49,18 @@ fileParser = do
     sfoFilename <- strArgument $
         metavar "FILE" <>
         help "File to importify"
-    sfoInPlace <- switch $
-        long "in-place" <>
-        short 'i' <>
-        help "Write changes directly to file"
+    sfoOutput <- outputOptionsParser
     pure $ SingleFile SingleFileOptions{..}
+  where
+    outputOptionsParser :: Parser OutputOptions
+    outputOptionsParser =
+         flag' InPlace (  long "in-place"
+                       <> short 'i'
+                       <> help "Write changes directly to file")
+     <|> ToFile <$> strOption (  long "to"
+                              <> short 't'
+                              <> help "Write to specified file")
+     <|> pure ToConsole
 
 cacheParser :: Parser Command
 cacheParser = do

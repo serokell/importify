@@ -1,0 +1,13 @@
+module BigMix where
+
+import Data.Bool (not)
+import Data.List (      sortOn)
+import Language.Haskell.Exts (Module         )
+
+import Language.Haskell.Exts.Syntax (       Decl (                 TypeSig))
+
+foo :: Language.Haskell.Exts.Module ()
+foo = undefined
+foo2 = not
+foo3 = sortOn
+baz = TypeSig
