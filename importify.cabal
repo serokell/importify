@@ -117,14 +117,10 @@ test-suite importify-test
   hs-source-dirs:      test
 
   build-depends:       base, importify
-                     , Cabal
                      , Diff
                      , directory
-                     , filepath
-                     , haskell-src-exts
                      , hspec
                      , path
-                     , text
                      , universum
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
