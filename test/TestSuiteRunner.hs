@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module Main where
 
 import           Universum
@@ -16,6 +14,7 @@ import           System.Directory      (listDirectory)
 import           Test.Hspec            (Spec, describe, hspec, it, runIO, shouldBe)
 
 import           Importify.Main        (doAst, doCache)
+import           Importify.Paths       (testDataDir, testDataPath)
 import           Importify.Syntax      (stripEndLineComment)
 
 main :: IO ()
@@ -23,11 +22,8 @@ main = do
     doCache "importify.cabal"  -- TODO: temporal workaround to make tests work;
             False              --       to be removed after enhancing test system
             []
-    testFolders <- listDirectory (fromRelDir testDataPath)
+    testFolders <- listDirectory testDataDir
     hspec $ mapM_ spec testFolders
-
-testDataPath :: Path Rel Dir
-testDataPath = $(mkRelDir "test/test-data/")
 
 spec :: FilePath -> Spec
 spec testDir = do

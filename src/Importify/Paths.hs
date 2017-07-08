@@ -14,6 +14,8 @@ module Importify.Paths
        , symbolsPath
        , targetsFile
        , targetsPath
+       , testDataPath
+       , testDataDir
 
          -- * Utility functions to work with directories
        , guessCabalName
@@ -29,28 +31,33 @@ import           System.FilePath ((<.>))
 cachePath :: Path Rel Dir
 cachePath = [reldir|.importify/|]
 
-symbolsPath :: Path Rel Dir
-symbolsPath = [reldir|symbols/|]
-
 -- | Path to file that stores mapping from module names to their packages.
 modulesPath :: Path Rel File
 modulesPath = [relfile|modules|]
+
+symbolsPath :: Path Rel Dir
+symbolsPath = [reldir|symbols/|]
 
 -- | Path to JSON-encoded Map from project module name to
 -- its target (i.e. __library__, __executable__).
 targetsPath :: Path Rel File
 targetsPath = [relfile|targets|]
 
+-- | Path to golden tests.
+testDataPath :: Path Rel Dir
+testDataPath = [reldir|test/test-data/|]
+
 -- | Path to JSON-encoded Map from target to its list of default extensions.
 extensionsPath :: Path Rel File
 extensionsPath = [relfile|extensions|]
 
-cacheDir, extensionsFile, modulesFile, symbolsDir, targetsFile :: FilePath
+cacheDir, extensionsFile, modulesFile, symbolsDir, targetsFile, testDataDir :: FilePath
 cacheDir    = fromRelDir  cachePath
 extensionsFile = fromRelFile extensionsPath
 modulesFile = fromRelFile modulesPath
 symbolsDir  = fromRelDir  symbolsPath
 targetsFile = fromRelFile targetsPath
+testDataDir = fromRelDir  testDataPath
 
 -- TODO: probably not reliable, instead file with
 -- .cabal extension should be searched
