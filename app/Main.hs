@@ -25,7 +25,7 @@ main = do
 
 importifySingleFile :: SingleFileOptions -> IO ()
 importifySingleFile SingleFileOptions{..} =
-    doFile sfoInPlace sfoFilename
+    doFile sfoOutput sfoFilename
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =
