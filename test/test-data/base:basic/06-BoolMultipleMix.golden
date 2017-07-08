@@ -1,0 +1,5 @@
+module BoolMultipleMix where
+
+import Data.Bool (not)
+
+func = not
