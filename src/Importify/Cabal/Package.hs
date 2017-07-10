@@ -2,7 +2,9 @@
 -- other miscellaneous stuff in .cabal files.
 
 module Importify.Cabal.Package
-       ( packageDependencies
+       ( libraryExtensions
+       , libraryIncludeDirs
+       , packageDependencies
        , readCabal
        , withLibrary
        ) where
@@ -42,19 +44,29 @@ readCabal = readPackageDescription normal
 
 -- | Perform given action with package library 'BuilInfo'
 -- if 'Library' is present. We care only about library exposed modules
--- because only they can be imported outside that package.
+-- because only they can be imported outside that package. Action
+-- returns 'Monoid'al values so if there's no 'Library' user gets
+-- @pure mempty@. In code this is used to collect list of modules.
 withLibrary :: (Applicative f, Monoid m)
             => GenericPackageDescription
-            -> (Library -> [HSE.Extension] -> f m)
+            -> (Library -> f m)
             -> f m
 withLibrary GenericPackageDescription{..} action =
     maybe (pure mempty)
-          (\treeNode -> let library       = condTreeData treeNode
-                            BuildInfo{..} = libBuildInfo library
-                            extensions    = filter isHseExt $ defaultExtensions ++ otherExtensions
-                        in action library (map cabalExtToHseExt extensions)
-          )
+          (action . condTreeData)
           condLibrary
+
+-- | Get list of all extensions from 'Library' and convert them into
+-- 'HSE.Extension'.
+libraryExtensions :: Library -> [HSE.Extension]
+libraryExtensions library = let BuildInfo{..} = libBuildInfo library
+                           in map cabalExtToHseExt
+                            $ filter isHseExt
+                            $ defaultExtensions ++ otherExtensions
+
+-- | Returns all include directories for 'Library'.
+libraryIncludeDirs :: Library -> [FilePath]
+libraryIncludeDirs = includeDirs . libBuildInfo
 
 cabalExtToHseExt :: Extension -> HSE.Extension
 cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show

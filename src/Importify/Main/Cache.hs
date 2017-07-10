@@ -26,7 +26,8 @@ import           System.Directory                (createDirectoryIfMissing,
 import           System.FilePath                 (dropExtension, takeFileName)
 import           Turtle                          (cd, shell)
 
-import           Importify.Cabal                 (getExtensionMaps, modulePaths,
+import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
+                                                  libraryIncludeDirs, modulePaths,
                                                   packageDependencies, readCabal,
                                                   splitOnExposedAndOther, withLibrary)
 import           Importify.CPP                   (parseModuleFile)
@@ -115,7 +116,7 @@ createProjectCache :: GenericPackageDescription
                    -> String
                    -> IO (Map String String)
 createProjectCache packageCabalDesc packagePath symbolsCachePath libName packageName =
-    withLibrary packageCabalDesc $ \library cabalExtensions -> do
+    withLibrary packageCabalDesc $ \library -> do
         -- creates ./.importify/symbols/<package>/
         packageNamePath     <- parseRelDir packageName
         let packageCachePath = symbolsCachePath </> packageNamePath
@@ -123,7 +124,6 @@ createProjectCache packageCabalDesc packagePath symbolsCachePath libName package
 
         (errors, libModules) <- parsedModulesWithErrors packagePath
                                                         library
-                                                        cabalExtensions
         reportErrorsIfAny errors libName
 
         let (exposedModules, otherModules) = splitOnExposedAndOther library libModules
@@ -140,13 +140,16 @@ createProjectCache packageCabalDesc packagePath symbolsCachePath libName package
 
         pure $ Map.fromList packageModules
 
-parsedModulesWithErrors :: Path Abs Dir
+parsedModulesWithErrors :: Path Abs Dir  -- ^ Path like @~/.../.importify/containers-0.5@
                         -> Library
-                        -> [Extension]
                         -> IO ([Text], [Module SrcSpanInfo])
-parsedModulesWithErrors packagePath library cabalExtensions = do
-    modPaths   <- modulePaths packagePath library
-    modEithers <- mapM (parseModuleFile cabalExtensions) modPaths
+parsedModulesWithErrors packagePath library = do
+    includeDirPaths <- mapM parseRelDir $ libraryIncludeDirs library
+    let includeDirs  = map (fromAbsDir . (packagePath </>)) includeDirPaths
+    let extensions   = libraryExtensions  library
+    pathsToModules  <- modulePaths packagePath library
+
+    modEithers <- mapM (parseModuleFile extensions includeDirs) pathsToModules
     pure $ partitionEithers modEithers
 
 reportErrorsIfAny :: [Text] -> String -> IO ()
