@@ -1,0 +1,5 @@
+module ImportBothUsedUnqualified where
+
+import           Language.Haskell.Names (symbolName)
+
+main = symbolName
