@@ -21,6 +21,6 @@ cabal.project.local
 
 *~
 .importify/
-temp.txt
+module_backup
 test/ManualTestForDebugging.hs
 *.out
