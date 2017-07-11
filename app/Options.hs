@@ -26,27 +26,29 @@ data Command
     deriving (Show)
 
 data SingleFileOptions = SingleFileOptions
-    { sfoFilename :: !FilePath      -- ^ File to apply the tool to
+    { sfoFileName :: !FilePath      -- ^ File where all redundant imports should be removed
     , sfoOutput   :: !OutputOptions -- ^ Options for @importify file@ output
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
-    { ccoFilename     :: !FilePath -- ^ Path to .cabal file
-    , ccoPreserve     :: !Bool     -- ^ Don't delete downloaded package cache
+    { ccoPreserve     :: !Bool     -- ^ Don't delete downloaded package cache
     , ccoDependencies :: ![String] -- ^ Use specified dependencies overriding .cabal ones
     } deriving (Show)
 
 optionsParser :: Parser Command
 optionsParser = subparser $
-    command "file" (info (helper <*> fileParser)
-                          (fullDesc <> progDesc "Importify a single file"))
- <> command "cache" (info (helper <*> cacheParser)
-                           (fullDesc <> progDesc
-                              "Store cache from .cabal file in ./.importify folder"))
+    command "file"
+            (info (helper <*> fileParser)
+                  (fullDesc <> progDesc "Importify a single file."))
+ <> command "cache"
+            (info (helper <*> cacheParser)
+                  (fullDesc <> progDesc
+                   "Search for .cabal file in current directory. If it's found then cache \
+                   \all dependencies for every target and store them inside ./.importify folder."))
 
 fileParser :: Parser Command
 fileParser = do
-    sfoFilename <- strArgument $
+    sfoFileName <- strArgument $
         metavar "FILE" <>
         help "File to importify"
     sfoOutput <- outputOptionsParser
@@ -64,9 +66,6 @@ fileParser = do
 
 cacheParser :: Parser Command
 cacheParser = do
-    ccoFilename <- strArgument $
-        metavar "FILE" <>
-        help "Path to .cabal file"
     ccoPreserve <- switch $
         long "preserve" <>
         short 'p' <>

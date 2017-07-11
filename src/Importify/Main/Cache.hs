@@ -23,7 +23,8 @@ import           Path                            (Abs, Dir, Path, fromAbsDir, fr
 import           System.Directory                (createDirectoryIfMissing,
                                                   getCurrentDirectory, listDirectory,
                                                   removeDirectoryRecursive)
-import           System.FilePath                 (dropExtension, takeFileName)
+import           System.FilePath                 (dropExtension, takeExtension,
+                                                  takeFileName)
 import           Turtle                          (cd, shell)
 
 import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
@@ -37,18 +38,31 @@ import           Importify.Paths                 (cacheDir, cachePath, extension
 import           Importify.Resolution            (resolveModules)
 
 -- | Caches packages information into local .importify directory.
-doCache :: FilePath -> Bool -> [String] -> IO ()
-doCache filepath preserve overrideDependencies = do
-    projectCabalDesc <- readCabal filepath
+doCache :: Bool -> [String] -> IO ()
+doCache preserveSources overrideDependencies = do
+    thisDirectory <- getCurrentDirectory
+    thisDirNodes  <- listDirectory thisDirectory
+    let cabalFiles = filter ((== ".cabal") . takeExtension) thisDirNodes
+    case cabalFiles of
+        [] -> putText "No .cabal file in this directory! Aborting. Please, \
+                         \run this command from root directory of your project."
+        (cabalFile:_) -> cacheProject preserveSources
+                                      overrideDependencies
+                                      cabalFile
 
-    curDir           <- getCurrentDirectory
-    projectPath      <- parseAbsDir curDir
+cacheProject :: Bool -> [String] -> FilePath -> IO ()
+cacheProject preserveSources overrideDependencies cabalFile = do
+    thisDirectory    <- getCurrentDirectory
+    projectPath      <- parseAbsDir thisDirectory
+    cabalFilePath    <- parseRelFile cabalFile
+    let cabalPath     = fromAbsFile $ projectPath </> cabalFilePath
     let importifyPath = projectPath </> cachePath
     let importifyDir  = fromAbsDir importifyPath
 
-    -- TODO: error if not inside project directory?
-    createDirectoryIfMissing True importifyDir  -- creates ./.importify
-    cd $ fromString cacheDir    -- cd to ./.importify/
+    createDirectoryIfMissing True importifyDir -- creates ./.importify
+    cd $ fromString cacheDir                   -- cd to ./.importify/
+
+    projectCabalDesc <- readCabal cabalPath
 
     -- Extension maps
     let (targetMaps, extensionMaps) = getExtensionMaps projectCabalDesc
@@ -56,7 +70,7 @@ doCache filepath preserve overrideDependencies = do
     BS.writeFile extensionsFile $ encode extensionMaps
 
     -- Libraries
-    let projectName = dropExtension $ takeFileName filepath
+    let projectName = dropExtension $ takeFileName cabalFile
     let fetchedLibs = filter (\p -> p /= "base" && p /= projectName)
                     $ packageDependencies projectCabalDesc
     let libs        = if null overrideDependencies
@@ -66,7 +80,7 @@ doCache filepath preserve overrideDependencies = do
 
     -- download & unpack sources, then cache and delete
     dependenciesResolutionMaps <- forM libs $
-        collectDependenciesResolution importifyPath preserve
+        collectDependenciesResolution importifyPath preserveSources
 
     let PackageIdentifier{..} = package $ packageDescription projectCabalDesc
     projectResolutionMap <- createProjectCache projectCabalDesc

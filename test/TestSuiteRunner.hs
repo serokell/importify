@@ -18,9 +18,7 @@ import           Importify.Paths     (testDataPath)
 
 main :: IO ()
 main = do
-    -- TODO: temporal workaround to make tests work;
-    --       to be removed after enhancing test system
-    doCache "importify.cabal" False []
+    doCache False []
     testFolders <- listDirectory (fromRelDir testDataPath)
     hspec $ mapM_ makeTestGroup testFolders
 
