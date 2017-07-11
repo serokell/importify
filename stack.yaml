@@ -3,9 +3,10 @@ resolver: lts-8.15
 packages: ['.']
 
 extra-deps:
-- universum-0.4.3
-- fmt-0.2.0.0
+- universum-0.5
+- fmt-0.3.0.0
 - path-0.6.1
+- log-warper-1.1.4
 
 flags: {}
 extra-package-dbs: []

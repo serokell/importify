@@ -2,8 +2,7 @@
 -- other miscellaneous stuff in .cabal files.
 
 module Importify.Cabal.Package
-       ( libraryExtensions
-       , libraryIncludeDirs
+       ( libraryIncludeDirs
        , packageDependencies
        , readCabal
        , withLibrary
@@ -11,11 +10,6 @@ module Importify.Cabal.Package
 
 import           Universum                             hiding (fromString)
 
-import qualified Data.HashMap.Strict                   as Map
-import           Data.List                             (partition)
-import           Distribution.ModuleName               (ModuleName, fromString,
-                                                        toFilePath)
-import qualified Distribution.ModuleName               as Cabal
 import           Distribution.Package                  (Dependency (..), PackageName (..))
 import           Distribution.PackageDescription       (Benchmark (benchmarkBuildInfo),
                                                         BuildInfo (..), CondTree,
@@ -23,21 +17,10 @@ import           Distribution.PackageDescription       (Benchmark (benchmarkBuil
                                                         GenericPackageDescription (..),
                                                         Library (..),
                                                         TestSuite (testBuildInfo),
-                                                        condTreeData, exeModules,
-                                                        libModules)
+                                                        condTreeData)
 import           Distribution.PackageDescription.Parse (readPackageDescription)
 import           Distribution.Verbosity                (normal)
-import           Language.Haskell.Extension            (Extension (..),
-                                                        KnownExtension (..))
-import qualified Language.Haskell.Exts                 as HSE
-import           Path                                  (Abs, Dir, File, Path, Rel,
-                                                        fromAbsFile, parseRelDir,
-                                                        parseRelFile, (</>))
-import           System.Directory                      (doesFileExist)
-import           System.FilePath.Posix                 (dropExtension)
-import           Text.Read                             (read)
 
-import           Importify.Syntax                      (getModuleTitle)
 
 readCabal :: FilePath -> IO GenericPackageDescription
 readCabal = readPackageDescription normal
@@ -56,25 +39,9 @@ withLibrary GenericPackageDescription{..} action =
           (action . condTreeData)
           condLibrary
 
--- | Get list of all extensions from 'Library' and convert them into
--- 'HSE.Extension'.
-libraryExtensions :: Library -> [HSE.Extension]
-libraryExtensions library = let BuildInfo{..} = libBuildInfo library
-                           in map cabalExtToHseExt
-                            $ filter isHseExt
-                            $ defaultExtensions ++ otherExtensions
-
 -- | Returns all include directories for 'Library'.
 libraryIncludeDirs :: Library -> [FilePath]
 libraryIncludeDirs = includeDirs . libBuildInfo
-
-cabalExtToHseExt :: Extension -> HSE.Extension
-cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show
-
-isHseExt :: Extension -> Bool
-isHseExt (EnableExtension NegativeLiterals) = False
-isHseExt (EnableExtension Unsafe)           = False
-isHseExt _                                  = True
 
 dependencyName :: Dependency -> String
 dependencyName (Dependency PackageName{..} _) = unPackageName

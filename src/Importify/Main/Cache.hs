@@ -14,8 +14,9 @@ import           Data.Version                    (showVersion)
 import           Distribution.Package            (PackageIdentifier (..))
 import           Distribution.PackageDescription (GenericPackageDescription (packageDescription),
                                                   Library, PackageDescription (package))
-import           Language.Haskell.Exts           (Extension, Module, ModuleName (..),
-                                                  SrcSpanInfo)
+import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
+                                                  indent, listF)
+import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Path                            (Abs, Dir, Path, fromAbsDir, fromAbsFile,
                                                   parseAbsDir, parseRelDir, parseRelFile,
@@ -23,91 +24,119 @@ import           Path                            (Abs, Dir, Path, fromAbsDir, fr
 import           System.Directory                (createDirectoryIfMissing,
                                                   getCurrentDirectory, listDirectory,
                                                   removeDirectoryRecursive)
-import           System.FilePath                 (dropExtension, takeFileName)
-import           Turtle                          (cd, shell)
+import           System.FilePath                 (dropExtension, takeExtension,
+                                                  takeFileName)
+import           Turtle                          (shell)
 
+import           Extended.System.Wlog            (printInfo, printWarning)
 import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
                                                   libraryIncludeDirs, modulePaths,
                                                   packageDependencies, readCabal,
-                                                  splitOnExposedAndOther, withLibrary)
+                                                  splitOnExposedAndOther,
+                                                  withHarmlessExtensions, withLibrary)
 import           Importify.CPP                   (parseModuleFile)
-import           Importify.Paths                 (cacheDir, cachePath, extensionsFile,
+import           Importify.ParseException        (ModuleParseException)
+import           Importify.ParseException        (reportErrorsIfAny)
+import           Importify.Paths                 (cachePath, doInsideDir, extensionsFile,
                                                   guessCabalName, modulesFile,
                                                   symbolsPath, targetsFile)
 import           Importify.Resolution            (resolveModules)
 
 -- | Caches packages information into local .importify directory.
-doCache :: FilePath -> Bool -> [String] -> IO ()
-doCache filepath preserve overrideDependencies = do
-    projectCabalDesc <- readCabal filepath
-
-    curDir           <- getCurrentDirectory
-    projectPath      <- parseAbsDir curDir
+doCache :: Bool -> [String] -> IO ()
+doCache preserveSources [] = do
+    thisDirectory <- getCurrentDirectory
+    thisDirNodes  <- listDirectory thisDirectory
+    let cabalFiles = filter ((== ".cabal") . takeExtension) thisDirNodes
+    case cabalFiles of
+        [] -> printWarning "No .cabal file in this directory! Aborting. Please, \
+                           \run this command from your project root directory."
+        (cabalFile:_) -> cacheProject preserveSources cabalFile
+doCache preserveSources explicitDependencies = do
+    printInfo "Using explicitly specifined list of dependencies for caching..."
+    thisDirectory    <- getCurrentDirectory
+    projectPath      <- parseAbsDir thisDirectory
     let importifyPath = projectPath </> cachePath
-    let importifyDir  = fromAbsDir importifyPath
+    doInsideDir importifyPath $
+        () <$ unpackAndCacheDependencies importifyPath
+                                         preserveSources
+                                         explicitDependencies
 
-    -- TODO: error if not inside project directory?
-    createDirectoryIfMissing True importifyDir  -- creates ./.importify
-    cd $ fromString cacheDir    -- cd to ./.importify/
+cacheProject :: Bool -> FilePath -> IO ()
+cacheProject preserveSources cabalFile = do
+    -- TODO: remove code duplication
+    thisDirectory    <- getCurrentDirectory
+    projectPath      <- parseAbsDir thisDirectory
+    cabalFilePath    <- parseRelFile cabalFile
+    let cabalPath     = fromAbsFile $ projectPath </> cabalFilePath
+    let importifyPath = projectPath </> cachePath
 
-    -- Extension maps
-    let (targetMaps, extensionMaps) = getExtensionMaps projectCabalDesc
-    BS.writeFile targetsFile    $ encode targetMaps
-    BS.writeFile extensionsFile $ encode extensionMaps
+    doInsideDir importifyPath $ do
+        projectCabalDesc <- readCabal cabalPath
 
-    -- Libraries
-    let projectName = dropExtension $ takeFileName filepath
-    let fetchedLibs = filter (\p -> p /= "base" && p /= projectName)
-                    $ packageDependencies projectCabalDesc
-    let libs        = if null overrideDependencies
-                      then fetchedLibs
-                      else overrideDependencies
-    print libs
+        -- Extension maps
+        let (targetMaps, extensionMaps) = getExtensionMaps projectCabalDesc
+        BS.writeFile targetsFile    $ encode targetMaps
+        BS.writeFile extensionsFile $ encode extensionMaps
 
-    -- download & unpack sources, then cache and delete
-    dependenciesResolutionMaps <- forM libs $
-        collectDependenciesResolution importifyPath preserve
+        -- Libraries
+        let projectName = dropExtension $ takeFileName cabalFile
+        let libraries   = sort
+                        $ filter (\p -> p /= "base" && p /= projectName)
+                        $ packageDependencies projectCabalDesc
+        printInfo $ fmt $ "Downloading dependencies: " <> listF libraries
 
-    let PackageIdentifier{..} = package $ packageDescription projectCabalDesc
-    projectResolutionMap <- createProjectCache projectCabalDesc
-                                               projectPath
-                                               (importifyPath </> symbolsPath)
-                                               projectName
-                                               (projectName ++ '-':showVersion pkgVersion)
+        -- download & unpack sources, then cache and delete
+        dependenciesResolutionMaps <- unpackAndCacheDependencies importifyPath
+                                                                 preserveSources
+                                                                 libraries
 
-    let importsMap = Map.unions (projectResolutionMap:dependenciesResolutionMaps)
-    BS.writeFile modulesFile $ encode importsMap
+        let PackageIdentifier{..} = package $ packageDescription projectCabalDesc
+        projectResolutionMap <- createProjectCache projectCabalDesc
+                                                   projectPath
+                                                   (importifyPath </> symbolsPath)
+                                                   projectName
+                                                   (projectName ++ '-':showVersion pkgVersion)
 
-    cd ".."
+        let importsMap = Map.unions (projectResolutionMap:dependenciesResolutionMaps)
+        BS.writeFile modulesFile $ encode importsMap
+
+unpackAndCacheDependencies :: Path Abs Dir
+                             -> Bool
+                             -> [String]
+                             -> IO [Map String String]
+unpackAndCacheDependencies importifyPath preserveSources dependencies =
+    forM dependencies $
+        collectDependenciesResolution importifyPath preserveSources
 
 collectDependenciesResolution :: Path Abs Dir
                               -> Bool
                               -> String
                               -> IO (Map String String)
 collectDependenciesResolution importifyPath preserve libName = do
-        _exitCode            <- shell ("stack unpack " <> toText libName) empty
-        localPackages        <- listDirectory (fromAbsDir importifyPath)
-        let maybePackage      = find (libName `isPrefixOf`) localPackages
-        let downloadedPackage = fromMaybe (error "Package wasn't downloaded!")
-                                          maybePackage  -- TODO: this is not fine
+    _exitCode            <- shell ("stack unpack " <> toText libName) empty
+    localPackages        <- listDirectory (fromAbsDir importifyPath)
+    let maybePackage      = find (libName `isPrefixOf`) localPackages
+    let downloadedPackage = fromMaybe (error "Package wasn't downloaded!")
+                                      maybePackage  -- TODO: this is not fine
 
-        packagePath              <- parseRelDir downloadedPackage
-        let downloadedPackagePath = importifyPath </> packagePath
-        let cabalFileName         = guessCabalName libName
-        packageCabalDesc         <- readCabal $ fromAbsFile
-                                              $ downloadedPackagePath </> cabalFileName
+    packagePath              <- parseRelDir downloadedPackage
+    let downloadedPackagePath = importifyPath </> packagePath
+    let cabalFileName         = guessCabalName libName
+    packageCabalDesc         <- readCabal $ fromAbsFile
+                                          $ downloadedPackagePath </> cabalFileName
 
-        let symbolsCachePath = importifyPath </> symbolsPath
-        packageModules <- createProjectCache packageCabalDesc
-                                             downloadedPackagePath
-                                             symbolsCachePath
-                                             libName
-                                             downloadedPackage
+    let symbolsCachePath = importifyPath </> symbolsPath
+    packageModules <- createProjectCache packageCabalDesc
+                                         downloadedPackagePath
+                                         symbolsCachePath
+                                         libName
+                                         downloadedPackage
 
-        unless preserve $  -- TODO: use bracket here
-            removeDirectoryRecursive downloadedPackage
+    unless preserve $  -- TODO: use bracket here
+        removeDirectoryRecursive downloadedPackage
 
-        pure packageModules
+    pure packageModules
 
 createProjectCache :: GenericPackageDescription
                    -> Path Abs Dir
@@ -142,17 +171,12 @@ createProjectCache packageCabalDesc packagePath symbolsCachePath libName package
 
 parsedModulesWithErrors :: Path Abs Dir  -- ^ Path like @~/.../.importify/containers-0.5@
                         -> Library
-                        -> IO ([Text], [Module SrcSpanInfo])
+                        -> IO ([ModuleParseException], [Module SrcSpanInfo])
 parsedModulesWithErrors packagePath library = do
     includeDirPaths <- mapM parseRelDir $ libraryIncludeDirs library
     let includeDirs  = map (fromAbsDir . (packagePath </>)) includeDirPaths
-    let extensions   = libraryExtensions  library
+    let extensions   = withHarmlessExtensions $ libraryExtensions library
     pathsToModules  <- modulePaths packagePath library
 
     modEithers <- mapM (parseModuleFile extensions includeDirs) pathsToModules
     pure $ partitionEithers modEithers
-
-reportErrorsIfAny :: [Text] -> String -> IO ()
-reportErrorsIfAny errors libName = whenNotNull errors $ \messages -> do
-    putText $ " * Next errors occured during caching of package: " <> toText libName
-    forM_ messages putText

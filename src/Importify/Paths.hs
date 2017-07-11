@@ -18,15 +18,18 @@ module Importify.Paths
        , testDataDir
 
          -- * Utility functions to work with directories
+       , doInsideDir
        , guessCabalName
        ) where
 
 import           Universum
 
-import           Path            (Dir, File, Rel, fromRelDir, fromRelFile, reldir,
-                                  relfile)
-import           Path.Internal   (Path (..))
-import           System.FilePath ((<.>))
+import           Path             (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
+                                   fromRelFile, reldir, relfile)
+import           Path.Internal    (Path (..))
+import           System.Directory (createDirectoryIfMissing)
+import           System.FilePath  ((<.>))
+import           Turtle           (cd, pwd)
 
 cachePath :: Path Rel Dir
 cachePath = [reldir|.importify/|]
@@ -52,14 +55,28 @@ extensionsPath :: Path Rel File
 extensionsPath = [relfile|extensions|]
 
 cacheDir, extensionsFile, modulesFile, symbolsDir, targetsFile, testDataDir :: FilePath
-cacheDir    = fromRelDir  cachePath
+cacheDir       = fromRelDir  cachePath
 extensionsFile = fromRelFile extensionsPath
-modulesFile = fromRelFile modulesPath
-symbolsDir  = fromRelDir  symbolsPath
-targetsFile = fromRelFile targetsPath
-testDataDir = fromRelDir  testDataPath
+modulesFile    = fromRelFile modulesPath
+symbolsDir     = fromRelDir  symbolsPath
+targetsFile    = fromRelFile targetsPath
+testDataDir    = fromRelDir  testDataPath
 
 -- TODO: probably not reliable, instead file with
 -- .cabal extension should be searched
 guessCabalName :: FilePath -> Path Rel File
 guessCabalName libName = Path $ libName <.> ".cabal"
+
+createCacheDir :: Path Abs Dir -> IO ()
+createCacheDir importifyPath = do
+    let importifyDir = fromAbsDir importifyPath
+    createDirectoryIfMissing True importifyDir -- creates ./.importify
+
+-- | Create given directory and perform given action inside it.
+doInsideDir :: Path Abs Dir -> IO () -> IO ()
+doInsideDir dir action = do
+    thisDirectory <- pwd
+    bracket_ (do createCacheDir dir
+                 cd $ fromString $ fromAbsDir dir)
+             (cd thisDirectory)
+             action

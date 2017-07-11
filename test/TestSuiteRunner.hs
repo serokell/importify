@@ -4,23 +4,23 @@ module Main where
 
 import           Universum
 
-import           Data.Algorithm.Diff (Diff (Both), getDiff)
-import           Data.List           (sort)
-import           Path                (Dir, File, Path, Rel, fileExtension, fromRelDir,
-                                      fromRelFile, parseRelDir, parseRelFile, (-<.>),
-                                      (</>))
-import           System.Directory    (listDirectory)
+import           Data.Algorithm.Diff  (Diff (Both), getDiff)
+import           Data.List            (sort)
+import           Path                 (Dir, File, Path, Rel, fileExtension, fromRelDir,
+                                       fromRelFile, parseRelDir, parseRelFile, (-<.>),
+                                       (</>))
+import           System.Directory     (listDirectory)
 
-import           Test.Hspec          (Spec, describe, hspec, it, runIO, shouldBe, xit)
+import           Test.Hspec           (Spec, describe, hspec, it, runIO, shouldBe, xit)
 
-import           Importify.Main      (doCache, doSource)
-import           Importify.Paths     (testDataPath)
+import           Extended.System.Wlog (initImportifyLogger)
+import           Importify.Main       (doCache, doSource)
+import           Importify.Paths      (testDataPath)
 
 main :: IO ()
 main = do
-    -- TODO: temporal workaround to make tests work;
-    --       to be removed after enhancing test system
-    doCache "importify.cabal" False []
+    initImportifyLogger
+    doCache False []
     testFolders <- listDirectory (fromRelDir testDataPath)
     hspec $ mapM_ makeTestGroup testFolders
 

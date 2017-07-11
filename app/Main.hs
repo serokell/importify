@@ -11,22 +11,24 @@ module Main where
 
 import           Universum
 
-import           Importify.Main (doCache, doFile)
+import           Extended.System.Wlog (initImportifyLogger)
+import           Importify.Main       (doCache, doFile)
 
-import           Options        (CabalCacheOptions (..), Command (..),
-                                 SingleFileOptions (..), parseOptions)
+import           Options              (CabalCacheOptions (..), Command (..),
+                                       SingleFileOptions (..), parseOptions)
 
 main :: IO ()
 main = do
     opts <- parseOptions
+    initImportifyLogger
     case opts of
         SingleFile sfOpts -> importifySingleFile sfOpts
         CabalCache ccOpts -> buildCabalCache ccOpts
 
 importifySingleFile :: SingleFileOptions -> IO ()
 importifySingleFile SingleFileOptions{..} =
-    doFile sfoOutput sfoFilename
+    doFile sfoOutput sfoFileName
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =
-    doCache ccoFilename ccoPreserve ccoDependencies
+    doCache ccoPreserve ccoDependencies
