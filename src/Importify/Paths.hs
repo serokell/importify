@@ -55,12 +55,12 @@ extensionsPath :: Path Rel File
 extensionsPath = [relfile|extensions|]
 
 cacheDir, extensionsFile, modulesFile, symbolsDir, targetsFile, testDataDir :: FilePath
-cacheDir    = fromRelDir  cachePath
+cacheDir       = fromRelDir  cachePath
 extensionsFile = fromRelFile extensionsPath
-modulesFile = fromRelFile modulesPath
-symbolsDir  = fromRelDir  symbolsPath
-targetsFile = fromRelFile targetsPath
-testDataDir = fromRelDir  testDataPath
+modulesFile    = fromRelFile modulesPath
+symbolsDir     = fromRelDir  symbolsPath
+targetsFile    = fromRelFile targetsPath
+testDataDir    = fromRelDir  testDataPath
 
 -- TODO: probably not reliable, instead file with
 -- .cabal extension should be searched

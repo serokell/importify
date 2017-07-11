@@ -108,29 +108,29 @@ collectDependenciesResolution :: Path Abs Dir
                               -> String
                               -> IO (Map String String)
 collectDependenciesResolution importifyPath preserve libName = do
-        _exitCode            <- shell ("stack unpack " <> toText libName) empty
-        localPackages        <- listDirectory (fromAbsDir importifyPath)
-        let maybePackage      = find (libName `isPrefixOf`) localPackages
-        let downloadedPackage = fromMaybe (error "Package wasn't downloaded!")
-                                          maybePackage  -- TODO: this is not fine
+    _exitCode            <- shell ("stack unpack " <> toText libName) empty
+    localPackages        <- listDirectory (fromAbsDir importifyPath)
+    let maybePackage      = find (libName `isPrefixOf`) localPackages
+    let downloadedPackage = fromMaybe (error "Package wasn't downloaded!")
+                                      maybePackage  -- TODO: this is not fine
 
-        packagePath              <- parseRelDir downloadedPackage
-        let downloadedPackagePath = importifyPath </> packagePath
-        let cabalFileName         = guessCabalName libName
-        packageCabalDesc         <- readCabal $ fromAbsFile
-                                              $ downloadedPackagePath </> cabalFileName
+    packagePath              <- parseRelDir downloadedPackage
+    let downloadedPackagePath = importifyPath </> packagePath
+    let cabalFileName         = guessCabalName libName
+    packageCabalDesc         <- readCabal $ fromAbsFile
+                                          $ downloadedPackagePath </> cabalFileName
 
-        let symbolsCachePath = importifyPath </> symbolsPath
-        packageModules <- createProjectCache packageCabalDesc
-                                             downloadedPackagePath
-                                             symbolsCachePath
-                                             libName
-                                             downloadedPackage
+    let symbolsCachePath = importifyPath </> symbolsPath
+    packageModules <- createProjectCache packageCabalDesc
+                                         downloadedPackagePath
+                                         symbolsCachePath
+                                         libName
+                                         downloadedPackage
 
-        unless preserve $  -- TODO: use bracket here
-            removeDirectoryRecursive downloadedPackage
+    unless preserve $  -- TODO: use bracket here
+        removeDirectoryRecursive downloadedPackage
 
-        pure packageModules
+    pure packageModules
 
 createProjectCache :: GenericPackageDescription
                    -> Path Abs Dir
