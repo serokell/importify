@@ -71,10 +71,12 @@ cacheParser = do
         short 'p' <>
         help "Don't remove downloaded package cache"
     ccoDependencies <- many $ strOption $
-        metavar "STRING" <>
+        metavar "[STRING]" <>
         long "dependency" <>
         short 'd' <>
-        help "List of manually specified dependencies that should be used instead of .cabal file"
+        help "List of manually specified dependencies that should be used \
+             \for caching instead of libraries from .cabal file. This option \
+             \overrides default behavior."
     pure $ CabalCache CabalCacheOptions{..}
 
 optsInfo :: ParserInfo Command

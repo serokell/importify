@@ -32,67 +32,76 @@ import           Importify.Cabal                 (getExtensionMaps, libraryExten
                                                   packageDependencies, readCabal,
                                                   splitOnExposedAndOther, withLibrary)
 import           Importify.CPP                   (parseModuleFile)
-import           Importify.Paths                 (cacheDir, cachePath, extensionsFile,
-                                                  guessCabalName, modulesFile,
-                                                  symbolsPath, targetsFile)
+import           Importify.Paths                 (cacheDir, cachePath, doInsideDir,
+                                                  extensionsFile, guessCabalName,
+                                                  modulesFile, symbolsPath, targetsFile)
 import           Importify.Resolution            (resolveModules)
 
 -- | Caches packages information into local .importify directory.
 doCache :: Bool -> [String] -> IO ()
-doCache preserveSources overrideDependencies = do
+doCache preserveSources [] = do
     thisDirectory <- getCurrentDirectory
     thisDirNodes  <- listDirectory thisDirectory
     let cabalFiles = filter ((== ".cabal") . takeExtension) thisDirNodes
     case cabalFiles of
         [] -> putText "No .cabal file in this directory! Aborting. Please, \
-                         \run this command from root directory of your project."
-        (cabalFile:_) -> cacheProject preserveSources
-                                      overrideDependencies
-                                      cabalFile
+                      \run this command from your project root directory."
+        (cabalFile:_) -> cacheProject preserveSources cabalFile
+doCache preserveSources explicitDependencies = do
+    putText "Using explicitly specifined list of dependencies for caching..."
+    thisDirectory    <- getCurrentDirectory
+    projectPath      <- parseAbsDir thisDirectory
+    let importifyPath = projectPath </> cachePath
+    doInsideDir importifyPath $
+        () <$ unpackAndCacheDependencies importifyPath
+                                         preserveSources
+                                         explicitDependencies
 
-cacheProject :: Bool -> [String] -> FilePath -> IO ()
-cacheProject preserveSources overrideDependencies cabalFile = do
+cacheProject :: Bool -> FilePath -> IO ()
+cacheProject preserveSources cabalFile = do
+    -- TODO: remove code duplication
     thisDirectory    <- getCurrentDirectory
     projectPath      <- parseAbsDir thisDirectory
     cabalFilePath    <- parseRelFile cabalFile
     let cabalPath     = fromAbsFile $ projectPath </> cabalFilePath
     let importifyPath = projectPath </> cachePath
-    let importifyDir  = fromAbsDir importifyPath
 
-    createDirectoryIfMissing True importifyDir -- creates ./.importify
-    cd $ fromString cacheDir                   -- cd to ./.importify/
+    doInsideDir importifyPath $ do
+        projectCabalDesc <- readCabal cabalPath
 
-    projectCabalDesc <- readCabal cabalPath
+        -- Extension maps
+        let (targetMaps, extensionMaps) = getExtensionMaps projectCabalDesc
+        BS.writeFile targetsFile    $ encode targetMaps
+        BS.writeFile extensionsFile $ encode extensionMaps
 
-    -- Extension maps
-    let (targetMaps, extensionMaps) = getExtensionMaps projectCabalDesc
-    BS.writeFile targetsFile    $ encode targetMaps
-    BS.writeFile extensionsFile $ encode extensionMaps
+        -- Libraries
+        let projectName = dropExtension $ takeFileName cabalFile
+        let libraries   = filter (\p -> p /= "base" && p /= projectName)
+                        $ packageDependencies projectCabalDesc
+        print libraries
 
-    -- Libraries
-    let projectName = dropExtension $ takeFileName cabalFile
-    let fetchedLibs = filter (\p -> p /= "base" && p /= projectName)
-                    $ packageDependencies projectCabalDesc
-    let libs        = if null overrideDependencies
-                      then fetchedLibs
-                      else overrideDependencies
-    print libs
+        -- download & unpack sources, then cache and delete
+        dependenciesResolutionMaps <- unpackAndCacheDependencies importifyPath
+                                                                 preserveSources
+                                                                 libraries
 
-    -- download & unpack sources, then cache and delete
-    dependenciesResolutionMaps <- forM libs $
+        let PackageIdentifier{..} = package $ packageDescription projectCabalDesc
+        projectResolutionMap <- createProjectCache projectCabalDesc
+                                                   projectPath
+                                                   (importifyPath </> symbolsPath)
+                                                   projectName
+                                                   (projectName ++ '-':showVersion pkgVersion)
+
+        let importsMap = Map.unions (projectResolutionMap:dependenciesResolutionMaps)
+        BS.writeFile modulesFile $ encode importsMap
+
+unpackAndCacheDependencies :: Path Abs Dir
+                             -> Bool
+                             -> [String]
+                             -> IO [Map String String]
+unpackAndCacheDependencies importifyPath preserveSources dependencies =
+    forM dependencies $
         collectDependenciesResolution importifyPath preserveSources
-
-    let PackageIdentifier{..} = package $ packageDescription projectCabalDesc
-    projectResolutionMap <- createProjectCache projectCabalDesc
-                                               projectPath
-                                               (importifyPath </> symbolsPath)
-                                               projectName
-                                               (projectName ++ '-':showVersion pkgVersion)
-
-    let importsMap = Map.unions (projectResolutionMap:dependenciesResolutionMaps)
-    BS.writeFile modulesFile $ encode importsMap
-
-    cd ".."
 
 collectDependenciesResolution :: Path Abs Dir
                               -> Bool
