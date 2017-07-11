@@ -9,11 +9,14 @@ import           Universum
 import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Lazy            as BS
 import qualified Data.Map                        as Map
+import qualified Data.Text                       as T
 import           Data.Version                    (showVersion)
 
 import           Distribution.Package            (PackageIdentifier (..))
 import           Distribution.PackageDescription (GenericPackageDescription (packageDescription),
                                                   Library, PackageDescription (package))
+import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
+                                                  indent, listF)
 import           Language.Haskell.Exts           (Extension, Module, ModuleName (..),
                                                   SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
@@ -27,11 +30,14 @@ import           System.FilePath                 (dropExtension, takeExtension,
                                                   takeFileName)
 import           Turtle                          (cd, shell)
 
+import           Extended.System.Wlog            (printInfo, printWarning)
 import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
                                                   libraryIncludeDirs, modulePaths,
                                                   packageDependencies, readCabal,
                                                   splitOnExposedAndOther, withLibrary)
 import           Importify.CPP                   (parseModuleFile)
+import           Importify.ParseException        (ModuleParseException)
+import           Importify.ParseException        (reportErrorsIfAny)
 import           Importify.Paths                 (cacheDir, cachePath, doInsideDir,
                                                   extensionsFile, guessCabalName,
                                                   modulesFile, symbolsPath, targetsFile)
@@ -44,11 +50,11 @@ doCache preserveSources [] = do
     thisDirNodes  <- listDirectory thisDirectory
     let cabalFiles = filter ((== ".cabal") . takeExtension) thisDirNodes
     case cabalFiles of
-        [] -> putText "No .cabal file in this directory! Aborting. Please, \
-                      \run this command from your project root directory."
+        [] -> printWarning "No .cabal file in this directory! Aborting. Please, \
+                           \run this command from your project root directory."
         (cabalFile:_) -> cacheProject preserveSources cabalFile
 doCache preserveSources explicitDependencies = do
-    putText "Using explicitly specifined list of dependencies for caching..."
+    printInfo "Using explicitly specifined list of dependencies for caching..."
     thisDirectory    <- getCurrentDirectory
     projectPath      <- parseAbsDir thisDirectory
     let importifyPath = projectPath </> cachePath
@@ -76,9 +82,10 @@ cacheProject preserveSources cabalFile = do
 
         -- Libraries
         let projectName = dropExtension $ takeFileName cabalFile
-        let libraries   = filter (\p -> p /= "base" && p /= projectName)
+        let libraries   = sort
+                        $ filter (\p -> p /= "base" && p /= projectName)
                         $ packageDependencies projectCabalDesc
-        print libraries
+        printInfo $ fmt $ "Downloading dependencies: " <> listF libraries
 
         -- download & unpack sources, then cache and delete
         dependenciesResolutionMaps <- unpackAndCacheDependencies importifyPath
@@ -165,7 +172,7 @@ createProjectCache packageCabalDesc packagePath symbolsCachePath libName package
 
 parsedModulesWithErrors :: Path Abs Dir  -- ^ Path like @~/.../.importify/containers-0.5@
                         -> Library
-                        -> IO ([Text], [Module SrcSpanInfo])
+                        -> IO ([ModuleParseException], [Module SrcSpanInfo])
 parsedModulesWithErrors packagePath library = do
     includeDirPaths <- mapM parseRelDir $ libraryIncludeDirs library
     let includeDirs  = map (fromAbsDir . (packagePath </>)) includeDirPaths
@@ -174,8 +181,3 @@ parsedModulesWithErrors packagePath library = do
 
     modEithers <- mapM (parseModuleFile extensions includeDirs) pathsToModules
     pure $ partitionEithers modEithers
-
-reportErrorsIfAny :: [Text] -> String -> IO ()
-reportErrorsIfAny errors libName = whenNotNull errors $ \messages -> do
-    putText $ " * Next errors occured during caching of package: " <> toText libName
-    forM_ messages putText

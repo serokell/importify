@@ -23,17 +23,20 @@ library
   exposed-modules:     Importify.Cabal
                        Importify.CPP
                        Importify.Main
+                       Importify.ParseException
                        Importify.Paths
                        Importify.Pretty
                        Importify.Resolution
                        Importify.Syntax
                        Importify.Tree
 
-  other-modules:
                        -- Different utilities extending functionality
-                       -- of other libs
+                       -- of other libs; TODO: reexport from Extended?
                        Extended.Data.List
+                       Extended.Data.Str
+                       Extended.System.Wlog
 
+  other-modules:
                        -- Functions to work with .cabal files
                        Importify.Cabal.Module
                        Importify.Cabal.Package
@@ -54,6 +57,8 @@ library
                      , haskell-names
                      , haskell-src-exts
                      , hse-cpp
+                     , log-warper
+                     , microlens-mtl
                      , path
                      , pretty-show
                      , syb
