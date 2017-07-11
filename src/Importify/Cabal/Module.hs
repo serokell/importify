@@ -6,32 +6,18 @@ module Importify.Cabal.Module
        , splitOnExposedAndOther
        ) where
 
-import           Universum                             hiding (fromString)
+import           Universum                       hiding (fromString)
 
-import qualified Data.HashMap.Strict                   as Map
-import           Data.List                             (partition)
-import           Distribution.ModuleName               (ModuleName, fromString,
-                                                        toFilePath)
-import qualified Distribution.ModuleName               as Cabal
-import           Distribution.Package                  (Dependency (..), PackageName (..))
-import           Distribution.PackageDescription       (BuildInfo (..), CondTree,
-                                                        Executable (..),
-                                                        GenericPackageDescription (..),
-                                                        Library (..), condTreeData,
-                                                        exeModules, libModules)
-import           Distribution.PackageDescription.Parse (readPackageDescription)
-import           Distribution.Verbosity                (normal)
-import           Language.Haskell.Extension            (Extension (..),
-                                                        KnownExtension (..))
-import qualified Language.Haskell.Exts                 as HSE
-import           Path                                  (Abs, Dir, File, Path, Rel,
-                                                        fromAbsFile, parseRelDir,
-                                                        parseRelFile, (</>))
-import           System.Directory                      (doesFileExist)
-import           System.FilePath.Posix                 (dropExtension)
-import           Text.Read                             (read)
+import           Data.List                       (partition)
+import           Distribution.ModuleName         (ModuleName, fromString, toFilePath)
+import qualified Distribution.ModuleName         as Cabal
+import           Distribution.PackageDescription (BuildInfo (..), Library (..))
+import qualified Language.Haskell.Exts           as HSE
+import           Path                            (Abs, Dir, File, Path, Rel, fromAbsFile,
+                                                  parseRelDir, parseRelFile, (</>))
+import           System.Directory                (doesFileExist)
 
-import           Importify.Syntax                      (getModuleTitle)
+import           Importify.Syntax                (getModuleTitle)
 
 -- | Split list of modules into /exposed/ modules and /other/ modules for given library.
 -- __First__ element of pair represents /exposed/ modules.

@@ -16,8 +16,7 @@ import           Language.Haskell.Exts                    (ImportDecl (..), Modu
                                                            ModuleName (..), QName (..),
                                                            SrcSpanInfo)
 import           Language.Haskell.Names                   (NameInfo (GlobalSymbol),
-                                                           Scoped (Scoped), resolve,
-                                                           symbolName)
+                                                           Scoped (Scoped), resolve)
 import qualified Language.Haskell.Names                   as N
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
 import           Language.Haskell.Names.SyntaxUtils       (getModuleName)

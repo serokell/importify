@@ -10,11 +10,6 @@ module Importify.Cabal.Package
 
 import           Universum                             hiding (fromString)
 
-import qualified Data.HashMap.Strict                   as Map
-import           Data.List                             (partition)
-import           Distribution.ModuleName               (ModuleName, fromString,
-                                                        toFilePath)
-import qualified Distribution.ModuleName               as Cabal
 import           Distribution.Package                  (Dependency (..), PackageName (..))
 import           Distribution.PackageDescription       (Benchmark (benchmarkBuildInfo),
                                                         BuildInfo (..), CondTree,
@@ -22,21 +17,10 @@ import           Distribution.PackageDescription       (Benchmark (benchmarkBuil
                                                         GenericPackageDescription (..),
                                                         Library (..),
                                                         TestSuite (testBuildInfo),
-                                                        condTreeData, exeModules,
-                                                        libModules)
+                                                        condTreeData)
 import           Distribution.PackageDescription.Parse (readPackageDescription)
 import           Distribution.Verbosity                (normal)
-import           Language.Haskell.Extension            (Extension (..),
-                                                        KnownExtension (..))
-import qualified Language.Haskell.Exts                 as HSE
-import           Path                                  (Abs, Dir, File, Path, Rel,
-                                                        fromAbsFile, parseRelDir,
-                                                        parseRelFile, (</>))
-import           System.Directory                      (doesFileExist)
-import           System.FilePath.Posix                 (dropExtension)
-import           Text.Read                             (read)
 
-import           Importify.Syntax                      (getModuleTitle)
 
 readCabal :: FilePath -> IO GenericPackageDescription
 readCabal = readPackageDescription normal

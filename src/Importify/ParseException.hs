@@ -12,15 +12,12 @@ import           Universum
 import qualified Data.Text.Buildable
 import           Fmt                   (Builder, blockListF, build, fmt, fmtLn, indent,
                                         listF, ( #| ), (|#))
-import           Language.Haskell.Exts (Comment, Extension, Module, ParseMode (..),
-                                        ParseResult (..), SrcSpanInfo, defaultParseMode,
-                                        prettyPrint)
-import qualified Language.Haskell.Exts as LHE (SrcLoc)
+import           Language.Haskell.Exts (ParseResult (..), prettyPrint, SrcLoc)
 
 import           Extended.Data.Str     (charWrap, wordWrap)
 import           Extended.System.Wlog  (printWarning)
 
-data ModuleParseException = MPE !LHE.SrcLoc !String
+data ModuleParseException = MPE SrcLoc !String
     deriving (Show)
 
 instance Exception ModuleParseException

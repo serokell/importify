@@ -9,10 +9,9 @@ module Extended.System.Wlog
 import           Universum
 
 import           Lens.Micro.Mtl (zoom, (?=))
-import           System.Wlog    (LoggerConfig, LoggerName, LoggerNameBox,
-                                 Severity (Info, Warning), consoleOutB, lcTree, logInfo,
-                                 logWarning, ltSeverity, setupLogging, usingLoggerName,
-                                 zoomLogger)
+import           System.Wlog    (LoggerConfig, LoggerNameBox, Severity (Info, Warning),
+                                 consoleOutB, lcTree, logInfo, logWarning, ltSeverity,
+                                 setupLogging, usingLoggerName, zoomLogger)
 
 importifyLoggerConfig :: LoggerConfig
 importifyLoggerConfig = executingState consoleOutB $ zoom lcTree $ do

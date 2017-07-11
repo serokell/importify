@@ -3,40 +3,19 @@
 
 module Importify.Cabal.Extension
        ( libraryExtensions
+       , showExt
        , withHarmlessExtensions
        ) where
 
 import           Universum
 
-import qualified Data.HashMap.Strict                   as Map
-import           Data.List                             (partition)
-import           Distribution.ModuleName               (ModuleName, fromString,
-                                                        toFilePath)
-import qualified Distribution.ModuleName               as Cabal
-import           Distribution.Package                  (Dependency (..), PackageName (..))
-import           Distribution.PackageDescription       (Benchmark (benchmarkBuildInfo),
-                                                        BuildInfo (..), CondTree,
-                                                        Executable (..),
-                                                        GenericPackageDescription (..),
-                                                        Library (..),
-                                                        TestSuite (testBuildInfo),
-                                                        condTreeData, exeModules,
-                                                        libModules)
-import           Distribution.PackageDescription.Parse (readPackageDescription)
-import           Distribution.Verbosity                (normal)
-import qualified Language.Haskell.Extension            as Cabal (Extension (EnableExtension),
-                                                                 KnownExtension (..))
-import qualified Language.Haskell.Exts                 as HSE
-import           Language.Haskell.Exts.Extension       (Extension (..),
-                                                        KnownExtension (..))
-import           Path                                  (Abs, Dir, File, Path, Rel,
-                                                        fromAbsFile, parseRelDir,
-                                                        parseRelFile, (</>))
-import           System.Directory                      (doesFileExist)
-import           System.FilePath.Posix                 (dropExtension)
-import           Text.Read                             (read)
+import qualified Distribution.ModuleName         as Cabal
+import           Distribution.PackageDescription (BuildInfo (..), Library (..))
+import qualified Language.Haskell.Extension      as Cabal (Extension (..),
+                                                           KnownExtension (..))
+import           Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
+import           Text.Read                       (read)
 
-import           Importify.Syntax                      (getModuleTitle)
 
 -- | Get list of all extensions from 'Library' and convert them into
 -- 'HSE.Extension'.
@@ -54,6 +33,11 @@ isHseExt :: Cabal.Extension -> Bool
 isHseExt (Cabal.EnableExtension Cabal.NegativeLiterals) = False
 isHseExt (Cabal.EnableExtension Cabal.Unsafe)           = False
 isHseExt _                                              = True
+
+showExt :: Cabal.Extension -> String
+showExt (Cabal.EnableExtension ext)   = show ext
+showExt (Cabal.DisableExtension ext)  = "No" ++ show ext
+showExt (Cabal.UnknownExtension name) = name
 
 -- | This function add list of harmless extensions wich helps to avoid
 -- some parsing errors but doesn't affect already correct parsing

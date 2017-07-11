@@ -9,7 +9,6 @@ import           Universum
 import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Lazy            as BS
 import qualified Data.Map                        as Map
-import qualified Data.Text                       as T
 import           Data.Version                    (showVersion)
 
 import           Distribution.Package            (PackageIdentifier (..))
@@ -17,8 +16,7 @@ import           Distribution.PackageDescription (GenericPackageDescription (pac
                                                   Library, PackageDescription (package))
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
                                                   indent, listF)
-import           Language.Haskell.Exts           (Extension, Module, ModuleName (..),
-                                                  SrcSpanInfo)
+import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Path                            (Abs, Dir, Path, fromAbsDir, fromAbsFile,
                                                   parseAbsDir, parseRelDir, parseRelFile,
@@ -28,7 +26,7 @@ import           System.Directory                (createDirectoryIfMissing,
                                                   removeDirectoryRecursive)
 import           System.FilePath                 (dropExtension, takeExtension,
                                                   takeFileName)
-import           Turtle                          (cd, shell)
+import           Turtle                          (shell)
 
 import           Extended.System.Wlog            (printInfo, printWarning)
 import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
@@ -39,9 +37,9 @@ import           Importify.Cabal                 (getExtensionMaps, libraryExten
 import           Importify.CPP                   (parseModuleFile)
 import           Importify.ParseException        (ModuleParseException)
 import           Importify.ParseException        (reportErrorsIfAny)
-import           Importify.Paths                 (cacheDir, cachePath, doInsideDir,
-                                                  extensionsFile, guessCabalName,
-                                                  modulesFile, symbolsPath, targetsFile)
+import           Importify.Paths                 (cachePath, doInsideDir, extensionsFile,
+                                                  guessCabalName, modulesFile,
+                                                  symbolsPath, targetsFile)
 import           Importify.Resolution            (resolveModules)
 
 -- | Caches packages information into local .importify directory.
