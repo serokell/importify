@@ -2,8 +2,7 @@
 -- other miscellaneous stuff in .cabal files.
 
 module Importify.Cabal.Package
-       ( libraryExtensions
-       , libraryIncludeDirs
+       ( libraryIncludeDirs
        , packageDependencies
        , readCabal
        , withLibrary
@@ -56,25 +55,9 @@ withLibrary GenericPackageDescription{..} action =
           (action . condTreeData)
           condLibrary
 
--- | Get list of all extensions from 'Library' and convert them into
--- 'HSE.Extension'.
-libraryExtensions :: Library -> [HSE.Extension]
-libraryExtensions library = let BuildInfo{..} = libBuildInfo library
-                           in map cabalExtToHseExt
-                            $ filter isHseExt
-                            $ defaultExtensions ++ otherExtensions
-
 -- | Returns all include directories for 'Library'.
 libraryIncludeDirs :: Library -> [FilePath]
 libraryIncludeDirs = includeDirs . libBuildInfo
-
-cabalExtToHseExt :: Extension -> HSE.Extension
-cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show
-
-isHseExt :: Extension -> Bool
-isHseExt (EnableExtension NegativeLiterals) = False
-isHseExt (EnableExtension Unsafe)           = False
-isHseExt _                                  = True
 
 dependencyName :: Dependency -> String
 dependencyName (Dependency PackageName{..} _) = unPackageName

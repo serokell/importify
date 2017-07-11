@@ -38,6 +38,7 @@ library
 
   other-modules:
                        -- Functions to work with .cabal files
+                       Importify.Cabal.Extension
                        Importify.Cabal.Module
                        Importify.Cabal.Package
                        Importify.Cabal.Target

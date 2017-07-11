@@ -34,7 +34,8 @@ import           Extended.System.Wlog            (printInfo, printWarning)
 import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
                                                   libraryIncludeDirs, modulePaths,
                                                   packageDependencies, readCabal,
-                                                  splitOnExposedAndOther, withLibrary)
+                                                  splitOnExposedAndOther,
+                                                  withHarmlessExtensions, withLibrary)
 import           Importify.CPP                   (parseModuleFile)
 import           Importify.ParseException        (ModuleParseException)
 import           Importify.ParseException        (reportErrorsIfAny)
@@ -176,7 +177,7 @@ parsedModulesWithErrors :: Path Abs Dir  -- ^ Path like @~/.../.importify/contai
 parsedModulesWithErrors packagePath library = do
     includeDirPaths <- mapM parseRelDir $ libraryIncludeDirs library
     let includeDirs  = map (fromAbsDir . (packagePath </>)) includeDirPaths
-    let extensions   = libraryExtensions  library
+    let extensions   = withHarmlessExtensions $ libraryExtensions library
     pathsToModules  <- modulePaths packagePath library
 
     modEithers <- mapM (parseModuleFile extensions includeDirs) pathsToModules
