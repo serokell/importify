@@ -41,6 +41,7 @@ import           Importify.Paths                 (cachePath, doInsideDir, extens
                                                   guessCabalName, modulesFile,
                                                   symbolsPath, targetsFile)
 import           Importify.Resolution            (resolveModules)
+import           Importify.Stack                 (ghcIncludePath)
 
 -- | Caches packages information into local .importify directory.
 doCache :: Bool -> [String] -> IO ()
@@ -173,8 +174,13 @@ parsedModulesWithErrors :: Path Abs Dir  -- ^ Path like @~/.../.importify/contai
                         -> Library
                         -> IO ([ModuleParseException], [Module SrcSpanInfo])
 parsedModulesWithErrors packagePath library = do
-    includeDirPaths <- mapM parseRelDir $ libraryIncludeDirs library
-    let includeDirs  = map (fromAbsDir . (packagePath </>)) includeDirPaths
+    -- get include directories for cpphs
+    includeDirPaths   <- mapM parseRelDir $ libraryIncludeDirs library
+    let pkgIncludeDirs = map (fromAbsDir . (packagePath </>)) includeDirPaths
+    ghcIncludeDir     <- toList <$> runMaybeT ghcIncludePath
+    let includeDirs    = pkgIncludeDirs ++ ghcIncludeDir
+
+    -- get extensions
     let extensions   = withHarmlessExtensions $ libraryExtensions library
     pathsToModules  <- modulePaths packagePath library
 
