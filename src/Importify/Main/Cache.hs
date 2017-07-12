@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 -- | Contains implementation of @importify cache@ command.
 
 module Importify.Main.Cache
@@ -18,14 +20,13 @@ import           Fmt                             (Builder, blockListF, build, fm
                                                   indent, listF)
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
-import           Path                            (Abs, Dir, Path, fromAbsDir, fromAbsFile,
-                                                  parseAbsDir, parseRelDir, parseRelFile,
-                                                  (</>))
+import           Path                            (Abs, Dir, File, Path, Rel, fromAbsDir,
+                                                  fromAbsFile, fromRelFile, parseAbsDir,
+                                                  parseRelDir, parseRelFile, (</>))
 import           System.Directory                (createDirectoryIfMissing,
                                                   getCurrentDirectory, listDirectory,
                                                   removeDirectoryRecursive)
-import           System.FilePath                 (dropExtension, takeExtension,
-                                                  takeFileName)
+import           System.FilePath                 (dropExtension)
 import           Turtle                          (shell)
 
 import           Extended.System.Wlog            (printInfo, printWarning)
@@ -38,21 +39,20 @@ import           Importify.CPP                   (parseModuleFile)
 import           Importify.ParseException        (ModuleParseException)
 import           Importify.ParseException        (reportErrorsIfAny)
 import           Importify.Paths                 (cachePath, doInsideDir, extensionsFile,
-                                                  guessCabalName, modulesFile,
-                                                  symbolsPath, targetsFile)
+                                                  findCabalFile, modulesFile, symbolsPath,
+                                                  targetsFile)
 import           Importify.Resolution            (resolveModules)
-import           Importify.Stack                 (ghcIncludePath)
+import           Importify.Stack                 (ghcIncludePath, stackListDependencies,
+                                                  upgradeWithVersions)
 
 -- | Caches packages information into local .importify directory.
 doCache :: Bool -> [String] -> IO ()
 doCache preserveSources [] = do
     thisDirectory <- getCurrentDirectory
-    thisDirNodes  <- listDirectory thisDirectory
-    let cabalFiles = filter ((== ".cabal") . takeExtension) thisDirNodes
-    case cabalFiles of
-        [] -> printWarning "No .cabal file in this directory! Aborting. Please, \
-                           \run this command from your project root directory."
-        (cabalFile:_) -> cacheProject preserveSources cabalFile
+    findCabalFile thisDirectory >>= \case
+        Nothing -> printWarning "No .cabal file in this directory! Aborting. Please, \
+                                \run this command from your project root directory."
+        Just cabalFile -> cacheProject preserveSources cabalFile
 doCache preserveSources explicitDependencies = do
     printInfo "Using explicitly specifined list of dependencies for caching..."
     thisDirectory    <- getCurrentDirectory
@@ -63,13 +63,12 @@ doCache preserveSources explicitDependencies = do
                                          preserveSources
                                          explicitDependencies
 
-cacheProject :: Bool -> FilePath -> IO ()
+cacheProject :: Bool -> Path Rel File -> IO ()
 cacheProject preserveSources cabalFile = do
     -- TODO: remove code duplication
     thisDirectory    <- getCurrentDirectory
     projectPath      <- parseAbsDir thisDirectory
-    cabalFilePath    <- parseRelFile cabalFile
-    let cabalPath     = fromAbsFile $ projectPath </> cabalFilePath
+    let cabalPath     = fromAbsFile $ projectPath </> cabalFile
     let importifyPath = projectPath </> cachePath
 
     doInsideDir importifyPath $ do
@@ -81,8 +80,10 @@ cacheProject preserveSources cabalFile = do
         BS.writeFile extensionsFile $ encode extensionMaps
 
         -- Libraries
-        let projectName = dropExtension $ takeFileName cabalFile
+        libVersions    <- stackListDependencies
+        let projectName = dropExtension $ fromRelFile cabalFile
         let libraries   = sort
+                        $ upgradeWithVersions libVersions
                         $ filter (\p -> p /= "base" && p /= projectName)
                         $ packageDependencies projectCabalDesc
         printInfo $ fmt $ "Downloading dependencies: " <> listF libraries
@@ -115,7 +116,8 @@ collectDependenciesResolution :: Path Abs Dir
                               -> String
                               -> IO (Map String String)
 collectDependenciesResolution importifyPath preserve libName = do
-    _exitCode            <- shell ("stack unpack " <> toText libName) empty
+    let textLibName       = toText libName
+    _exitCode            <- shell ("stack unpack " <> textLibName) empty
     localPackages        <- listDirectory (fromAbsDir importifyPath)
     let maybePackage      = find (libName `isPrefixOf`) localPackages
     let downloadedPackage = fromMaybe (error "Package wasn't downloaded!")
@@ -123,9 +125,13 @@ collectDependenciesResolution importifyPath preserve libName = do
 
     packagePath              <- parseRelDir downloadedPackage
     let downloadedPackagePath = importifyPath </> packagePath
-    let cabalFileName         = guessCabalName libName
-    packageCabalDesc         <- readCabal $ fromAbsFile
-                                          $ downloadedPackagePath </> cabalFileName
+    mCabalFileName           <- findCabalFile libName
+
+    let cabalFileName = fromMaybe (error $ "No .cabal file inside: " <> textLibName)
+                                  mCabalFileName
+    packageCabalDesc <- readCabal
+                      $ fromAbsFile
+                      $ downloadedPackagePath </> cabalFileName
 
     let symbolsCachePath = importifyPath </> symbolsPath
     packageModules <- createProjectCache packageCabalDesc
