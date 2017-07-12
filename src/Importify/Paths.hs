@@ -1,4 +1,5 @@
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes   #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | This module contains common utilities for working with importify cache.
 
@@ -19,16 +20,16 @@ module Importify.Paths
 
          -- * Utility functions to work with directories
        , doInsideDir
-       , guessCabalName
+       , findCabalFile
        ) where
 
 import           Universum
 
 import           Path             (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
-                                   fromRelFile, reldir, relfile)
+                                   fromRelFile, parseRelFile, reldir, relfile)
 import           Path.Internal    (Path (..))
-import           System.Directory (createDirectoryIfMissing)
-import           System.FilePath  ((<.>))
+import           System.Directory (createDirectoryIfMissing, listDirectory)
+import           System.FilePath  (takeExtension)
 import           Turtle           (cd, pwd)
 
 cachePath :: Path Rel Dir
@@ -62,10 +63,13 @@ symbolsDir     = fromRelDir  symbolsPath
 targetsFile    = fromRelFile targetsPath
 testDataDir    = fromRelDir  testDataPath
 
--- TODO: probably not reliable, instead file with
--- .cabal extension should be searched
-guessCabalName :: FilePath -> Path Rel File
-guessCabalName libName = Path $ libName <.> ".cabal"
+-- | Returns relative path to cabal file under given directory.
+findCabalFile :: FilePath -> IO $ Maybe $ Path Rel File
+findCabalFile projectPath = do
+    projectDirectoryContent <- listDirectory projectPath
+    let cabalFiles           = filter ((== ".cabal") . takeExtension)
+                                      projectDirectoryContent
+    traverse parseRelFile $ head cabalFiles
 
 createCacheDir :: Path Abs Dir -> IO ()
 createCacheDir importifyPath = do
