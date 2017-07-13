@@ -73,8 +73,9 @@ cacheProject preserveSources cabalFile = do
     doInsideDir importifyPath $ do
         projectCabalDesc <- readCabal cabalPath
 
-        -- Extension maps
-        let (targetMaps, extensionMaps) = getExtensionMaps projectCabalDesc
+        -- Maps from full path to module
+        (targetMaps, extensionMaps) <- getExtensionMaps projectPath
+                                                        projectCabalDesc
         BS.writeFile targetsFile    $ encode targetMaps
         BS.writeFile extensionsFile $ encode extensionMaps
 

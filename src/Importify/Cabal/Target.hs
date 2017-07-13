@@ -14,20 +14,23 @@ import           Universum                       hiding (fromString)
 
 import qualified Data.HashMap.Strict             as HM
 import           Distribution.ModuleName         (ModuleName)
-import           Distribution.PackageDescription (Benchmark (benchmarkBuildInfo),
+import           Distribution.PackageDescription (Benchmark (..), BenchmarkInterface (..),
                                                   BuildInfo (..), CondTree,
-                                                  Executable (buildInfo),
+                                                  Executable (..),
                                                   GenericPackageDescription (..),
-                                                  Library (..), TestSuite (testBuildInfo),
+                                                  Library (..), TestSuite (..),
+                                                  TestSuiteInterface (..),
                                                   benchmarkModules, condTreeData,
                                                   exeModules, libModules, testModules)
 import           Distribution.Text               (display)
 import           Language.Haskell.Extension      (Extension (..))
+import           Path                            (Abs, Dir, File, Path, fromAbsFile)
 
 import           Importify.Cabal.Extension       (showExt)
+import           Importify.Cabal.Module          (modulePaths)
 
 
-type    TargetsMap = HashMap String String
+type    TargetsMap = HashMap FilePath String
 type ExtensionsMap = HashMap String [String]
 type MapBundle     = (TargetsMap, ExtensionsMap)
 
@@ -42,52 +45,83 @@ cabalTargetId (ExecutableId exeName)  = "executable " ++ exeName
 cabalTargetId (TestSuiteId testName)  = "test-suite " ++ testName
 cabalTargetId (BenchmarkId benchName) = "benchmark "  ++ benchName
 
-getExtensionMaps :: GenericPackageDescription -> MapBundle
-getExtensionMaps GenericPackageDescription{..} =
-    ( HM.unions $ libTM : exeTMs ++ testTMs ++ benchTMs
-    , HM.unions $ libEM : exeEMs ++ testEMs ++ benchEMs
-    )
+getExtensionMaps :: Path Abs Dir -> GenericPackageDescription -> IO MapBundle
+getExtensionMaps projectPath GenericPackageDescription{..} = do
+    (libTM,    libEM)    <- libMaps
+    (exeTMs,   exeEMs)   <- exeMaps
+    (testTMs,  testEMs)  <- testMaps
+    (benchTMs, benchEMs) <- benchMaps
+
+    return ( HM.unions $ libTM : exeTMs ++ testTMs ++ benchTMs
+           , HM.unions $ libEM : exeEMs ++ testEMs ++ benchEMs
+           )
   where
-    (libTM, libEM) =
-        maybe mempty (collectLibraryMaps . condTreeData) condLibrary
+    projectPaths :: BuildInfo -> Either [ModuleName] FilePath -> IO [Path Abs File]
+    projectPaths = modulePaths projectPath
 
-    (exeTMs, exeEMs) =
-        collectTargetsListMaps condExecutables
-                               ExecutableId
-                               (collectTargetMaps exeModules buildInfo)
+    libPaths :: Library -> IO [Path Abs File]
+    libPaths Library{..} = projectPaths libBuildInfo (Left exposedModules)
 
-    (testTMs, testEMs) =
-        collectTargetsListMaps condTestSuites
-                               TestSuiteId
-                               (collectTargetMaps testModules testBuildInfo)
+    exePaths :: Executable -> IO [Path Abs File]
+    exePaths Executable{..} = projectPaths buildInfo (Right modulePath)
 
-    (benchTMs, benchEMs) =
-        collectTargetsListMaps condBenchmarks
-                               BenchmarkId
-                               (collectTargetMaps benchmarkModules benchmarkBuildInfo)
+    testPaths :: TestSuite -> IO [Path Abs File]
+    testPaths TestSuite{..} = projectPaths testBuildInfo $ case testInterface of
+        TestSuiteExeV10 _ path -> Right path
+        TestSuiteLibV09 _ name -> Left [name]
+        TestSuiteUnsupported _ -> Left []
 
-collectLibraryMaps :: Library -> MapBundle
-collectLibraryMaps = collectTargetMaps libModules libBuildInfo LibraryId
+    benchPaths :: Benchmark -> IO [Path Abs File]
+    benchPaths Benchmark{..} = projectPaths benchmarkBuildInfo $ case benchmarkInterface of
+        BenchmarkExeV10 _ path -> Right path
+        BenchmarkUnsupported _ -> Left []
 
+    libMaps :: IO MapBundle
+    libMaps = maybe mempty
+                    ( collectTargetMaps libPaths
+                                        libBuildInfo
+                                        LibraryId
+                    . condTreeData)
+                    condLibrary
+    exeMaps :: IO ([TargetsMap], [ExtensionsMap])
+    exeMaps = collectTargetsListMaps condExecutables
+                                     ExecutableId
+                                     (collectTargetMaps exePaths buildInfo)
+
+    testMaps :: IO ([TargetsMap], [ExtensionsMap])
+    testMaps = collectTargetsListMaps condTestSuites
+                                      TestSuiteId
+                                      (collectTargetMaps testPaths testBuildInfo)
+
+    benchMaps :: IO ([TargetsMap], [ExtensionsMap])
+    benchMaps = collectTargetsListMaps condBenchmarks
+                                       BenchmarkId
+                                       (collectTargetMaps benchPaths benchmarkBuildInfo)
+
+
+-- | Generalized 'MapBundle' collector for executables, testsuites and
+-- benchmakrs parts of package.
 collectTargetsListMaps :: [(String, CondTree v c target)]
                        -> (String -> TargetId)
-                       -> (TargetId -> target -> MapBundle)
-                       -> ([TargetsMap], [ExtensionsMap])
-collectTargetsListMaps treeList idConstructor mapBundler = unzip $ do
-    (name, condTree) <- treeList
-    pure $ mapBundler (idConstructor name) $ condTreeData condTree
+                       -> (TargetId -> target -> IO MapBundle)
+                       -> IO ([TargetsMap], [ExtensionsMap])
+collectTargetsListMaps treeList idConstructor mapBundler = do
+    bundles <- forM treeList $ \(name, condTree) ->
+        mapBundler (idConstructor name) $ condTreeData condTree
+    return $ unzip bundles
 
-collectTargetMaps :: (target -> [ModuleName])
+collectTargetMaps :: (target -> IO [Path Abs File])
                   -> (target -> BuildInfo)
                   -> TargetId
                   -> target
-                  -> MapBundle
-collectTargetMaps modulesExtractor buildInfoExtractor id target =
-    collectModuleMaps (cabalTargetId id)
-                      (map display $ modulesExtractor target)
-                      (defaultExtensions $ buildInfoExtractor target)
+                  -> IO MapBundle
+collectTargetMaps modulePathsExtractor buildInfoExtractor id target = do
+    pathsToModules <- modulePathsExtractor target
+    return $ collectModuleMaps (cabalTargetId id)
+                               (map fromAbsFile pathsToModules)
+                               (defaultExtensions $ buildInfoExtractor target)
 
-collectModuleMaps :: String -> [String] -> [Extension] -> MapBundle
+collectModuleMaps :: String -> [FilePath] -> [Extension] -> MapBundle
 collectModuleMaps targetName modules extensions =
     ( HM.fromList $ map (, targetName) modules
     , one (targetName, map showExt extensions)
