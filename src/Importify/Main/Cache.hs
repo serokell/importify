@@ -22,8 +22,8 @@ import           Fmt                             (Builder, blockListF, build, fm
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Path                            (Abs, Dir, File, Path, Rel, fromAbsDir,
-                                                  fromAbsFile, fromRelFile, parseAbsDir,
-                                                  parseRelDir, parseRelFile, (</>))
+                                                  fromAbsFile, fromRelFile, parseRelDir,
+                                                  parseRelFile, (</>))
 import           System.Directory                (createDirectoryIfMissing,
                                                   getCurrentDirectory, listDirectory,
                                                   removeDirectoryRecursive)

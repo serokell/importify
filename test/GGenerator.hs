@@ -41,7 +41,7 @@ generateGoldenTests :: IO ()
 generateGoldenTests = do
     testCaseFiles <- findByExtension [".hs"] testDataDir
     forM_ testCaseFiles $ \testCaseFile -> do
-       modifiedSrc  <- doSource =<< readFile testCaseFile
+       modifiedSrc  <- doSource testCaseFile =<< readFile testCaseFile
        testCasePath <- parseRelFile testCaseFile
        goldenPath   <- testCasePath -<.> "golden"
        writeBinaryFile (fromRelFile goldenPath) (toString modifiedSrc)

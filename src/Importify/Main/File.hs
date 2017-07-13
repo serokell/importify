@@ -1,8 +1,9 @@
+{-# LANGUAGE ViewPatterns #-}
+
 -- | Contains implementation of @importify file@ command.
 
 module Importify.Main.File
        ( OutputOptions (..)
-       , doAst
        , doFile
        , doSource
        ) where
@@ -21,23 +22,22 @@ import           Language.Haskell.Exts              (Extension, ImportDecl, Modu
                                                      parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols)
-
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Path                               (fromRelFile, parseRelDir,
+import           Path                               (Abs, File, Path, fromAbsFile,
+                                                     fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
 import           System.Directory                   (doesFileExist)
 import           Turtle                             (cd)
 
 import           Importify.Cabal                    (MapBundle)
 import           Importify.Paths                    (cacheDir, cachePath, extensionsFile,
-                                                     modulesPath, symbolsPath,
-                                                     targetsFile)
+                                                     getCurrentPath, modulesPath,
+                                                     symbolsPath, targetsFile)
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedSymbols,
                                                      removeUnusedQualifiedAsImports)
-import           Importify.Syntax                   (getSourceModuleName, importSlice,
-                                                     unscope)
+import           Importify.Syntax                   (importSlice, unscope)
 import           Importify.Tree                     (removeSymbols)
 
 -- | This data type dictates how output of @importify@ should be
@@ -50,20 +50,20 @@ data OutputOptions = ToConsole        -- ^ Print to console
 doFile :: OutputOptions -> FilePath -> IO ()
 doFile options srcPath = do
     src         <- readFile srcPath
-    modifiedSrc <- doSource src
+    modifiedSrc <- doSource srcPath src
 
     case options of
         ToConsole -> putText modifiedSrc
         InPlace   -> writeFile srcPath modifiedSrc
         ToFile to -> writeFile to      modifiedSrc
 
-doSource :: Text -> IO Text
-doSource src = do
-    let moduleName = getSourceModuleName src
+doSource :: FilePath -> Text -> IO Text
+doSource srcFile src = do
     extensionMaps <- readExtensionMaps
-
+    srcPath       <- parseRelFile srcFile
+    projectPath   <- getCurrentPath
     let exts       = fromMaybe []
-                   $ getExtensions moduleName extensionMaps
+                   $ getExtensions (projectPath </> srcPath) extensionMaps
 
     let ast        = fromParseResult
                    $ parseFileContentsWithExts exts
@@ -91,10 +91,10 @@ doAst src ast@(Module _ _ _ imports _) =
         Nothing -> pure src
 doAst _ _ = error "Source file is not Language.Haskell.Exts.Module(Module)"
 
-getExtensions :: String -> Maybe MapBundle -> Maybe [Extension]
-getExtensions moduleName maps = do
+getExtensions :: Path Abs File -> Maybe MapBundle -> Maybe [Extension]
+getExtensions (fromAbsFile -> moduleFile) maps = do
     (targetMap, extensionsMap) <- maps
-    target     <- HM.lookup moduleName targetMap
+    target     <- HM.lookup moduleFile targetMap
     extensions <- HM.lookup target extensionsMap
     pure $ map parseExtension extensions
 

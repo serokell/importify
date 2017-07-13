@@ -50,7 +50,7 @@ loadTestDataDiff testDirPath testCasePath = do
     goldenExamplePath <- fullPathToTest -<.> ".golden"
 
     testCasePathContent <- readFile (fromRelFile fullPathToTest)
-    importifiedSrc      <- doSource testCasePathContent
+    importifiedSrc      <- doSource (fromRelFile testCasePath) testCasePathContent
     goldenExampleSrc    <- readFile (fromRelFile goldenExamplePath)
 
     return $ filter isDivergent $ getDiff (lines importifiedSrc)

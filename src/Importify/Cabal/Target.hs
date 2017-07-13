@@ -19,10 +19,7 @@ import           Distribution.PackageDescription (Benchmark (..), BenchmarkInter
                                                   Executable (..),
                                                   GenericPackageDescription (..),
                                                   Library (..), TestSuite (..),
-                                                  TestSuiteInterface (..),
-                                                  benchmarkModules, condTreeData,
-                                                  exeModules, libModules, testModules)
-import           Distribution.Text               (display)
+                                                  TestSuiteInterface (..), condTreeData)
 import           Language.Haskell.Extension      (Extension (..))
 import           Path                            (Abs, Dir, File, Path, fromAbsFile)
 
