@@ -15,7 +15,8 @@ import           Data.Version                    (showVersion)
 
 import           Distribution.Package            (PackageIdentifier (..))
 import           Distribution.PackageDescription (GenericPackageDescription (packageDescription),
-                                                  Library, PackageDescription (package))
+                                                  Library (..),
+                                                  PackageDescription (package))
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
                                                   indent, listF)
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
@@ -186,7 +187,9 @@ parsedModulesWithErrors packagePath library = do
 
     -- get extensions
     let extensions   = withHarmlessExtensions $ libraryExtensions library
-    pathsToModules  <- modulePaths packagePath library
+    pathsToModules  <- modulePaths packagePath
+                                   (libBuildInfo library)
+                                   (Left $ exposedModules library)
 
     modEithers <- mapM (parseModuleFile extensions includeDirs) pathsToModules
     pure $ partitionEithers modEithers
