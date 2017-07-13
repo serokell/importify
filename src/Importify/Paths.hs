@@ -21,14 +21,17 @@ module Importify.Paths
          -- * Utility functions to work with directories
        , doInsideDir
        , findCabalFile
+       , getCurrentPath
        ) where
 
 import           Universum
 
 import           Path             (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
-                                   fromRelFile, parseRelFile, reldir, relfile)
+                                   fromRelFile, parseAbsDir, parseRelFile, reldir,
+                                   relfile)
 import           Path.Internal    (Path (..))
-import           System.Directory (createDirectoryIfMissing, listDirectory)
+import           System.Directory (createDirectoryIfMissing, getCurrentDirectory,
+                                   listDirectory)
 import           System.FilePath  (takeExtension)
 import           Turtle           (cd, pwd)
 
@@ -62,6 +65,12 @@ modulesFile    = fromRelFile modulesPath
 symbolsDir     = fromRelDir  symbolsPath
 targetsFile    = fromRelFile targetsPath
 testDataDir    = fromRelDir  testDataPath
+
+-- | Get absolute path to given directory.
+getCurrentPath :: IO (Path Abs Dir)
+getCurrentPath = do
+    thisDirectory <- getCurrentDirectory
+    parseAbsDir thisDirectory
 
 -- | Returns relative path to cabal file under given directory.
 findCabalFile :: FilePath -> IO $ Maybe $ Path Rel File

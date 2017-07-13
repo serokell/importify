@@ -15,14 +15,15 @@ import           Data.Version                    (showVersion)
 
 import           Distribution.Package            (PackageIdentifier (..))
 import           Distribution.PackageDescription (GenericPackageDescription (packageDescription),
-                                                  Library, PackageDescription (package))
+                                                  Library (..),
+                                                  PackageDescription (package))
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
                                                   indent, listF)
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Path                            (Abs, Dir, File, Path, Rel, fromAbsDir,
-                                                  fromAbsFile, fromRelFile, parseAbsDir,
-                                                  parseRelDir, parseRelFile, (</>))
+                                                  fromAbsFile, fromRelFile, parseRelDir,
+                                                  parseRelFile, (</>))
 import           System.Directory                (createDirectoryIfMissing,
                                                   getCurrentDirectory, listDirectory,
                                                   removeDirectoryRecursive)
@@ -39,8 +40,8 @@ import           Importify.CPP                   (parseModuleFile)
 import           Importify.ParseException        (ModuleParseException)
 import           Importify.ParseException        (reportErrorsIfAny)
 import           Importify.Paths                 (cachePath, doInsideDir, extensionsFile,
-                                                  findCabalFile, modulesFile, symbolsPath,
-                                                  targetsFile)
+                                                  findCabalFile, getCurrentPath,
+                                                  modulesFile, symbolsPath, targetsFile)
 import           Importify.Resolution            (resolveModules)
 import           Importify.Stack                 (ghcIncludePath, stackListDependencies,
                                                   upgradeWithVersions)
@@ -55,8 +56,7 @@ doCache preserveSources [] = do
         Just cabalFile -> cacheProject preserveSources cabalFile
 doCache preserveSources explicitDependencies = do
     printInfo "Using explicitly specifined list of dependencies for caching..."
-    thisDirectory    <- getCurrentDirectory
-    projectPath      <- parseAbsDir thisDirectory
+    projectPath      <- getCurrentPath
     let importifyPath = projectPath </> cachePath
     doInsideDir importifyPath $
         () <$ unpackAndCacheDependencies importifyPath
@@ -66,16 +66,16 @@ doCache preserveSources explicitDependencies = do
 cacheProject :: Bool -> Path Rel File -> IO ()
 cacheProject preserveSources cabalFile = do
     -- TODO: remove code duplication
-    thisDirectory    <- getCurrentDirectory
-    projectPath      <- parseAbsDir thisDirectory
+    projectPath      <- getCurrentPath
     let cabalPath     = fromAbsFile $ projectPath </> cabalFile
     let importifyPath = projectPath </> cachePath
 
     doInsideDir importifyPath $ do
         projectCabalDesc <- readCabal cabalPath
 
-        -- Extension maps
-        let (targetMaps, extensionMaps) = getExtensionMaps projectCabalDesc
+        -- Maps from full path to module
+        (targetMaps, extensionMaps) <- getExtensionMaps projectPath
+                                                        projectCabalDesc
         BS.writeFile targetsFile    $ encode targetMaps
         BS.writeFile extensionsFile $ encode extensionMaps
 
@@ -188,7 +188,9 @@ parsedModulesWithErrors packagePath library = do
 
     -- get extensions
     let extensions   = withHarmlessExtensions $ libraryExtensions library
-    pathsToModules  <- modulePaths packagePath library
+    pathsToModules  <- modulePaths packagePath
+                                   (libBuildInfo library)
+                                   (Left $ exposedModules library)
 
     modEithers <- mapM (parseModuleFile extensions includeDirs) pathsToModules
     pure $ partitionEithers modEithers

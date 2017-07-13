@@ -51,7 +51,7 @@ ghcIncludePath = do
     guardM $ liftIO $ doesDirectoryExist ghcIncludeDir
     return ghcIncludeDir
 
--- TODO: remove after universum update
+-- TODO: remove after universum update to 0.6
 guardM :: MonadPlus m => m Bool -> m ()
 guardM f = guard =<< f
 

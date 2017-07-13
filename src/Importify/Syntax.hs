@@ -8,7 +8,6 @@ module Importify.Syntax
        , getImportModuleName
        , getModuleNameId
        , getModuleTitle
-       , getSourceModuleName
        , importSlice
        , pullScopedInfo
        , scopedNameInfo
@@ -24,11 +23,8 @@ import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Text                          as T
 import           Language.Haskell.Exts              (Annotated (ann), ImportDecl (..),
                                                      Module (..), ModuleName,
-                                                     ModuleName (..), NonGreedy (..),
-                                                     ParseResult (..),
-                                                     PragmasAndModuleName (..),
-                                                     SrcSpan (..), SrcSpanInfo (..),
-                                                     combSpanInfo, fromParseResult, parse)
+                                                     ModuleName (..), SrcSpan (..),
+                                                     SrcSpanInfo (..), combSpanInfo)
 import           Language.Haskell.Names             (NameInfo, Scoped (..))
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Text.Show.Pretty                   (ppShow)
@@ -52,6 +48,9 @@ importSlice [ImportDecl{..}] = Just $ startAndEndLines importAnn
 importSlice (x:y:xs)         = Just $ startAndEndLines
                                     $ combSpanInfo (importAnn x) (importAnn $ NE.last (y :| xs))
 
+{- TODO: this function used earlier, it works, but is not used anymore
+   I'll keep it in case we need it again.
+
 -- | Returns module name of the source file.
 -- We can't parse the whole file to get it because default extensions are not available yet
 -- so this method uses 'NonGreedy' parsing to parse only module head.
@@ -64,6 +63,7 @@ getSourceModuleName src =
         ModuleName _ modNameStr =
             fromMaybe (error "File doesn't have `module' declaration") maybeModuleName
     in modNameStr
+-}
 
 -- | Returns name of 'Module' as a 'String'.
 getModuleTitle :: Module l -> String
