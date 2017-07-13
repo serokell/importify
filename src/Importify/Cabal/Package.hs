@@ -49,8 +49,6 @@ dependencyName (Dependency PackageName{..} _) = unPackageName
 -- | Retrieve list of unique names for all package dependencies inside
 -- library, all executables, all test suites and all benchmarks for a
 -- given package.
---
--- TODO: what about version bounds?
 packageDependencies :: GenericPackageDescription -> [String]
 packageDependencies = ordNub
                     . concatMap (map dependencyName . targetBuildDepends)
