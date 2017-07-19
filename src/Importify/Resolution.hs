@@ -2,12 +2,12 @@
 
 module Importify.Resolution
        ( -- * Symbols search engines
-         collectUnusedBy
+         collectUnusedSymbolsBy
        , collectUsedQuals
 
          -- * Predicates for unused imports
-       , hidingUsed
-       , symbolUsed
+       , hidingUsedIn
+       , symbolUsedIn
 
          -- * Utility resolvers
        , removeUnusedQualifiedAsImports
@@ -54,8 +54,8 @@ elemAnnotations used = any used . map scopedNameInfo
 
 -- | Checks if 'Symbol' is used inside annotations. This function
 -- needed to remove unused imports.
-symbolUsed :: N.Symbol -> [Scoped l] -> Bool
-symbolUsed symbol = elemAnnotations used
+symbolUsedIn :: N.Symbol -> [Scoped l] -> Bool
+symbolUsedIn symbol = elemAnnotations used
   where
     used :: NameInfo l -> Bool
 
@@ -77,8 +77,8 @@ symbolUsed symbol = elemAnnotations used
 -- | Checks if given 'Symbol' is used in module annotations. This
 -- function performs comparison by ignoring module names because we want
 -- to remove @hiding@ by calling this function.
-hidingUsed :: N.Symbol -> [Scoped l] -> Bool
-hidingUsed symbol = elemAnnotations used
+hidingUsedIn :: N.Symbol -> [Scoped l] -> Bool
+hidingUsedIn symbol = elemAnnotations used
   where
     used :: NameInfo l -> Bool
     used (GlobalSymbol global _) =
@@ -86,11 +86,11 @@ hidingUsed symbol = elemAnnotations used
     used _ = False
 
 -- | Collect symbols unused in annotations.
-collectUnusedBy :: (N.Symbol -> [Scoped l] -> Bool) -- ^ Used detector
-                -> [Scoped l]   -- ^ Annotations for given module
-                -> Table        -- ^ Mapping from imported names to their symbols
-                -> [N.Symbol]   -- ^ Returns list of unused symbols from 'Table'
-collectUnusedBy usedBy annotations table = do
+collectUnusedSymbolsBy
+    :: (N.Symbol -> Bool) -- ^ 'True' iff 'Symbol' is used
+    -> Table              -- ^ Mapping from imported names to their symbols
+    -> [N.Symbol]         -- ^ Returns list of unused symbols from 'Table'
+collectUnusedSymbolsBy isUsed table = do
     -- 1. For every pair (entity, its symbols) in Table
     (_, importedSymbols) <- M.toList table
 
@@ -98,7 +98,7 @@ collectUnusedBy usedBy annotations table = do
     symbol <- importedSymbols
 
     -- 3. Check whether this symbol used or not
-    guard $ not $ symbol `usedBy` annotations
+    guard $ not $ isUsed symbol
 
     -- 4. If not found ⇒ unused
     pure symbol
@@ -116,7 +116,7 @@ resolveModules exposedModules otherModules =
         exposedSymbols = M.assocs exposedEnv
     in exposedSymbols
 
--- | Remove unused qualified as imports, i.e. in the next form:
+-- | Remove unused @qualified as@ imports, i.e. in the next form:
 -- @
 --   import qualified Data.List as L
 -- @
@@ -129,7 +129,7 @@ removeUnusedQualifiedAsImports imports annotations =
 
 -- | Collect list of modules used for fully qualified names.
 -- E.g. if it encounters "IO.putStrLn" it should collect @ModuleName "IO"@
--- Used later to determine whether `as' import needed or not
+-- Used later to determine whether @qualified@ import needed or not
 collectUsedQuals :: [ImportDecl SrcSpanInfo] -> [Scoped SrcSpanInfo] -> [ModuleName SrcSpanInfo]
 collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) annotations) quals
   where

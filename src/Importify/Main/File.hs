@@ -35,9 +35,9 @@ import           Importify.Paths                    (cacheDir, cachePath, extens
                                                      getCurrentPath, modulesPath,
                                                      symbolsPath, targetsFile)
 import           Importify.Pretty                   (printLovelyImports)
-import           Importify.Resolution               (collectUnusedBy, hidingUsed,
+import           Importify.Resolution               (collectUnusedSymbolsBy, hidingUsedIn,
                                                      removeUnusedQualifiedAsImports,
-                                                     symbolUsed)
+                                                     symbolUsedIn)
 import           Importify.Syntax                   (importSlice, switchHidingImports,
                                                      unscope)
 import           Importify.Tree                     (UnusedHidings (UnusedHidings),
@@ -140,8 +140,9 @@ collectAndRemoveUnusedSymbols ast imports = do
 
     -- ordNub needed because name can occur as Qual and as UnQual
     -- but we don't care about qualification
-    let unusedSymbols        = ordNub $ collectUnusedBy symbolUsed annotations symbolTable
-    let unusedHidings        = ordNub $ collectUnusedBy hidingUsed annotations hidingTable
+    let unusedCollector      = ordNub ... collectUnusedSymbolsBy
+    let unusedSymbols        = unusedCollector (`symbolUsedIn` annotations) symbolTable
+    let unusedHidings        = unusedCollector (`hidingUsedIn` annotations) hidingTable
     let withoutUnusedSymbols = map unscope $ removeSymbols (UnusedSymbols unusedSymbols)
                                                            (UnusedHidings unusedHidings)
                                                            annotatedDecls
