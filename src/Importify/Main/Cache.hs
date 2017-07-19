@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -- | Contains implementation of @importify cache@ command.
 
 module Importify.Main.Cache

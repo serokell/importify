@@ -20,33 +20,32 @@ source-repository head
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Importify.Cabal
+  exposed-modules:
+                       Importify.Cabal
+                           Importify.Cabal.Extension
+                           Importify.Cabal.Module
+                           Importify.Cabal.Package
+                           Importify.Cabal.Target
                        Importify.CPP
                        Importify.Main
+                           Importify.Main.Cache
+                           Importify.Main.File
                        Importify.ParseException
                        Importify.Paths
                        Importify.Pretty
                        Importify.Resolution
                        Importify.Stack
                        Importify.Syntax
+                           Importify.Syntax.Import
+                           Importify.Syntax.Module
+                           Importify.Syntax.Scoped
+                           Importify.Syntax.Text
                        Importify.Tree
 
-                       -- Different utilities extending functionality
-                       -- of other libs; TODO: reexport from Extended?
-                       Extended.Data.List
-                       Extended.Data.Str
                        Extended.System.Wlog
 
-  other-modules:
-                       -- Functions to work with .cabal files
-                       Importify.Cabal.Extension
-                       Importify.Cabal.Module
-                       Importify.Cabal.Package
-                       Importify.Cabal.Target
-
-                       -- Main functions used by commands
-                       Importify.Main.Cache
-                       Importify.Main.File
+  other-modules:       Extended.Data.List
+                       Extended.Data.Str
 
   build-depends:       base >= 4.7 && < 5
                      , aeson
@@ -78,6 +77,7 @@ library
 
   default-language:    Haskell2010
   default-extensions:  GeneralizedNewtypeDeriving
+                       LambdaCase
                        NoImplicitPrelude
                        OverloadedStrings
                        RecordWildCards
