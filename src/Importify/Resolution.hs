@@ -1,8 +1,15 @@
 -- | This module contains functions to work with name resolution.
 
 module Importify.Resolution
-       ( collectUnusedSymbols
+       ( -- * Symbols search engines
+         collectUnusedBy
        , collectUsedQuals
+
+         -- * Predicates for unused imports
+       , hidingUsed
+       , symbolUsed
+
+         -- * Utility resolvers
        , removeUnusedQualifiedAsImports
        , resolveModules
        ) where
@@ -42,8 +49,13 @@ import           Importify.Syntax                         (scopedNameInfo)
 -- symbolsByName :: N.Symbol -> [N.Symbol] -> [N.Symbol]
 -- symbolsByName name = filter (name ==)
 
+elemAnnotations :: (NameInfo l -> Bool) -> [Scoped l] -> Bool
+elemAnnotations used = any used . map scopedNameInfo
+
+-- | Checks if 'Symbol' is used inside annotations. This function
+-- needed to remove unused imports.
 symbolUsed :: N.Symbol -> [Scoped l] -> Bool
-symbolUsed symbol annotations = any used $ map scopedNameInfo annotations
+symbolUsed symbol = elemAnnotations used
   where
     used :: NameInfo l -> Bool
 
@@ -62,11 +74,23 @@ symbolUsed symbol annotations = any used $ map scopedNameInfo annotations
     used (GlobalSymbol global _) = symbol == global
     used _                       = False
 
+-- | Checks if given 'Symbol' is used in module annotations. This
+-- function performs comparison by ignoring module names because we want
+-- to remove @hiding@ by calling this function.
+hidingUsed :: N.Symbol -> [Scoped l] -> Bool
+hidingUsed symbol = elemAnnotations used
+  where
+    used :: NameInfo l -> Bool
+    used (GlobalSymbol global _) =
+        symbol { N.symbolModule = N.symbolModule global } == global
+    used _ = False
+
 -- | Collect symbols unused in annotations.
-collectUnusedSymbols :: [Scoped l]   -- ^ Annotations for given module
-                     -> Table        -- ^ Mapping from imported names to their symbols
-                     -> [N.Symbol]   -- ^ Returns list of unused symbols from 'Table'
-collectUnusedSymbols annotations table = do
+collectUnusedBy :: (N.Symbol -> [Scoped l] -> Bool) -- ^ Used detector
+                -> [Scoped l]   -- ^ Annotations for given module
+                -> Table        -- ^ Mapping from imported names to their symbols
+                -> [N.Symbol]   -- ^ Returns list of unused symbols from 'Table'
+collectUnusedBy usedBy annotations table = do
     -- 1. For every pair (entity, its symbols) in Table
     (_, importedSymbols) <- M.toList table
 
@@ -74,7 +98,7 @@ collectUnusedSymbols annotations table = do
     symbol <- importedSymbols
 
     -- 3. Check whether this symbol used or not
-    guard $ not $ symbolUsed symbol annotations
+    guard $ not $ symbol `usedBy` annotations
 
     -- 4. If not found ⇒ unused
     pure symbol
@@ -84,7 +108,7 @@ collectUnusedSymbols annotations table = do
 -- returning only list of symbols for /exposed/ modules.
 resolveModules :: (Data l, Eq l) => [Module l] -> [Module l] -> [(ModuleName (), [N.Symbol])]
 resolveModules exposedModules otherModules =
-    let symbolsEnv     = resolve (exposedModules ++ otherModules) mempty -- TODO: optimize?
+    let symbolsEnv     = resolve (exposedModules ++ otherModules) mempty
         otherCleared   = map ((() <$) . getModuleName) otherModules
 
         -- remove @otherModules@ from environment because only @exposed@ can be imported

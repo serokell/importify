@@ -1,3 +1,3 @@
 module HidingUnused where
 
-import Data.HashTable hiding (delete)
+import Data.List hiding (sort)
