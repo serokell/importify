@@ -1,7 +1,9 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Importify.Tree
-       ( removeSymbols
+       ( UnusedHidings (..)
+       , UnusedSymbols (..)
+       , removeSymbols
        ) where
 
 import           Universum
@@ -17,6 +19,12 @@ import           Language.Haskell.Names (NameInfo (..), Scoped (..))
 import qualified Language.Haskell.Names as N
 
 import           Importify.Syntax       (InScoped, pullScopedInfo)
+
+-- | @newtype@ wrapper for list of unused symbols.
+newtype UnusedSymbols = UnusedSymbols { getUnusedSymbols :: [N.Symbol] }
+
+-- | @newtype@ wrapper for list of unused symbols from @hiding@.
+newtype UnusedHidings = UnusedHidings { getUnusedHidings :: [N.Symbol] }
 
 -- | Remove a list of identifiers from 'ImportDecl's.
 -- Next algorithm is used:
@@ -38,17 +46,17 @@ import           Importify.Syntax       (InScoped, pullScopedInfo)
 -- @
 --
 -- 4. Remove all implicit imports preserving only initially implicit or empty.
---
-removeSymbols :: [N.Symbol]            -- ^ List of symbols which should be removed
+removeSymbols :: UnusedSymbols        -- ^ List of symbols which should be removed
+              -> UnusedHidings        -- ^ List of hidings which should be removed
               -> [InScoped ImportDecl] -- ^ Imports to be purified
               -> [InScoped ImportDecl]
-removeSymbols symbols decls =
-    (volatileImports ++) $
-    cleanDecls $
-    everywhere (mkT traverseToClean) $
-    everywhere (mkT $ traverseToRemove symbols) $
-    everywhere (mkT $ traverseToRemoveThing symbols)
-    decls
+removeSymbols (UnusedSymbols symbols) (UnusedHidings hidings) decls =
+    (volatileImports ++)
+  $ cleanDecls
+  $ everywhere (mkT traverseToClean)
+  $ everywhere (mkT $ traverseToRemove hidings True)
+  $ everywhere (mkT $ traverseToRemove symbols False)
+  $ everywhere (mkT $ traverseToRemoveThing symbols) decls
   where
     volatileImports = filter isVolatileImport decls
 
@@ -90,19 +98,24 @@ traverseToRemoveThing
     isCNameNotInSymbols _                                         = False
 traverseToRemoveThing _ spec = spec
 
--- | Traverses ImportDecls to remove identifiers from ImportSpecs
-traverseToRemove :: [N.Symbol]
+-- | Traverses 'ImportSpecList' to remove identifiers from those lists.
+traverseToRemove :: [N.Symbol]  -- ^
+                 -> Bool
                  -> InScoped ImportSpecList
                  -> InScoped ImportSpecList
-traverseToRemove _ specs@(ImportSpecList _ True _) = specs -- Don't touch @hiding@ imports
 traverseToRemove symbols
-                 (ImportSpecList (Scoped ni oldSpanInfo) notHiding specs)
-  = let (neededSpecs, newSpanInfo) = removeSrcSpanInfoPoints (isSpecNeeded symbols)
-                                                             specs
-                                                             oldSpanInfo
-    in ImportSpecList (Scoped ni newSpanInfo)
-                      notHiding
-                      neededSpecs
+                 yes'CleanIt
+                 specList@(ImportSpecList (Scoped ni oldSpanInfo) isHiding specs)
+    | isHiding == yes'CleanIt = newSpecs
+    | otherwise               = specList
+  where
+    (neededSpecs, newSpanInfo) = removeSrcSpanInfoPoints (isSpecNeeded symbols)
+                                                         specs
+                                                         oldSpanInfo
+
+    newSpecs = ImportSpecList (Scoped ni newSpanInfo)
+                              isHiding
+                              neededSpecs
 
 -- | Removes 'SrcSpanInfo' points of deleted elements.
 removeSrcSpanInfoPoints :: (a -> Bool)  -- ^ Keep entitity?
@@ -134,7 +147,7 @@ isSpecNeeded _       (IThingWith _ _ (_:_)) = True -- Do not remove if cnames li
 isNameNeeded :: InScoped Name -> [N.Symbol] -> Bool
 isNameNeeded (pullScopedInfo -> ImportPart symbols) unusedSymbols =
     any (`notElem` unusedSymbols) symbols
-isNameNeeded _  _                                    =
+isNameNeeded _ _ =
     True
 
 -- | Traverses ImportDecls to remove empty import specs

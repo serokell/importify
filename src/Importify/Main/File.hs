@@ -35,10 +35,14 @@ import           Importify.Paths                    (cacheDir, cachePath, extens
                                                      getCurrentPath, modulesPath,
                                                      symbolsPath, targetsFile)
 import           Importify.Pretty                   (printLovelyImports)
-import           Importify.Resolution               (collectUnusedSymbols,
-                                                     removeUnusedQualifiedAsImports)
-import           Importify.Syntax                   (importSlice, unscope)
-import           Importify.Tree                     (removeSymbols)
+import           Importify.Resolution               (collectUnusedBy, hidingUsed,
+                                                     removeUnusedQualifiedAsImports,
+                                                     symbolUsed)
+import           Importify.Syntax                   (importSlice, switchHidingImports,
+                                                     unscope)
+import           Importify.Tree                     (UnusedHidings (UnusedHidings),
+                                                     UnusedSymbols (UnusedSymbols),
+                                                     removeSymbols)
 
 -- | This data type dictates how output of @importify@ should be
 -- outputed.
@@ -117,20 +121,30 @@ readExtensionMaps = bracket_ stepIn
             pure $ liftA2 (,) (decode targetsMap) (decode extensionsMap)
 
 -- | Collect all unused entities in given module from given list of imports.
+-- Algorithm performs next steps:
+-- -1. Load environment
+--  0. Collect annotations for module and imports.
+--  1. Remove unused symbols from explicit list.
+--  2. Remove unused hidings from explicit lists.
+--  3. Remove unused qualified imports.
 collectAndRemoveUnusedSymbols
     :: Module SrcSpanInfo        -- ^ Module where symbols should be removed
     -> [ImportDecl SrcSpanInfo]  -- ^ Imports from module
     -> IO [ImportDecl SrcSpanInfo]
 collectAndRemoveUnusedSymbols ast imports = do
     environment       <- loadEnvironment
-    let table          = importTable environment ast
+    let symbolTable    = importTable environment ast
+    let hidingTable    = importTable environment $ switchHidingImports ast
     let annotatedDecls = annotateImportDecls (getModuleName ast) environment imports
     let annotations    = annotateModule ast environment
 
     -- ordNub needed because name can occur as Qual and as UnQual
     -- but we don't care about qualification
-    let unusedSymbols        = ordNub $ collectUnusedSymbols annotations table
-    let withoutUnusedSymbols = map unscope $ removeSymbols unusedSymbols annotatedDecls
+    let unusedSymbols        = ordNub $ collectUnusedBy symbolUsed annotations symbolTable
+    let unusedHidings        = ordNub $ collectUnusedBy hidingUsed annotations hidingTable
+    let withoutUnusedSymbols = map unscope $ removeSymbols (UnusedSymbols unusedSymbols)
+                                                           (UnusedHidings unusedHidings)
+                                                           annotatedDecls
     let withoutUnusedQualsAs = removeUnusedQualifiedAsImports withoutUnusedSymbols
                                                               annotations
 
