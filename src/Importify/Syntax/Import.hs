@@ -11,11 +11,7 @@ module Importify.Syntax.Import
 import           Universum
 
 import qualified Data.List.NonEmpty                       as NE
-import qualified Data.Map.Strict                          as M
-import qualified Data.Text                                as T
-
-import           Language.Haskell.Exts                    (Annotated (ann),
-                                                           Extension (DisableExtension),
+import           Language.Haskell.Exts                    (Extension (DisableExtension),
                                                            ImportDecl (..),
                                                            ImportSpecList (..),
                                                            KnownExtension (ImplicitPrelude),
@@ -25,11 +21,8 @@ import           Language.Haskell.Exts                    (Annotated (ann),
                                                            Name (Ident), SrcSpan (..),
                                                            SrcSpanInfo (..), combSpanInfo,
                                                            noSrcSpan, prettyExtension)
-import           Language.Haskell.Names                   (NameInfo (Import), Scoped (..))
-import qualified Language.Haskell.Names                   as N
+import           Language.Haskell.Names                   (NameInfo (Import))
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
-import           Language.Haskell.Names.SyntaxUtils       (getModuleName)
-import           Text.Show.Pretty                         (ppShow)
 
 import           Importify.Syntax.Scoped                  (InScoped, pullScopedInfo)
 

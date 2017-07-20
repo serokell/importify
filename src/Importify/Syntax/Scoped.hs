@@ -10,21 +10,8 @@ module Importify.Syntax.Scoped
 
 import           Universum
 
-import qualified Data.List.NonEmpty                 as NE
-import qualified Data.Text                          as T
-import           Language.Haskell.Exts              (Annotated (ann),
-                                                     Extension (DisableExtension),
-                                                     ImportDecl (..), ImportSpecList (..),
-                                                     KnownExtension (ImplicitPrelude),
-                                                     Module (..), ModuleName,
-                                                     ModuleName (..),
-                                                     ModulePragma (LanguagePragma),
-                                                     Name (Ident), SrcSpan (..),
-                                                     SrcSpanInfo (..), combSpanInfo,
-                                                     noSrcSpan, prettyExtension)
-import           Language.Haskell.Names             (NameInfo, Scoped (..))
-import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Text.Show.Pretty                   (ppShow)
+import           Language.Haskell.Exts  (Annotated (ann), SrcSpanInfo (..))
+import           Language.Haskell.Names (NameInfo, Scoped (..))
 
 -- | Short wrapper for types annotated by @Scoped SrcSpanInfo@.
 -- For example, use @InScoped ImportDecl@ instead of @ImportDecl (Scoped SrcSpanInfo)@.

@@ -7,21 +7,8 @@ module Importify.Syntax.Text
 
 import           Universum
 
-import qualified Data.List.NonEmpty                 as NE
-import qualified Data.Text                          as T
-import           Language.Haskell.Exts              (Annotated (ann),
-                                                     Extension (DisableExtension),
-                                                     ImportDecl (..), ImportSpecList (..),
-                                                     KnownExtension (ImplicitPrelude),
-                                                     Module (..), ModuleName,
-                                                     ModuleName (..),
-                                                     ModulePragma (LanguagePragma),
-                                                     Name (Ident), SrcSpan (..),
-                                                     SrcSpanInfo (..), combSpanInfo,
-                                                     noSrcSpan, prettyExtension)
-import           Language.Haskell.Names             (NameInfo, Scoped (..))
-import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Text.Show.Pretty                   (ppShow)
+import qualified Data.Text        as T
+import           Text.Show.Pretty (ppShow)
 
 -- | This functions strips out trailing single line comment.
 stripEndLineComment :: Text -> Text
@@ -36,4 +23,8 @@ stripEndLineComment line = case T.breakOnAll "--" line of
 debugAst :: Show a => Text -> a -> IO ()
 debugAst header msg = do
     putText $ "-------------------- // " <> header <> " // --------------------"
-    putText $ toText $ ppShow msg
+    putText $ unlines
+            $ zipWith (\i line -> show i <> ": " <> line) [1 :: Int ..]
+            $ lines
+            $ toText
+            $ ppShow msg

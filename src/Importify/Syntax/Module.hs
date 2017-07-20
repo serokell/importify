@@ -7,21 +7,9 @@ module Importify.Syntax.Module
 
 import           Universum
 
-import qualified Data.List.NonEmpty                 as NE
-import qualified Data.Text                          as T
-import           Language.Haskell.Exts              (Annotated (ann),
-                                                     Extension (DisableExtension),
-                                                     ImportDecl (..), ImportSpecList (..),
-                                                     KnownExtension (ImplicitPrelude),
-                                                     Module (..), ModuleName,
-                                                     ModuleName (..),
-                                                     ModulePragma (LanguagePragma),
-                                                     Name (Ident), SrcSpan (..),
-                                                     SrcSpanInfo (..), combSpanInfo,
-                                                     noSrcSpan, prettyExtension)
-import           Language.Haskell.Names             (NameInfo, Scoped (..))
+import           Language.Haskell.Exts              (Module (..), ModuleName,
+                                                     ModuleName (..))
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Text.Show.Pretty                   (ppShow)
 
 {- TODO: this function used earlier, it works, but is not used anymore
    I'll keep it in case we need it again.

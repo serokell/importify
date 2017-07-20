@@ -13,18 +13,17 @@ import           Universum
 import           Data.Aeson                         (decode)
 import qualified Data.ByteString.Lazy               as BS
 import qualified Data.HashMap.Strict                as HM
-import           Data.List                          (notElem)
 import qualified Data.Map                           as Map
 
-import           Language.Haskell.Exts              (Extension, ImportDecl (importModule),
-                                                     Module (..), ModuleName (..),
-                                                     SrcSpanInfo, exactPrint,
-                                                     fromParseResult, parseExtension,
+import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
+                                                     ModuleName (..), SrcSpanInfo,
+                                                     exactPrint, fromParseResult,
+                                                     parseExtension,
                                                      parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
-import           Language.Haskell.Names.SyntaxUtils (dropAnn, getModuleName)
+import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Path                               (Abs, File, Path, fromAbsFile,
                                                      fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
@@ -41,9 +40,8 @@ import           Importify.Resolution               (collectUnusedImplicitImport
                                                      removeImplicitImports,
                                                      removeUnusedQualifiedAsImports,
                                                      symbolUsedIn)
-import           Importify.Syntax                   (debugAst, importSlice,
-                                                     isImportImplicit,
-                                                     switchHidingImports, unscope)
+import           Importify.Syntax                   (importSlice, switchHidingImports,
+                                                     unscope)
 import           Importify.Tree                     (UnusedHidings (UnusedHidings),
                                                      UnusedSymbols (UnusedSymbols),
                                                      removeImports)
