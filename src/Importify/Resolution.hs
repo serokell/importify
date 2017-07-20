@@ -1,22 +1,27 @@
 -- | This module contains functions to work with name resolution.
 
 module Importify.Resolution
-       ( -- * Symbols search engines
-         collectUnusedSymbolsBy
+       ( -- * Unused symbols search engines
+         collectUnusedImplicitImports
+       , collectUnusedSymbolsBy
        , collectUsedQuals
 
          -- * Predicates for unused imports
        , hidingUsedIn
        , symbolUsedIn
 
-         -- * Utility resolvers
+         -- * Removals
+       , removeImplicitImports
        , removeUnusedQualifiedAsImports
+
+         -- * Resolvers
        , resolveModules
        ) where
 
 import           Universum
 
 import           Data.Data                                (Data)
+import           Data.List                                (notElem)
 import qualified Data.Map.Strict                          as M
 
 import           Language.Haskell.Exts                    (ImportDecl (..), Module,
@@ -26,28 +31,12 @@ import           Language.Haskell.Names                   (NameInfo (GlobalSymbo
                                                            Scoped (Scoped), resolve)
 import qualified Language.Haskell.Names                   as N
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
-import           Language.Haskell.Names.SyntaxUtils       (getModuleName)
+import           Language.Haskell.Names.SyntaxUtils       (dropAnn, getModuleName)
 
-import           Importify.Syntax                         (scopedNameInfo)
-
--- This function returns list of symbols which names matches
--- given name. The result type is list because there're may be
--- several entities that share same name inside one module.
--- For example — type name and constructor name. Consider next example:
---
--- @
---   [ Constructor { symbolModule = ModuleName () "Language.Haskell.Exts.Syntax"
---                 , symbolName = Ident () "Module"
---                 , typeName = Ident () "Module" }
---   , Data { symbolModule = ModuleName () "Language.Haskell.Exts.Syntax"
---          , symbolName = Ident () "Module" }
---   ]
--- @
---
--- Currently we're not trying to guess 'Symbol' type by entity inside
--- 'ImportSpec'.
--- symbolsByName :: N.Symbol -> [N.Symbol] -> [N.Symbol]
--- symbolsByName name = filter (name ==)
+import           Importify.Syntax                         (InScoped,
+                                                           importNamesWithTables,
+                                                           isImportImplicit,
+                                                           scopedNameInfo)
 
 elemAnnotations :: (NameInfo l -> Bool) -> [Scoped l] -> Bool
 elemAnnotations used = any used . map scopedNameInfo
@@ -103,8 +92,29 @@ collectUnusedSymbolsBy isUsed table = do
     -- 4. If not found ⇒ unused
     pure symbol
 
+-- | Collect names of unused implicit imports.
+collectUnusedImplicitImports :: (N.Symbol -> Bool)
+                             -> [InScoped ImportDecl]
+                             -> [ModuleName ()]
+collectUnusedImplicitImports isUsed imports =
+    let implicitImports = filter isImportImplicit imports
+        nameWithTable   = importNamesWithTables implicitImports
+        isImportUnused  = null . collectUnusedSymbolsBy (not . isUsed)
+        unusedImports   = map fst $ filter (isImportUnused . snd) nameWithTable
+    in unusedImports
+
+-- | Remove all implicit import declarations specified by given list
+-- of module names.
+removeImplicitImports :: [ModuleName ()]
+                      -> [ImportDecl l]
+                      -> [ImportDecl l]
+removeImplicitImports names = filter notImplicitOrUnused
+  where
+    notImplicitOrUnused imp@ImportDecl{..} = not (isImportImplicit imp)
+                                          || dropAnn importModule `notElem` names
+
 -- | Gather all symbols for given list of 'Module's. In reality those
--- modules represents all /exposed/ and /other/ modules for one package
+-- modules represent all /exposed/ and /other/ modules for one package
 -- returning only list of symbols for /exposed/ modules.
 resolveModules :: (Data l, Eq l) => [Module l] -> [Module l] -> [(ModuleName (), [N.Symbol])]
 resolveModules exposedModules otherModules =

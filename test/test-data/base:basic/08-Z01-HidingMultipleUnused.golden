@@ -1,5 +1,5 @@
-module HidingPartiallyUnused where
+module HidingMultipleUnused where
 
-import GHC.OldList (sort)
+import           GHC.OldList (sort)
 
 foo = sort

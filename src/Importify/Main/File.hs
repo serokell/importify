@@ -13,17 +13,18 @@ import           Universum
 import           Data.Aeson                         (decode)
 import qualified Data.ByteString.Lazy               as BS
 import qualified Data.HashMap.Strict                as HM
+import           Data.List                          (notElem)
 import qualified Data.Map                           as Map
 
-import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
-                                                     ModuleName (..), SrcSpanInfo,
-                                                     exactPrint, fromParseResult,
-                                                     parseExtension,
+import           Language.Haskell.Exts              (Extension, ImportDecl (importModule),
+                                                     Module (..), ModuleName (..),
+                                                     SrcSpanInfo, exactPrint,
+                                                     fromParseResult, parseExtension,
                                                      parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
-import           Language.Haskell.Names.SyntaxUtils (getModuleName)
+import           Language.Haskell.Names.SyntaxUtils (dropAnn, getModuleName)
 import           Path                               (Abs, File, Path, fromAbsFile,
                                                      fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
@@ -35,14 +36,17 @@ import           Importify.Paths                    (cacheDir, cachePath, extens
                                                      getCurrentPath, modulesPath,
                                                      symbolsPath, targetsFile)
 import           Importify.Pretty                   (printLovelyImports)
-import           Importify.Resolution               (collectUnusedSymbolsBy, hidingUsedIn,
+import           Importify.Resolution               (collectUnusedImplicitImports,
+                                                     collectUnusedSymbolsBy, hidingUsedIn,
+                                                     removeImplicitImports,
                                                      removeUnusedQualifiedAsImports,
                                                      symbolUsedIn)
-import           Importify.Syntax                   (importSlice, switchHidingImports,
-                                                     unscope)
+import           Importify.Syntax                   (debugAst, importSlice,
+                                                     isImportImplicit,
+                                                     switchHidingImports, unscope)
 import           Importify.Tree                     (UnusedHidings (UnusedHidings),
                                                      UnusedSymbols (UnusedSymbols),
-                                                     removeSymbols)
+                                                     removeImports)
 
 -- | This data type dictates how output of @importify@ should be
 -- outputed.
@@ -85,7 +89,7 @@ doAst src ast@(Module _ _ _ imports _) =
             let (preamble, rest) = splitAt (start - 1) codeLines
             let (impText, decls) = splitAt (end - start + 1) rest
 
-            newImports          <- collectAndRemoveUnusedSymbols ast imports
+            newImports          <- removeUnusedImports ast imports
             let printedImports   = printLovelyImports start end impText newImports
 
             pure $ unlines preamble
@@ -120,18 +124,19 @@ readExtensionMaps = bracket_ stepIn
             extensionsMap <- BS.readFile extensionsFile
             pure $ liftA2 (,) (decode targetsMap) (decode extensionsMap)
 
--- | Collect all unused entities in given module from given list of imports.
+-- | Remove all unused entities in given module from given list of imports.
 -- Algorithm performs next steps:
 -- -1. Load environment
 --  0. Collect annotations for module and imports.
---  1. Remove unused symbols from explicit list.
---  2. Remove unused hidings from explicit lists.
---  3. Remove unused qualified imports.
-collectAndRemoveUnusedSymbols
+--  1. Remove unused implicit imports.
+--  2. Remove unused symbols from explicit list.
+--  3. Remove unused hidings from explicit lists.
+--  4. Remove unused qualified imports.
+removeUnusedImports
     :: Module SrcSpanInfo        -- ^ Module where symbols should be removed
     -> [ImportDecl SrcSpanInfo]  -- ^ Imports from module
     -> IO [ImportDecl SrcSpanInfo]
-collectAndRemoveUnusedSymbols ast imports = do
+removeUnusedImports ast imports = do
     environment       <- loadEnvironment
     let symbolTable    = importTable environment ast
     let hidingTable    = importTable environment $ switchHidingImports ast
@@ -140,14 +145,21 @@ collectAndRemoveUnusedSymbols ast imports = do
 
     -- ordNub needed because name can occur as Qual and as UnQual
     -- but we don't care about qualification
-    let unusedCollector      = ordNub ... collectUnusedSymbolsBy
-    let unusedSymbols        = unusedCollector (`symbolUsedIn` annotations) symbolTable
-    let unusedHidings        = unusedCollector (`hidingUsedIn` annotations) hidingTable
-    let withoutUnusedSymbols = map unscope $ removeSymbols (UnusedSymbols unusedSymbols)
-                                                           (UnusedHidings unusedHidings)
-                                                           annotatedDecls
-    let withoutUnusedQualsAs = removeUnusedQualifiedAsImports withoutUnusedSymbols
-                                                              annotations
+    let unusedCollector = ordNub ... collectUnusedSymbolsBy
+    let unusedSymbols   = unusedCollector (`symbolUsedIn` annotations) symbolTable
+    let unusedHidings   = unusedCollector (`hidingUsedIn` annotations) hidingTable
+    let unusedImplicits = collectUnusedImplicitImports (`symbolUsedIn` annotations)
+                                                       annotatedDecls
+
+    -- Remove all collected info from imports
+    let withoutUnusedImplicits = removeImplicitImports unusedImplicits
+                                                       annotatedDecls
+    let withoutUnusedSymbols   = map unscope
+                               $ removeImports (UnusedSymbols unusedSymbols)
+                                               (UnusedHidings unusedHidings)
+                                               withoutUnusedImplicits
+    let withoutUnusedQualsAs   = removeUnusedQualifiedAsImports withoutUnusedSymbols
+                                                                annotations
 
     return withoutUnusedQualsAs
 

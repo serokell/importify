@@ -3,7 +3,7 @@
 module Importify.Tree
        ( UnusedHidings (..)
        , UnusedSymbols (..)
-       , removeSymbols
+       , removeImports
        ) where
 
 import           Universum
@@ -46,11 +46,11 @@ newtype UnusedHidings = UnusedHidings { getUnusedHidings :: [N.Symbol] }
 -- @
 --
 -- 4. Remove all implicit imports preserving only initially implicit or empty.
-removeSymbols :: UnusedSymbols        -- ^ List of symbols which should be removed
+removeImports :: UnusedSymbols        -- ^ List of symbols which should be removed
               -> UnusedHidings        -- ^ List of hidings which should be removed
               -> [InScoped ImportDecl] -- ^ Imports to be purified
               -> [InScoped ImportDecl]
-removeSymbols (UnusedSymbols symbols) (UnusedHidings hidings) decls =
+removeImports (UnusedSymbols symbols) (UnusedHidings hidings) decls =
     (volatileImports ++)
   $ cleanDecls
   $ everywhere (mkT traverseToClean)
@@ -150,14 +150,21 @@ isNameNeeded (pullScopedInfo -> ImportPart symbols) unusedSymbols =
 isNameNeeded _ _ =
     True
 
--- | Traverses ImportDecls to remove empty import specs
+-- | Traverses 'ImportDecl's to remove empty non-@hiding@ import specs.
 traverseToClean :: InScoped ImportDecl -> InScoped ImportDecl
-traverseToClean decl@ImportDecl{ importSpecs = Just (ImportSpecList _ _ []) } =
+traverseToClean decl@ImportDecl{ importSpecs = Just (ImportSpecList _ False []) } =
     decl { importSpecs = Nothing }
 traverseToClean decl = decl
 
+-- | First remove all imports with no lists and then remove
+-- 'ImportSpecList' from empty @hiding@ imports.
 cleanDecls :: [InScoped ImportDecl] -> [InScoped ImportDecl]
-cleanDecls = filter declNeeded
+cleanDecls = map removeHidingList . filter isDeclNeeded
   where
-    declNeeded :: InScoped ImportDecl -> Bool
-    declNeeded = isJust . importSpecs
+    removeHidingList :: InScoped ImportDecl -> InScoped ImportDecl
+    removeHidingList decl@ImportDecl{ importSpecs = Just (ImportSpecList _ True []) } =
+        decl { importSpecs = Nothing }
+    removeHidingList decl = decl
+
+    isDeclNeeded :: InScoped ImportDecl -> Bool
+    isDeclNeeded = isJust . importSpecs

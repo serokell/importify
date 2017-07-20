@@ -1,0 +1,5 @@
+module HidingsUnusedButModuleUsed where
+
+import           Data.List
+
+bar = subsequences

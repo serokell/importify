@@ -47,4 +47,5 @@ withHarmlessExtensions = ordNub
                        . (++ map EnableExtension [ MultiParamTypeClasses
                                                  , FlexibleContexts
                                                  , ConstraintKinds
+                                                 , ExplicitNamespaces
                                                  ])

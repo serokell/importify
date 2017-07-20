@@ -82,7 +82,7 @@ cacheProject preserveSources cabalFile = do
         let projectName = dropExtension $ fromRelFile cabalFile
         let libraries   = sort
                         $ upgradeWithVersions libVersions
-                        $ filter (\p -> p /= "base" && p /= projectName)
+                        $ filter (/= projectName)
                         $ packageDependencies projectCabalDesc
         printInfo $ fmt $ "Downloading dependencies: " <> listF libraries
 

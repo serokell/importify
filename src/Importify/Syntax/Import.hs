@@ -2,31 +2,50 @@
 
 module Importify.Syntax.Import
        ( getImportModuleName
+       , importNamesWithTables
        , importSlice
+       , isImportImplicit
        , switchHidingImports
        ) where
 
 import           Universum
 
-import qualified Data.List.NonEmpty                 as NE
-import qualified Data.Text                          as T
-import           Language.Haskell.Exts              (Annotated (ann),
-                                                     Extension (DisableExtension),
-                                                     ImportDecl (..), ImportSpecList (..),
-                                                     KnownExtension (ImplicitPrelude),
-                                                     Module (..), ModuleName,
-                                                     ModuleName (..),
-                                                     ModulePragma (LanguagePragma),
-                                                     Name (Ident), SrcSpan (..),
-                                                     SrcSpanInfo (..), combSpanInfo,
-                                                     noSrcSpan, prettyExtension)
-import           Language.Haskell.Names             (NameInfo, Scoped (..))
-import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Text.Show.Pretty                   (ppShow)
+import qualified Data.List.NonEmpty                       as NE
+import qualified Data.Map.Strict                          as M
+import qualified Data.Text                                as T
+
+import           Language.Haskell.Exts                    (Annotated (ann),
+                                                           Extension (DisableExtension),
+                                                           ImportDecl (..),
+                                                           ImportSpecList (..),
+                                                           KnownExtension (ImplicitPrelude),
+                                                           Module (..), ModuleName,
+                                                           ModuleName (..),
+                                                           ModulePragma (LanguagePragma),
+                                                           Name (Ident), SrcSpan (..),
+                                                           SrcSpanInfo (..), combSpanInfo,
+                                                           noSrcSpan, prettyExtension)
+import           Language.Haskell.Names                   (NameInfo (Import), Scoped (..))
+import qualified Language.Haskell.Names                   as N
+import           Language.Haskell.Names.GlobalSymbolTable (Table)
+import           Language.Haskell.Names.SyntaxUtils       (getModuleName)
+import           Text.Show.Pretty                         (ppShow)
+
+import           Importify.Syntax.Scoped                  (InScoped, pullScopedInfo)
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
 getImportModuleName :: ImportDecl l -> ModuleName ()
 getImportModuleName ImportDecl{..} = () <$ importModule
+
+-- | Returns 'True' iff import has next form:
+-- @
+--   import Module.Name
+-- @
+isImportImplicit :: ImportDecl l -> Bool
+isImportImplicit ImportDecl{ importQualified = True }                       = False
+isImportImplicit ImportDecl{ importSpecs = Nothing }                        = True
+isImportImplicit ImportDecl{ importSpecs = Just (ImportSpecList _ True _) } = True
+isImportImplicit _                                                          = False
 
 -- | Keep only hiding imports making them non-hiding. This function
 -- needed to collect unused hiding imports because @importTable@ doesn't
@@ -52,8 +71,16 @@ switchHidingImports (Module ml mhead mpragmas mimports mdecls) =
                                               }
 switchHidingImports m = m
 
-startAndEndLines :: SrcSpanInfo -> (Int, Int)
-startAndEndLines (SrcSpanInfo SrcSpan{..} _) = (srcSpanStartLine, srcSpanEndLine)
+-- | Collect mapping from import name to to list of symbols it exports.
+importNamesWithTables :: [InScoped ImportDecl] -> [(ModuleName (), Table)]
+importNamesWithTables = map (getImportModuleName &&& getImportedSymbols)
+  where
+    getImportedSymbols :: InScoped ImportDecl -> Table
+    getImportedSymbols = fromImportInfo . pullScopedInfo
+
+    fromImportInfo :: NameInfo l -> Table
+    fromImportInfo (Import dict) = dict
+    fromImportInfo _             = mempty
 
 -- | Returns pair of line numbers — first and last line of import section
 -- if any import is in list.
@@ -62,3 +89,6 @@ importSlice []               = Nothing
 importSlice [ImportDecl{..}] = Just $ startAndEndLines importAnn
 importSlice (x:y:xs)         = Just $ startAndEndLines
                                     $ combSpanInfo (importAnn x) (importAnn $ NE.last (y :| xs))
+
+startAndEndLines :: SrcSpanInfo -> (Int, Int)
+startAndEndLines (SrcSpanInfo SrcSpan{..} _) = (srcSpanStartLine, srcSpanEndLine)
