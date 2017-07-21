@@ -9,12 +9,9 @@ module Importify.CPP
 
 import           Universum
 
-import qualified Data.Text.Buildable
 import           Fmt                       (( #| ), (|#))
 import           Language.Haskell.Exts     (Extension, Module, ParseMode (..),
-                                            ParseResult (..), SrcSpanInfo,
-                                            defaultParseMode, prettyPrint)
-import qualified Language.Haskell.Exts     as LHE (SrcLoc)
+                                            SrcSpanInfo, defaultParseMode)
 import           Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpphsOptions,
                                             parseFileWithCommentsAndCPP)
 import           Path                      (Abs, File, Path, fromAbsFile)

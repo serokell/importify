@@ -144,7 +144,12 @@ collectUsedQuals :: [ImportDecl SrcSpanInfo] -> [Scoped SrcSpanInfo] -> [ModuleN
 collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) annotations) quals
   where
     quals :: [ModuleName SrcSpanInfo]
-    quals = mapMaybe importAs $ filter (isNothing . importSpecs) imports
+    quals = mapMaybe maybeQualified $ filter (isNothing . importSpecs) imports
+
+    maybeQualified :: ImportDecl SrcSpanInfo -> Maybe (ModuleName SrcSpanInfo)
+    maybeQualified ImportDecl{ importAs = as@(Just _)     } = as
+    maybeQualified ImportDecl{ importQualified = True, .. } = Just importModule
+    maybeQualified _                                        = Nothing
 
 qualUsed :: ModuleName SrcSpanInfo -> Scoped SrcSpanInfo -> Bool
 qualUsed (ModuleName _ name)
@@ -152,11 +157,12 @@ qualUsed (ModuleName _ name)
   = name == usedName
 qualUsed _ _ = False
 
+-- | TODO: make more elegant
 qualifiedAsImportNeeded :: [ModuleName SrcSpanInfo]
                         -> ImportDecl SrcSpanInfo
                         -> Bool
-qualifiedAsImportNeeded usedQuals ImportDecl{..} =
-    case importAs of
-        Just name -> isJust importSpecs
-                  || name `elem` usedQuals
-        Nothing   -> True
+qualifiedAsImportNeeded usedQuals ImportDecl{ importAs = Just name, .. } =
+    isJust importSpecs || name `elem` usedQuals
+qualifiedAsImportNeeded usedQuals ImportDecl{ importQualified = True, .. } =
+    isJust importSpecs || importModule `elem` usedQuals
+qualifiedAsImportNeeded _ _ = True
