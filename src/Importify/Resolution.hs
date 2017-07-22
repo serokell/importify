@@ -5,6 +5,7 @@ module Importify.Resolution
          collectUnusedImplicitImports
        , collectUnusedSymbolsBy
        , collectUsedQuals
+       , isKnownImport
 
          -- * Predicates for unused imports
        , hidingUsedIn
@@ -27,13 +28,14 @@ import qualified Data.Map.Strict                          as M
 import           Language.Haskell.Exts                    (ImportDecl (..), Module,
                                                            ModuleName (..), QName (..),
                                                            SrcSpanInfo)
-import           Language.Haskell.Names                   (NameInfo (GlobalSymbol),
+import           Language.Haskell.Names                   (Environment,
+                                                           NameInfo (GlobalSymbol),
                                                            Scoped (Scoped), resolve)
 import qualified Language.Haskell.Names                   as N
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
 import           Language.Haskell.Names.SyntaxUtils       (dropAnn, getModuleName)
 
-import           Importify.Syntax                         (InScoped,
+import           Importify.Syntax                         (InScoped, getImportModuleName,
                                                            importNamesWithTables,
                                                            isImportImplicit,
                                                            scopedNameInfo)
@@ -102,6 +104,11 @@ collectUnusedImplicitImports isUsed imports =
         isImportUnused  = null . collectUnusedSymbolsBy (not . isUsed)
         unusedImports   = map fst $ filter (isImportUnused . snd) nameWithTable
     in unusedImports
+
+-- | Checks if module symbols were cached. We don't want to remove
+-- unknown imports we just want to not touch them.
+isKnownImport :: Environment -> ImportDecl l -> Bool
+isKnownImport env decl = M.member (getImportModuleName decl) env
 
 -- | Remove all implicit import declarations specified by given list
 -- of module names.
