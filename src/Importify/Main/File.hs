@@ -37,7 +37,7 @@ import           Importify.Paths                    (cacheDir, cachePath, extens
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedImplicitImports,
                                                      collectUnusedSymbolsBy, hidingUsedIn,
-                                                     removeImplicitImports,
+                                                     isKnownImport, removeImplicitImports,
                                                      removeUnusedQualifiedAsImports,
                                                      symbolUsedIn)
 import           Importify.Syntax                   (importSlice, switchHidingImports,
@@ -147,7 +147,7 @@ removeUnusedImports ast imports = do
     let unusedSymbols   = unusedCollector (`symbolUsedIn` annotations) symbolTable
     let unusedHidings   = unusedCollector (`hidingUsedIn` annotations) hidingTable
     let unusedImplicits = collectUnusedImplicitImports (`symbolUsedIn` annotations)
-                                                       annotatedDecls
+                        $ filter (isKnownImport environment) annotatedDecls
 
     -- Remove all collected info from imports
     let withoutUnusedImplicits = removeImplicitImports unusedImplicits

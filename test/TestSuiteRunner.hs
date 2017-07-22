@@ -5,11 +5,12 @@ module Main where
 import           Universum
 
 import           Data.Algorithm.Diff  (Diff (Both), getDiff)
-import           Data.List            (sort)
+import           Data.List            (partition, sort)
 import           Path                 (Dir, File, Path, Rel, fileExtension, fromRelDir,
                                        fromRelFile, parseRelDir, parseRelFile, (-<.>),
                                        (</>))
 import           System.Directory     (listDirectory)
+import           System.Environment   (withArgs)
 
 import           Test.Hspec           (Spec, describe, hspec, it, runIO, shouldBe, xit)
 
@@ -19,10 +20,15 @@ import           Importify.Paths      (testDataPath)
 
 main :: IO ()
 main = do
+    (cacheArgs, hspecArgs) <- splitCmdOptions <$> getArgs
     initImportifyLogger
-    doCache False []
+    when (null cacheArgs) $ doCache False []
+
     testFolders <- listDirectory (fromRelDir testDataPath)
-    hspec $ mapM_ makeTestGroup testFolders
+    withArgs hspecArgs $ hspec $ mapM_ makeTestGroup testFolders
+
+splitCmdOptions :: [String] -> ([String], [String])
+splitCmdOptions = partition (== "--no-cache")
 
 makeTestGroup :: FilePath -> Spec
 makeTestGroup testDir = do

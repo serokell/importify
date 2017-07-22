@@ -1,0 +1,4 @@
+module IOFullyQualfiedAllUnused where
+
+
+main = return ()
