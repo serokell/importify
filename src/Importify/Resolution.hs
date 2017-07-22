@@ -1,10 +1,13 @@
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
+
 -- | This module contains functions to work with name resolution.
 
 module Importify.Resolution
        ( -- * Unused symbols search engines
          collectUnusedImplicitImports
        , collectUnusedSymbolsBy
-       , collectUsedQuals
        , isKnownImport
 
          -- * Predicates for unused imports
@@ -13,7 +16,7 @@ module Importify.Resolution
 
          -- * Removals
        , removeImplicitImports
-       , removeUnusedQualifiedAsImports
+       , removeUnusedQualifiedImports
 
          -- * Resolvers
        , resolveModules
@@ -22,23 +25,25 @@ module Importify.Resolution
 import           Universum
 
 import           Data.Data                                (Data)
-import           Data.List                                (notElem)
+import           Data.List                                (notElem, partition)
 import qualified Data.Map.Strict                          as M
 
-import           Language.Haskell.Exts                    (ImportDecl (..), Module,
-                                                           ModuleName (..), QName (..),
-                                                           SrcSpanInfo)
+import           Language.Haskell.Exts                    (ExportSpec (EModuleContents),
+                                                           ExportSpecList (..),
+                                                           ImportDecl (..), Module,
+                                                           ModuleHead (..),
+                                                           ModuleName (..), QName (..))
 import           Language.Haskell.Names                   (Environment,
-                                                           NameInfo (GlobalSymbol),
-                                                           Scoped (Scoped), resolve)
-import qualified Language.Haskell.Names                   as N
+                                                           NameInfo (Export, GlobalSymbol),
+                                                           Scoped, resolve, symbolModule)
+import qualified Language.Haskell.Names                   as N (Symbol (..), symbolName)
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
 import           Language.Haskell.Names.SyntaxUtils       (dropAnn, getModuleName)
 
 import           Importify.Syntax                         (InScoped, getImportModuleName,
                                                            importNamesWithTables,
                                                            isImportImplicit,
-                                                           scopedNameInfo)
+                                                           scopedNameInfo, scopedNameInfo)
 
 elemAnnotations :: (NameInfo l -> Bool) -> [Scoped l] -> Bool
 elemAnnotations used = any used . map scopedNameInfo
@@ -54,12 +59,15 @@ symbolUsedIn symbol = elemAnnotations used
     -- if one of its constructors is used
     used (GlobalSymbol global@(N.Constructor smodule _sname stype) _) =
         symbol == global ||
-        (N.symbolName symbol == stype && N.symbolModule symbol == smodule)
+        (N.symbolName symbol == stype && symbolModule symbol == smodule)
 
     -- ditto for selectors
     used (GlobalSymbol global@(N.Selector smodule _sname stype _scons) _) =
         symbol == global ||
-        (N.symbolName symbol == stype && N.symbolModule symbol == smodule)
+        (N.symbolName symbol == stype && symbolModule symbol == smodule)
+
+    -- Symbol is used as a part of export declaration
+    used (Export symbols) = symbol `elem` symbols
 
     -- The symbol is used itself
     used (GlobalSymbol global _) = symbol == global
@@ -72,9 +80,14 @@ hidingUsedIn :: N.Symbol -> [Scoped l] -> Bool
 hidingUsedIn symbol = elemAnnotations used
   where
     used :: NameInfo l -> Bool
-    used (GlobalSymbol global _) =
-        symbol { N.symbolModule = N.symbolModule global } == global
-    used _ = False
+    used (GlobalSymbol global _) = modulelessEq symbol global
+    used (Export symbols)        = any (modulelessEq symbol) symbols
+    used _                       = False
+
+-- | Compares if two symbols are equal ignoring 'symbolModule'
+-- field. Used to remove imports from @hiding@ sections.
+modulelessEq :: N.Symbol -> N.Symbol -> Bool
+modulelessEq this other = this { N.symbolModule = N.symbolModule other } == other
 
 -- | Collect symbols unused in annotations.
 collectUnusedSymbolsBy
@@ -133,43 +146,58 @@ resolveModules exposedModules otherModules =
         exposedSymbols = M.assocs exposedEnv
     in exposedSymbols
 
--- | Remove unused @qualified as@ imports, i.e. in the next form:
+-- | Remove unused @qualified as@ imports, i.e. in one of the next form:
 -- @
+--   import qualified Data.List
 --   import qualified Data.List as L
+--   import           Data.List as L
 -- @
-removeUnusedQualifiedAsImports :: [ImportDecl SrcSpanInfo]
-                               -> [Scoped SrcSpanInfo]
-                               -> [ImportDecl SrcSpanInfo]
-removeUnusedQualifiedAsImports imports annotations =
-    let usedQuals = collectUsedQuals imports annotations
-    in filter (qualifiedAsImportNeeded usedQuals) imports
+-- This function ignores qualified imports because it is running after
+-- stage where symbols from explicit list removed.
+removeUnusedQualifiedImports :: [ImportDecl l]
+                             -> Maybe (ModuleHead l)
+                             -> [Scoped l]
+                             -> [ImportDecl l]
+removeUnusedQualifiedImports imports moduleHead annotations =
+    let (emptySpecs, others) = partition (isNothing . importSpecs) imports
+        isImportNeeded name  = isInsideExport moduleHead  name
+                            || isInsideModule annotations name
+        byModuleName         = maybe True isImportNeeded . fmap dropAnn . qualifiedName
+        neededQualified      = filter byModuleName emptySpecs
+    in neededQualified ++ others
 
--- | Collect list of modules used for fully qualified names.
--- E.g. if it encounters "IO.putStrLn" it should collect @ModuleName "IO"@
--- Used later to determine whether @qualified@ import needed or not
-collectUsedQuals :: [ImportDecl SrcSpanInfo] -> [Scoped SrcSpanInfo] -> [ModuleName SrcSpanInfo]
-collectUsedQuals imports annotations = filter (\qual -> any (qualUsed qual) annotations) quals
+-- | For given import collect qualified name.
+-- Qualified names gathered using next scheme:
+-- @
+--   import           A      ⇒ Nothing
+--   import qualified B      ⇒ Just B
+--   import qualified C as X ⇒ Just X
+--   import           D as Y ⇒ Just Y
+-- @
+-- Used later to determine whether empty @qualified@ import needed or not.
+qualifiedName :: ImportDecl l -> Maybe (ModuleName l)
+qualifiedName ImportDecl{ importAs = as@(Just _)     } = as
+qualifiedName ImportDecl{ importQualified = True, .. } = Just importModule
+qualifiedName _                                        = Nothing
+
+isInsideExport :: forall l. Maybe (ModuleHead l) -> ModuleName () -> Bool
+isInsideExport moduleHead moduleName = moduleName `elem` exportedModules
   where
-    quals :: [ModuleName SrcSpanInfo]
-    quals = mapMaybe maybeQualified $ filter (isNothing . importSpecs) imports
+    exports :: Maybe (ExportSpecList l)
+    exports = do
+        ModuleHead _ _ _ maybeExports <- moduleHead
+        maybeExports
 
-    maybeQualified :: ImportDecl SrcSpanInfo -> Maybe (ModuleName SrcSpanInfo)
-    maybeQualified ImportDecl{ importAs = as@(Just _)     } = as
-    maybeQualified ImportDecl{ importQualified = True, .. } = Just importModule
-    maybeQualified _                                        = Nothing
+    exportedModules :: [ModuleName ()]
+    exportedModules = do
+      ExportSpecList  _ specs   <- maybe [] one exports
+      EModuleContents _ eModule <- specs
+      pure $ dropAnn eModule
 
-qualUsed :: ModuleName SrcSpanInfo -> Scoped SrcSpanInfo -> Bool
-qualUsed (ModuleName _ name)
-         (Scoped (GlobalSymbol _ (Qual _ (ModuleName _ usedName) _)) _)
-  = name == usedName
-qualUsed _ _ = False
-
--- | TODO: make more elegant
-qualifiedAsImportNeeded :: [ModuleName SrcSpanInfo]
-                        -> ImportDecl SrcSpanInfo
-                        -> Bool
-qualifiedAsImportNeeded usedQuals ImportDecl{ importAs = Just name, .. } =
-    isJust importSpecs || name `elem` usedQuals
-qualifiedAsImportNeeded usedQuals ImportDecl{ importQualified = True, .. } =
-    isJust importSpecs || importModule `elem` usedQuals
-qualifiedAsImportNeeded _ _ = True
+isInsideModule :: forall l. [Scoped l] -> ModuleName () -> Bool
+isInsideModule annotations moduleName = any isNameUsed annotations
+  where
+    isNameUsed :: Scoped l -> Bool
+    isNameUsed (scopedNameInfo -> nameInfo) = case nameInfo of
+        GlobalSymbol _ (Qual _ usedName _) -> moduleName == usedName
+        _                                  -> False

@@ -16,9 +16,9 @@ import qualified Data.HashMap.Strict                as HM
 import qualified Data.Map                           as Map
 
 import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
-                                                     ModuleName (..), SrcSpanInfo,
-                                                     exactPrint, fromParseResult,
-                                                     parseExtension,
+                                                     ModuleHead, ModuleName (..),
+                                                     SrcSpanInfo, exactPrint,
+                                                     fromParseResult, parseExtension,
                                                      parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols)
@@ -38,7 +38,7 @@ import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedImplicitImports,
                                                      collectUnusedSymbolsBy, hidingUsedIn,
                                                      isKnownImport, removeImplicitImports,
-                                                     removeUnusedQualifiedAsImports,
+                                                     removeUnusedQualifiedImports,
                                                      symbolUsedIn)
 import           Importify.Syntax                   (importSlice, switchHidingImports,
                                                      unscope)
@@ -139,7 +139,9 @@ removeUnusedImports ast imports = do
     let symbolTable    = importTable environment ast
     let hidingTable    = importTable environment $ switchHidingImports ast
     let annotatedDecls = annotateImportDecls (getModuleName ast) environment imports
-    let annotations    = annotateModule ast environment
+
+    -- return exports to search for qualified imports there later
+    let (annotations, moduleHead) = annotateModule ast environment
 
     -- ordNub needed because name can occur as Qual and as UnQual
     -- but we don't care about qualification
@@ -156,8 +158,9 @@ removeUnusedImports ast imports = do
                                $ removeImports (UnusedSymbols unusedSymbols)
                                                (UnusedHidings unusedHidings)
                                                withoutUnusedImplicits
-    let withoutUnusedQualsAs   = removeUnusedQualifiedAsImports withoutUnusedSymbols
-                                                                annotations
+    let withoutUnusedQualsAs   = removeUnusedQualifiedImports withoutUnusedSymbols
+                                                              moduleHead
+                                                              annotations
 
     return withoutUnusedQualsAs
 
@@ -188,7 +191,9 @@ loadEnvironment = do
 
 -- | Annotates module but drops import annotations because they can contain GlobalSymbol
 -- annotations and collectUnusedSymbols later does its job by looking for GlobalSymbol
-annotateModule :: Module SrcSpanInfo -> Environment -> [Scoped SrcSpanInfo]
+annotateModule :: Module SrcSpanInfo
+               -> Environment
+               -> ([Scoped SrcSpanInfo], Maybe (ModuleHead SrcSpanInfo))
 annotateModule ast environment =
     let (Module l mhead mpragmas _mimports mdecls) = annotate environment ast
-    in toList (Module l mhead mpragmas [] mdecls)
+    in (toList (Module l mhead mpragmas [] mdecls), fmap unscope mhead)
