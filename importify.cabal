@@ -62,7 +62,7 @@ library
                      , log-warper
                      , microlens-mtl
                      , path
-                     , pretty-show
+                     , pretty-simple
                      , syb
                      , text
                      , text-format

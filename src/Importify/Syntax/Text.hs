@@ -2,13 +2,14 @@
 
 module Importify.Syntax.Text
        ( stripEndLineComment
-       , debugAst
+       , debugAST
        ) where
 
 import           Universum
 
-import qualified Data.Text        as T
-import           Text.Show.Pretty (ppShow)
+import qualified Data.Text          as T
+import           Fmt                (fmt, padLeftF)
+import           Text.Pretty.Simple (pShow)
 
 -- | This functions strips out trailing single line comment.
 stripEndLineComment :: Text -> Text
@@ -19,12 +20,16 @@ stripEndLineComment line = case T.breakOnAll "--" line of
 -- | Helper function to debug different parts of AST processing.
 --
 -- TODO: better utility with logging?
-{-# WARNING debugAst "'debugAst' remains in code" #-}
-debugAst :: Show a => Text -> a -> IO ()
-debugAst header msg = do
-    putText $ "-------------------- // " <> header <> " // --------------------"
-    putText $ unlines
-            $ zipWith (\i line -> show i <> ": " <> line) [1 :: Int ..]
+{-# WARNING debugAST "'debugAst' remains in code" #-}
+debugAST :: Show a => Text -> a -> IO ()
+debugAST header msg = do
+    let preamble = "-------------------- // " <> header <> " // --------------------\n"
+    putText $ (preamble <>)
+            $ unlines
+            $ zipWith (\i line -> lineNumber i <> ": " <> line) [1..]
             $ lines
             $ toText
-            $ ppShow msg
+            $ pShow msg
+  where
+    lineNumber :: Int -> Text
+    lineNumber = fmt . padLeftF 4 ' '  -- padding 4 should be enough (no bigger 9999)
