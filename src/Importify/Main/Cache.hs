@@ -35,8 +35,7 @@ import           Importify.Cabal                 (getExtensionMaps, libraryExten
                                                   splitOnExposedAndOther,
                                                   withHarmlessExtensions, withLibrary)
 import           Importify.CPP                   (parseModuleFile)
-import           Importify.ParseException        (ModuleParseException)
-import           Importify.ParseException        (reportErrorsIfAny)
+import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny)
 import           Importify.Paths                 (cachePath, doInsideDir, extensionsFile,
                                                   findCabalFile, getCurrentPath,
                                                   modulesFile, symbolsPath, targetsFile)
@@ -97,6 +96,7 @@ cacheProject preserveSources cabalFile = do
                                                    (importifyPath </> symbolsPath)
                                                    projectName
                                                    (projectName ++ '-':showVersion pkgVersion)
+                                                   True
 
         let importsMap = Map.unions (projectResolutionMap:dependenciesResolutionMaps)
         BS.writeFile modulesFile $ encode importsMap
@@ -137,6 +137,7 @@ collectDependenciesResolution importifyPath preserve libName = do
                                          symbolsCachePath
                                          libName
                                          downloadedPackage
+                                         False
 
     unless preserve $  -- TODO: use bracket here
         removeDirectoryRecursive downloadedPackage
@@ -148,8 +149,16 @@ createProjectCache :: GenericPackageDescription
                    -> Path Abs Dir
                    -> String
                    -> String
+                   -> Bool
                    -> IO (Map String String)
-createProjectCache packageCabalDesc packagePath symbolsCachePath libName packageName =
+createProjectCache
+    packageCabalDesc
+    packagePath
+    symbolsCachePath
+    libName
+    packageName
+    keepOtherModules
+  =
     withLibrary packageCabalDesc $ \library -> do
         -- creates ./.importify/symbols/<package>/
         packageNamePath     <- parseRelDir packageName
@@ -161,7 +170,9 @@ createProjectCache packageCabalDesc packagePath symbolsCachePath libName package
         reportErrorsIfAny errors libName
 
         let (exposedModules, otherModules) = splitOnExposedAndOther library libModules
-        let resolvedModules = resolveModules exposedModules otherModules
+        let resolvedModules = if keepOtherModules
+                              then resolveModules (exposedModules ++ otherModules) []
+                              else resolveModules exposedModules otherModules
 
         packageModules <- forM resolvedModules $ \(ModuleName () moduleTitle, resolvedSymbols) -> do
             modSymbolsPath     <- parseRelFile $ moduleTitle ++ ".symbols"

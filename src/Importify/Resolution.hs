@@ -139,7 +139,7 @@ removeImplicitImports names = filter notImplicitOrUnused
 resolveModules :: (Data l, Eq l) => [Module l] -> [Module l] -> [(ModuleName (), [N.Symbol])]
 resolveModules exposedModules otherModules =
     let symbolsEnv     = resolve (exposedModules ++ otherModules) mempty
-        otherCleared   = map ((() <$) . getModuleName) otherModules
+        otherCleared   = map (dropAnn . getModuleName) otherModules
 
         -- remove @otherModules@ from environment because only @exposed@ can be imported
         exposedEnv     = foldl' (flip M.delete) symbolsEnv otherCleared
