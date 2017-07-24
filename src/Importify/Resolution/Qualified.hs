@@ -12,14 +12,13 @@ import           Universum
 
 import           Data.List                          (partition)
 
-import           Language.Haskell.Exts              (ExportSpec (EModuleContents),
-                                                     ExportSpecList (..), ImportDecl (..),
-                                                     ModuleHead (..), ModuleName (..),
-                                                     QName (..))
+import           Language.Haskell.Exts              (ImportDecl (..), ModuleHead (..),
+                                                     ModuleName (..), QName (..))
 import           Language.Haskell.Names             (NameInfo (GlobalSymbol), Scoped)
 import           Language.Haskell.Names.SyntaxUtils (dropAnn)
 
-import           Importify.Syntax                   (scopedNameInfo, scopedNameInfo)
+import           Importify.Syntax                   (isInsideExport, scopedNameInfo,
+                                                     scopedNameInfo)
 
 -- | Remove unused @qualified as@ imports, i.e. in one of the next form:
 -- @
@@ -54,20 +53,6 @@ qualifiedName :: ImportDecl l -> Maybe (ModuleName l)
 qualifiedName ImportDecl{ importAs = as@(Just _)     } = as
 qualifiedName ImportDecl{ importQualified = True, .. } = Just importModule
 qualifiedName _                                        = Nothing
-
-isInsideExport :: forall l. Maybe (ModuleHead l) -> ModuleName () -> Bool
-isInsideExport moduleHead moduleName = moduleName `elem` exportedModules
-  where
-    exports :: Maybe (ExportSpecList l)
-    exports = do
-        ModuleHead _ _ _ maybeExports <- moduleHead
-        maybeExports
-
-    exportedModules :: [ModuleName ()]
-    exportedModules = do
-      ExportSpecList  _ specs   <- maybe [] one exports
-      EModuleContents _ eModule <- specs
-      pure $ dropAnn eModule
 
 isInsideModule :: forall l. [Scoped l] -> ModuleName () -> Bool
 isInsideModule annotations moduleName = any isNameUsed annotations

@@ -8,18 +8,16 @@ module Importify.Resolution.Implicit
 
 import           Universum
 
-import           Data.List                          (notElem)
-import qualified Data.Map.Strict                    as M
+import           Data.List                     (notElem)
+import qualified Data.Map.Strict               as M
 
-import           Language.Haskell.Exts              (ImportDecl (..), ModuleName (..))
-import           Language.Haskell.Names             (Environment)
-import qualified Language.Haskell.Names             as N (Symbol (..))
-import           Language.Haskell.Names.SyntaxUtils (dropAnn)
+import           Language.Haskell.Exts         (ImportDecl (..), ModuleName (..))
+import           Language.Haskell.Names        (Environment)
+import qualified Language.Haskell.Names        as N (Symbol (..))
 
-import           Importify.Resolution.Explicit      (collectUnusedSymbolsBy)
-import           Importify.Syntax                   (InScoped, getImportModuleName,
-                                                     importNamesWithTables,
-                                                     isImportImplicit)
+import           Importify.Resolution.Explicit (collectUnusedSymbolsBy)
+import           Importify.Syntax              (InScoped, getImportModuleName,
+                                                importNamesWithTables, isImportImplicit)
 
 -- | Collect names of unused implicit imports.
 collectUnusedImplicitImports :: (N.Symbol -> Bool)
@@ -44,5 +42,5 @@ removeImplicitImports :: [ModuleName ()]
                       -> [ImportDecl l]
 removeImplicitImports names = filter notImplicitOrUnused
   where
-    notImplicitOrUnused imp@ImportDecl{..} = not (isImportImplicit imp)
-                                          || dropAnn importModule `notElem` names
+    notImplicitOrUnused imp = not (isImportImplicit imp)
+                           || getImportModuleName imp `notElem` names
