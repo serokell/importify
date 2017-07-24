@@ -24,6 +24,7 @@ import           Language.Haskell.Exts                    (Extension (DisableExt
 import           Language.Haskell.Names                   (NameInfo (Import))
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
 
+import           Importify.Syntax.Module                  (isInsideExport)
 import           Importify.Syntax.Scoped                  (InScoped, pullScopedInfo)
 
 -- | Returns module name for 'ImportDecl' with annotation erased.
@@ -39,6 +40,16 @@ isImportImplicit ImportDecl{ importQualified = True }                       = Fa
 isImportImplicit ImportDecl{ importSpecs = Nothing }                        = True
 isImportImplicit ImportDecl{ importSpecs = Just (ImportSpecList _ True _) } = True
 isImportImplicit _                                                          = False
+
+-- | This function returns name of import disregard to its
+-- qualification, how this module should be referenced, i.e. like this:
+-- @
+--   import <whatever> A      ⇒ A
+--   import <whatever> B as X ⇒ X
+-- @
+importReferenceName :: ImportDecl l -> ModuleName ()
+importReferenceName ImportDecl{ importAs = Nothing, .. } = () <$ importModule
+importReferenceName ImportDecl{ importAs = Just name   } = () <$ name
 
 -- | Keep only hiding imports making them non-hiding. This function
 -- needed to collect unused hiding imports because @importTable@ doesn't
@@ -56,12 +67,13 @@ switchHidingImports (Module ml mhead mpragmas mimports mdecls) =
            (mapMaybe unhide mimports)
            mdecls
   where
-    unhide decl@ImportDecl{..} = importSpecs >>= \case
-        ImportSpecList _ False _      -> Nothing
-        ImportSpecList l True imports -> Just
-                                       $ decl {importSpecs = Just
-                                                           $ ImportSpecList l False imports
-                                              }
+    unhide :: ImportDecl SrcSpanInfo -> Maybe (ImportDecl SrcSpanInfo)
+    unhide decl = do
+        ImportSpecList l isHiding imports <- importSpecs decl
+        guard isHiding
+        guard $ not $ isInsideExport mhead (importReferenceName decl)
+        pure $ decl { importSpecs = Just $ ImportSpecList l False imports }
+
 switchHidingImports m = m
 
 -- | Collect mapping from import name to to list of symbols it exports.

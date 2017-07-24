@@ -22,5 +22,5 @@ cabal.project.local
 *~
 .importify/
 module_backup
-test/ManualTestForDebugging.hs
+test/Sandbox.hs
 *.out

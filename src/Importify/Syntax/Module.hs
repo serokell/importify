@@ -3,13 +3,16 @@
 module Importify.Syntax.Module
        ( getModuleNameId
        , getModuleTitle
+       , isInsideExport
        ) where
 
 import           Universum
 
-import           Language.Haskell.Exts              (Module (..), ModuleName,
+import           Language.Haskell.Exts              (ExportSpec (EModuleContents),
+                                                     ExportSpecList (..), Module (..),
+                                                     ModuleHead (..), ModuleName,
                                                      ModuleName (..))
-import           Language.Haskell.Names.SyntaxUtils (getModuleName)
+import           Language.Haskell.Names.SyntaxUtils (dropAnn, getModuleName)
 
 {- TODO: this function used earlier, it works, but is not used anymore
    I'll keep it in case we need it again.
@@ -35,3 +38,21 @@ getModuleNameId (ModuleName _ id) = id
 -- | Returns name of 'Module' as a 'String'.
 getModuleTitle :: Module l -> String
 getModuleTitle = getModuleNameId . getModuleName
+
+-- | Returns 'True' iff given 'ModuleName' is inside export list.
+isInsideExport :: Maybe (ModuleHead l) -> ModuleName () -> Bool
+isInsideExport moduleHead moduleName = moduleName `elem` exportedModules moduleHead
+
+-- | Extracts list of module names exported with @module A@ way.
+exportedModules :: Maybe (ModuleHead l) -> [ModuleName ()]
+exportedModules moduleHead = qualifiedModuleNames
+  where
+    exports = do
+        ModuleHead _ _ _ maybeExports <- moduleHead
+        maybeExports
+
+    qualifiedModuleNames :: [ModuleName ()]
+    qualifiedModuleNames = do
+      ExportSpecList  _ specs   <- maybe [] one exports
+      EModuleContents _ eModule <- specs
+      pure $ dropAnn eModule

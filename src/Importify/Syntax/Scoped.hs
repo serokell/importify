@@ -3,6 +3,7 @@
 
 module Importify.Syntax.Scoped
        ( InScoped
+       , anyAnnotation
        , pullScopedInfo
        , scopedNameInfo
        , unscope
@@ -28,3 +29,6 @@ pullScopedInfo = scopedNameInfo . ann
 -- | Drop 'Scoped' annotation from 'Functor' type.
 unscope :: Functor f => f (Scoped l) -> f l
 unscope = fmap $ \case Scoped _ l -> l
+
+anyAnnotation :: (NameInfo l -> Bool) -> [Scoped l] -> Bool
+anyAnnotation used = any used . map scopedNameInfo

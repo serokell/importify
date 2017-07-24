@@ -34,6 +34,10 @@ library
                        Importify.Paths
                        Importify.Pretty
                        Importify.Resolution
+                           Importify.Resolution.Explicit
+                           Importify.Resolution.Hiding
+                           Importify.Resolution.Implicit
+                           Importify.Resolution.Qualified
                        Importify.Stack
                        Importify.Syntax
                            Importify.Syntax.Import

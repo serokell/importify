@@ -136,12 +136,13 @@ removeUnusedImports
     -> IO [ImportDecl SrcSpanInfo]
 removeUnusedImports ast imports = do
     environment       <- loadEnvironment
-    let symbolTable    = importTable environment ast
-    let hidingTable    = importTable environment $ switchHidingImports ast
-    let annotatedDecls = annotateImportDecls (getModuleName ast) environment imports
 
     -- return exports to search for qualified imports there later
     let (annotations, moduleHead) = annotateModule ast environment
+
+    let symbolTable    = importTable environment ast
+    let hidingTable    = importTable environment $ switchHidingImports ast
+    let annotatedDecls = annotateImportDecls (getModuleName ast) environment imports
 
     -- ordNub needed because name can occur as Qual and as UnQual
     -- but we don't care about qualification
