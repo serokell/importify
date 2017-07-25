@@ -40,8 +40,8 @@ import           Importify.Resolution               (collectUnusedImplicitImport
                                                      isKnownImport, removeImplicitImports,
                                                      removeUnusedQualifiedImports,
                                                      symbolUsedIn)
-import           Importify.Syntax                   (importSlice, switchHidingImports,
-                                                     unscope)
+import           Importify.Syntax                   (debugAST, importSlice,
+                                                     switchHidingImports, unscope)
 import           Importify.Tree                     (UnusedHidings (UnusedHidings),
                                                      UnusedSymbols (UnusedSymbols),
                                                      removeImports)
@@ -75,6 +75,7 @@ doSource srcFile src = do
                    $ parseFileContentsWithExts exts
                    $ toString src
 
+    debugAST "AST" ast
     doAst src ast
 
 -- Meeeh, ugly code ;(

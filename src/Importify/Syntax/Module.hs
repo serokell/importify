@@ -4,6 +4,7 @@ module Importify.Syntax.Module
        ( getModuleNameId
        , getModuleTitle
        , isInsideExport
+       , modulePragmas
        ) where
 
 import           Universum
@@ -11,7 +12,7 @@ import           Universum
 import           Language.Haskell.Exts              (ExportSpec (EModuleContents),
                                                      ExportSpecList (..), Module (..),
                                                      ModuleHead (..), ModuleName,
-                                                     ModuleName (..))
+                                                     ModuleName (..), ModulePragma)
 import           Language.Haskell.Names.SyntaxUtils (dropAnn, getModuleName)
 
 {- TODO: this function used earlier, it works, but is not used anymore
@@ -56,3 +57,9 @@ exportedModules moduleHead = qualifiedModuleNames
       ExportSpecList  _ specs   <- maybe [] one exports
       EModuleContents _ eModule <- specs
       pure $ dropAnn eModule
+
+-- | Extract all 'ModulePragma's from 'Module'.
+modulePragmas :: Module l -> [ModulePragma l]
+modulePragmas (Module _ _ pragmas _ _)            = pragmas
+modulePragmas (XmlPage _ _ pragmas _ _ _ _)       = pragmas
+modulePragmas (XmlHybrid _ _ pragmas _ _ _ _ _ _) = pragmas
