@@ -42,7 +42,6 @@ import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
 import           Importify.Stack                 (ghcIncludePath, stackListDependencies,
                                                   upgradeWithVersions)
-import           Importify.Syntax                (debugAST)
 
 -- | Caches packages information into local .importify directory.
 doCache :: Bool -> [String] -> IO ()
@@ -173,8 +172,7 @@ createProjectCache
         let resolvedModules = if keepOtherModules
                               then resolveModules (exposedModules ++ otherModules) []
                               else resolveModules exposedModules otherModules
-        when (packageName == "importify-0.0.1") $ do
-          debugAST "MODULES" $ map fst resolvedModules
+
         packageModules <- forM resolvedModules $ \(ModuleName () moduleTitle, resolvedSymbols) -> do
             modSymbolsPath     <- parseRelFile $ moduleTitle ++ ".symbols"
             let moduleCachePath = packageCachePath </> modSymbolsPath

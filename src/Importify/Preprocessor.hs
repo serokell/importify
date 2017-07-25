@@ -17,13 +17,11 @@ import           Language.Haskell.Exts     (Extension, Module,
                                             SrcSpanInfo, Tool (GHC), defaultParseMode)
 import           Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpphsOptions,
                                             parseFileWithCommentsAndCPP)
-import           Path                      (Abs, File, Path, fromAbsFile, fromRelFile,
-                                            parseRelFile, (-<.>))
+import           Path                      (Abs, File, Path, fromAbsFile, (-<.>))
 import           System.Directory          (removeFile)
 
 import           Importify.ParseException  (ModuleParseException, prettyParseResult)
-import           Importify.Paths           (getCurrentPath)
-import           Importify.Syntax          (debugAST, getModuleTitle, modulePragmas)
+import           Importify.Syntax          (modulePragmas)
 
 -- | Parse module after preproccessing this module with possibly
 -- custom preprocessor. It first calls parsing with CPP, then reads
