@@ -48,7 +48,8 @@ library
 
                        Extended.System.Wlog
 
-  other-modules:       Extended.Data.List
+  other-modules:       Extended.Data.Bool
+                       Extended.Data.List
                        Extended.Data.Str
 
   build-depends:       base >= 4.7 && < 5

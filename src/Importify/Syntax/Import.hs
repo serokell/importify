@@ -34,6 +34,8 @@ getImportModuleName ImportDecl{..} = () <$ importModule
 -- | Returns 'True' iff import has next form:
 -- @
 --   import Module.Name
+--   import Module.Name as Other.Name
+--   import Module.Name hiding (smth)
 -- @
 isImportImplicit :: ImportDecl l -> Bool
 isImportImplicit ImportDecl{ importQualified = True }                       = False

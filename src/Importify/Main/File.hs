@@ -162,6 +162,7 @@ removeUnusedImports ast imports = do
     let withoutUnusedQualsAs   = removeUnusedQualifiedImports withoutUnusedSymbols
                                                               moduleHead
                                                               annotations
+                                                              unusedImplicits
 
     return withoutUnusedQualsAs
 
