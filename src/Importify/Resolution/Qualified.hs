@@ -17,8 +17,9 @@ import           Language.Haskell.Exts              (ImportDecl (..), ModuleHead
 import           Language.Haskell.Names             (NameInfo (GlobalSymbol), Scoped)
 import           Language.Haskell.Names.SyntaxUtils (dropAnn)
 
-import           Importify.Syntax                   (isInsideExport, scopedNameInfo,
-                                                     scopedNameInfo)
+import           Extended.Data.Bool                 ((==>))
+import           Importify.Syntax                   (getImportModuleName, isInsideExport,
+                                                     scopedNameInfo, scopedNameInfo)
 
 -- | Remove unused @qualified as@ imports, i.e. in one of the next form:
 -- @
@@ -26,19 +27,32 @@ import           Importify.Syntax                   (isInsideExport, scopedNameI
 --   import qualified Data.List as L
 --   import           Data.List as L
 -- @
--- This function ignores qualified imports because it is running after
--- stage where symbols from explicit list removed.
+-- This function ignores imports with explicit import lists because it
+-- is running after stage where symbols from explicit list removed.
 removeUnusedQualifiedImports :: [ImportDecl l]
                              -> Maybe (ModuleHead l)
                              -> [Scoped l]
+                             -> [ModuleName ()]  -- ^ Unused @import A as B@
                              -> [ImportDecl l]
-removeUnusedQualifiedImports imports moduleHead annotations =
-    let (emptySpecs, others) = partition (isNothing . importSpecs) imports
-        isImportNeeded name  = isInsideExport moduleHead  name
-                            || isInsideModule annotations name
-        byModuleName         = maybe True isImportNeeded . fmap dropAnn . qualifiedName
-        neededQualified      = filter byModuleName emptySpecs
+removeUnusedQualifiedImports imports moduleHead annotations unusedImplicits =
+    let (possiblyUnused, others) = partition (possiblyUnusedImport unusedImplicits) imports
+
+        isImportNeeded name      = isInsideExport moduleHead  name
+                                || isInsideModule annotations name
+
+        byModuleName             = maybe True isImportNeeded
+                                 . fmap dropAnn
+                                 . qualifiedName
+
+        neededQualified          = filter byModuleName possiblyUnused
     in neededQualified ++ others
+
+possiblyUnusedImport :: [ModuleName ()] -> ImportDecl l -> Bool
+possiblyUnusedImport unusedImplicits decl = isNothing (importSpecs decl)
+                                         && isNotImplicitUnused
+  where
+    isNotImplicitUnused = (isJust (importAs decl) && not (importQualified decl))
+                      ==> getImportModuleName decl `elem` unusedImplicits
 
 -- | For given import collect qualified name.
 -- Qualified names gathered using next scheme:

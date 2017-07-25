@@ -9,7 +9,6 @@ module Importify.ParseException
 
 import           Universum
 
-import qualified Data.Text.Buildable
 import           Fmt                   (Builder, blockListF, build, fmt, fmtLn, indent,
                                         listF, ( #| ), (|#))
 import           Language.Haskell.Exts (ParseResult (..), prettyPrint, SrcLoc)
