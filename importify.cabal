@@ -26,12 +26,12 @@ library
                            Importify.Cabal.Module
                            Importify.Cabal.Package
                            Importify.Cabal.Target
-                       Importify.CPP
                        Importify.Main
                            Importify.Main.Cache
                            Importify.Main.File
                        Importify.ParseException
                        Importify.Paths
+                       Importify.Preprocessor
                        Importify.Pretty
                        Importify.Resolution
                            Importify.Resolution.Explicit
@@ -54,6 +54,7 @@ library
 
   build-depends:       base >= 4.7 && < 5
                      , aeson
+                     , autoexporter
                      , bytestring
                      , Cabal
                      , containers

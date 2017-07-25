@@ -34,11 +34,11 @@ import           Importify.Cabal                 (getExtensionMaps, libraryExten
                                                   packageDependencies, readCabal,
                                                   splitOnExposedAndOther,
                                                   withHarmlessExtensions, withLibrary)
-import           Importify.CPP                   (parseModuleFile)
 import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny)
 import           Importify.Paths                 (cachePath, doInsideDir, extensionsFile,
                                                   findCabalFile, getCurrentPath,
                                                   modulesFile, symbolsPath, targetsFile)
+import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
 import           Importify.Stack                 (ghcIncludePath, stackListDependencies,
                                                   upgradeWithVersions)
@@ -102,9 +102,9 @@ cacheProject preserveSources cabalFile = do
         BS.writeFile modulesFile $ encode importsMap
 
 unpackAndCacheDependencies :: Path Abs Dir
-                             -> Bool
-                             -> [String]
-                             -> IO [Map String String]
+                           -> Bool
+                           -> [String]
+                           -> IO [Map String String]
 unpackAndCacheDependencies importifyPath preserveSources dependencies =
     forM dependencies $
         collectDependenciesResolution importifyPath preserveSources
@@ -158,8 +158,7 @@ createProjectCache
     libName
     packageName
     keepOtherModules
-  =
-    withLibrary packageCabalDesc $ \library -> do
+  = withLibrary packageCabalDesc $ \library -> do
         -- creates ./.importify/symbols/<package>/
         packageNamePath     <- parseRelDir packageName
         let packageCachePath = symbolsCachePath </> packageNamePath
@@ -185,10 +184,19 @@ createProjectCache
 
         pure $ Map.fromList packageModules
 
+packageLibraryModules :: Path Abs Dir
+                      -> Library
+                      -> IO [Path Abs File]
+packageLibraryModules packagePath Library{..} =
+    modulePaths packagePath libBuildInfo (Left exposedModules)
+
 parsedModulesWithErrors :: Path Abs Dir  -- ^ Path like @~/.../.importify/containers-0.5@
                         -> Library
                         -> IO ([ModuleParseException], [Module SrcSpanInfo])
 parsedModulesWithErrors packagePath library = do
+    -- paths to all modules
+    pathsToModules <- packageLibraryModules packagePath library
+
     -- get include directories for cpphs
     includeDirPaths   <- mapM parseRelDir $ libraryIncludeDirs library
     let pkgIncludeDirs = map (fromAbsDir . (packagePath </>)) includeDirPaths
@@ -196,10 +204,8 @@ parsedModulesWithErrors packagePath library = do
     let includeDirs    = pkgIncludeDirs ++ ghcIncludeDir
 
     -- get extensions
-    let extensions   = withHarmlessExtensions $ libraryExtensions library
-    pathsToModules  <- modulePaths packagePath
-                                   (libBuildInfo library)
-                                   (Left $ exposedModules library)
+    let extensions = withHarmlessExtensions $ libraryExtensions library
 
-    modEithers <- mapM (parseModuleFile extensions includeDirs) pathsToModules
-    pure $ partitionEithers modEithers
+    fmap partitionEithers
+       $ mapM (parseModuleWithPreprocessor extensions includeDirs)
+              pathsToModules
