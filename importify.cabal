@@ -59,6 +59,7 @@ library
                      , Cabal
                      , containers
                      , directory
+                     , extra
                      , filepath
                      , fmt
                      , foldl
@@ -94,6 +95,7 @@ executable importify
   other-modules:       Options
 
   build-depends:       base, importify
+                     , log-warper
                      , optparse-applicative
                      , universum
 
@@ -134,6 +136,7 @@ test-suite importify-test
                      , Diff
                      , directory
                      , hspec
+                     , log-warper
                      , path
                      , universum
 

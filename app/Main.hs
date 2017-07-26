@@ -15,13 +15,14 @@ import           Extended.System.Wlog (initImportifyLogger)
 import           Importify.Main       (doCache, doFile)
 
 import           Options              (CabalCacheOptions (..), Command (..),
-                                       SingleFileOptions (..), parseOptions)
+                                       ImportifyCliArgs (..), SingleFileOptions (..),
+                                       coLoggingSeverity, parseOptions)
 
 main :: IO ()
 main = do
-    opts <- parseOptions
-    initImportifyLogger
-    case opts of
+    ImportifyCliArgs{..} <- parseOptions
+    initImportifyLogger (coLoggingSeverity icaCommon)
+    case icaCommand of
         SingleFile sfOpts -> importifySingleFile sfOpts
         CabalCache ccOpts -> buildCabalCache ccOpts
 

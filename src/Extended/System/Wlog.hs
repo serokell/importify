@@ -2,6 +2,7 @@
 
 module Extended.System.Wlog
        ( initImportifyLogger
+       , printDebug
        , printInfo
        , printWarning
        ) where
@@ -9,22 +10,27 @@ module Extended.System.Wlog
 import           Universum
 
 import           Lens.Micro.Mtl (zoom, (?=))
-import           System.Wlog    (LoggerConfig, LoggerNameBox, Severity (Info, Warning),
-                                 consoleOutB, lcTree, logInfo, logWarning, ltSeverity,
-                                 setupLogging, usingLoggerName, zoomLogger)
+import           System.Wlog    (LoggerConfig, LoggerNameBox, Severity (Warning),
+                                 consoleOutB, lcTree, logDebug, logInfo, logWarning,
+                                 ltSeverity, setupLogging, usingLoggerName, zoomLogger)
 
-importifyLoggerConfig :: LoggerConfig
-importifyLoggerConfig = executingState consoleOutB $ zoom lcTree $ do
-    ltSeverity ?= Warning
-    zoomLogger "importify" $
-        ltSeverity ?= Info
+importifyLoggerConfig :: Severity -> LoggerConfig
+importifyLoggerConfig importifySeverity =
+    executingState consoleOutB $ zoom lcTree $ do
+        ltSeverity ?= Warning
+        zoomLogger "importify" $
+            ltSeverity ?= importifySeverity
 
 -- | Initializes importify logger.
-initImportifyLogger :: IO ()
-initImportifyLogger = setupLogging importifyLoggerConfig
+initImportifyLogger :: Severity -> IO ()
+initImportifyLogger = setupLogging . importifyLoggerConfig
 
 withImportify :: LoggerNameBox m a -> m a
 withImportify = usingLoggerName "importify"
+
+-- | Prints 'System.Wlog.Debug' message.
+printDebug :: Text -> IO ()
+printDebug = withImportify  . logDebug
 
 -- | Prints 'Info' message.
 printInfo :: Text -> IO ()

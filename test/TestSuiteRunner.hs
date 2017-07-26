@@ -11,6 +11,7 @@ import           Path                 (Dir, File, Path, Rel, fileExtension, from
                                        (</>))
 import           System.Directory     (listDirectory)
 import           System.Environment   (withArgs)
+import           System.Wlog          (Severity (Info))
 
 import           Test.Hspec           (Spec, describe, hspec, it, runIO, shouldBe, xit)
 
@@ -21,7 +22,7 @@ import           Importify.Paths      (testDataPath)
 main :: IO ()
 main = do
     (cacheArgs, hspecArgs) <- splitCmdOptions <$> getArgs
-    initImportifyLogger
+    initImportifyLogger Info
     when (null cacheArgs) $ doCache False []
 
     testFolders <- listDirectory (fromRelDir testDataPath)
