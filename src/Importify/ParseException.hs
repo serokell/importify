@@ -34,12 +34,12 @@ prettyParseResult (ParseOk (moduleAst, _)) = Right moduleAst
 prettyParseResult (ParseFailed loc reason) = Left $ MPE loc reason
 
 -- | Pretty printing 'NonEmpty' list of errors in really nice way.
-prettyParseErrors :: String -> NonEmpty ModuleParseException -> Text
+prettyParseErrors :: Text -> NonEmpty ModuleParseException -> Text
 prettyParseErrors libName exceptions =
     "Next errors occured during caching of package: "#|libName|#"\n"
  #| indent 4 (blockListF exceptions) |# ""
 
 -- | Prints parse errors if list of errors is not empty.
-reportErrorsIfAny :: [ModuleParseException] -> String -> IO ()
+reportErrorsIfAny :: [ModuleParseException] -> Text -> IO ()
 reportErrorsIfAny exceptions libName = whenNotNull exceptions $
     printWarning . prettyParseErrors libName

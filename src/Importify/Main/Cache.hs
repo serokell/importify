@@ -6,9 +6,10 @@ module Importify.Main.Cache
 
 import           Universum
 
-import           Data.Aeson                      (encode)
-import qualified Data.ByteString.Lazy            as BS
-import qualified Data.Map                        as Map
+import           Data.Aeson                      (decodeStrict, encode)
+import qualified Data.ByteString                 as BS
+import qualified Data.ByteString.Lazy            as LBS
+import qualified Data.Map                        as M
 import           Data.Version                    (showVersion)
 
 import           Distribution.Package            (PackageIdentifier (..))
@@ -20,15 +21,17 @@ import           Fmt                             (Builder, blockListF, build, fm
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Path                            (Abs, Dir, File, Path, Rel, fromAbsDir,
-                                                  fromAbsFile, fromRelFile, parseRelDir,
-                                                  parseRelFile, (</>))
+                                                  fromAbsFile, fromRelDir, fromRelFile,
+                                                  parseRelDir, parseRelFile, (</>))
 import           System.Directory                (createDirectoryIfMissing,
-                                                  getCurrentDirectory, listDirectory,
+                                                  doesDirectoryExist, doesFileExist,
+                                                  getCurrentDirectory,
                                                   removeDirectoryRecursive)
 import           System.FilePath                 (dropExtension)
 import           Turtle                          (shell)
 
-import           Extended.System.Wlog            (printInfo, printWarning)
+import           Extended.Data.List              (mapMaybeM)
+import           Extended.System.Wlog            (printDebug, printInfo, printWarning)
 import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
                                                   libraryIncludeDirs, modulePaths,
                                                   packageDependencies, readCabal,
@@ -73,8 +76,8 @@ cacheProject preserveSources cabalFile = do
         -- Maps from full path to module
         (targetMaps, extensionMaps) <- getExtensionMaps projectPath
                                                         projectCabalDesc
-        BS.writeFile targetsFile    $ encode targetMaps
-        BS.writeFile extensionsFile $ encode extensionMaps
+        LBS.writeFile targetsFile    $ encode targetMaps
+        LBS.writeFile extensionsFile $ encode extensionMaps
 
         -- Libraries
         libVersions    <- stackListDependencies
@@ -91,41 +94,52 @@ cacheProject preserveSources cabalFile = do
                                                                  libraries
 
         let PackageIdentifier{..} = package $ packageDescription projectCabalDesc
+        let fullProjectName       = toText $ projectName ++ '-':showVersion pkgVersion
         projectResolutionMap <- createProjectCache projectCabalDesc
                                                    projectPath
                                                    (importifyPath </> symbolsPath)
-                                                   projectName
-                                                   (projectName ++ '-':showVersion pkgVersion)
+                                                   fullProjectName
                                                    True
 
-        let importsMap = Map.unions (projectResolutionMap:dependenciesResolutionMaps)
-        BS.writeFile modulesFile $ encode importsMap
+        let importsMap = M.unions (projectResolutionMap:dependenciesResolutionMaps)
+        updateModulesMap importsMap
 
 unpackAndCacheDependencies :: Path Abs Dir
                            -> Bool
                            -> [String]
-                           -> IO [Map String String]
+                           -> IO [Map String Text]
 unpackAndCacheDependencies importifyPath preserveSources dependencies =
-    forM dependencies $
-        collectDependenciesResolution importifyPath preserveSources
+    mapM libraryResolver =<< mapMaybeM isNotUnpacked dependencies
+  where
+    isNotUnpacked :: String -> IO (Maybe Text)
+    isNotUnpacked libName = do
+        libraryPath       <- parseRelDir libName
+        let libSymbolsPath = symbolsPath </> libraryPath
+        isAlreadyUnpacked <- doesDirectoryExist (fromRelDir libSymbolsPath)
+
+        let textLibName    = toText libName
+        if isAlreadyUnpacked then do
+            printDebug $ textLibName <> " is already cached"
+            return Nothing
+        else
+            return $ Just textLibName
+
+    libraryResolver :: Text -> IO (Map String Text)
+    libraryResolver = collectDependenciesResolution importifyPath preserveSources
 
 collectDependenciesResolution :: Path Abs Dir
                               -> Bool
-                              -> String
-                              -> IO (Map String String)
+                              -> Text
+                              -> IO (Map String Text)
 collectDependenciesResolution importifyPath preserve libName = do
-    let textLibName       = toText libName
-    _exitCode            <- shell ("stack unpack " <> textLibName) empty
-    localPackages        <- listDirectory (fromAbsDir importifyPath)
-    let maybePackage      = find (libName `isPrefixOf`) localPackages
-    let downloadedPackage = fromMaybe (error "Package wasn't downloaded!")
-                                      maybePackage  -- TODO: this is not fine
+    _exitCode <- shell ("stack unpack " <> libName) empty
 
-    packagePath              <- parseRelDir downloadedPackage
+    let stringLibName         = toString libName
+    packagePath              <- parseRelDir stringLibName
     let downloadedPackagePath = importifyPath </> packagePath
-    mCabalFileName           <- findCabalFile libName
+    mCabalFileName           <- findCabalFile stringLibName
 
-    let cabalFileName = fromMaybe (error $ "No .cabal file inside: " <> textLibName)
+    let cabalFileName = fromMaybe (error $ "No .cabal file inside: " <> libName)
                                   mCabalFileName
     packageCabalDesc <- readCabal
                       $ fromAbsFile
@@ -136,37 +150,34 @@ collectDependenciesResolution importifyPath preserve libName = do
                                          downloadedPackagePath
                                          symbolsCachePath
                                          libName
-                                         downloadedPackage
                                          False
 
     unless preserve $  -- TODO: use bracket here
-        removeDirectoryRecursive downloadedPackage
+        removeDirectoryRecursive stringLibName
 
     pure packageModules
 
 createProjectCache :: GenericPackageDescription
                    -> Path Abs Dir
                    -> Path Abs Dir
-                   -> String
-                   -> String
+                   -> Text
                    -> Bool
-                   -> IO (Map String String)
+                   -> IO (Map String Text)
 createProjectCache
     packageCabalDesc
     packagePath
     symbolsCachePath
-    libName
     packageName
     keepOtherModules
   = withLibrary packageCabalDesc $ \library -> do
         -- creates ./.importify/symbols/<package>/
-        packageNamePath     <- parseRelDir packageName
+        packageNamePath     <- parseRelDir (toString packageName)
         let packageCachePath = symbolsCachePath </> packageNamePath
         createDirectoryIfMissing True $ fromAbsDir packageCachePath
 
         (errors, libModules) <- parsedModulesWithErrors packagePath
                                                         library
-        reportErrorsIfAny errors libName
+        reportErrorsIfAny errors packageName
 
         let (exposedModules, otherModules) = splitOnExposedAndOther library libModules
         let resolvedModules = if keepOtherModules
@@ -182,7 +193,7 @@ createProjectCache
 
             pure (moduleTitle, packageName)
 
-        pure $ Map.fromList packageModules
+        pure $ M.fromList packageModules
 
 packageLibraryModules :: Path Abs Dir
                       -> Library
@@ -206,6 +217,15 @@ parsedModulesWithErrors packagePath library = do
     -- get extensions
     let extensions = withHarmlessExtensions $ libraryExtensions library
 
-    fmap partitionEithers
-       $ mapM (parseModuleWithPreprocessor extensions includeDirs)
-              pathsToModules
+    let moduleParser = parseModuleWithPreprocessor extensions includeDirs
+    partitionEithers <$> mapM moduleParser pathsToModules
+
+updateModulesMap :: Map String Text -> IO ()
+updateModulesMap newCachedModules = do
+    isModulesFileExist <- doesFileExist modulesFile
+    existingImportsMap <- if isModulesFileExist
+                          then fromMaybe (error "Invalid modules file") . decodeStrict
+                           <$> BS.readFile modulesFile
+                          else pure mempty
+    let mergedMaps = newCachedModules `M.union` existingImportsMap
+    LBS.writeFile modulesFile $ encode mergedMaps

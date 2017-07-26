@@ -3,8 +3,9 @@
 -- | Command line options for Importify
 
 module Options
-       ( Command (..)
-
+       ( ImportifyCliArgs  (..)
+       , CommonOptions     (..)
+       , Command (..)
        , CabalCacheOptions (..)
        , SingleFileOptions (..)
 
@@ -13,12 +14,22 @@ module Options
 
 import           Universum
 
-import           Options.Applicative (Parser, ParserInfo, command, execParser, flag',
-                                      fullDesc, help, helper, info, long, metavar,
-                                      progDesc, short, strArgument, strOption, subparser,
-                                      switch)
+import           Options.Applicative (Parser, ParserInfo, auto, command, execParser,
+                                      flag', fullDesc, help, helper, info, long, metavar,
+                                      option, progDesc, short, showDefault, strArgument,
+                                      strOption, subparser, switch, value)
+import           System.Wlog         (Severity (Info))
 
 import           Importify.Main      (OutputOptions (..))
+
+data ImportifyCliArgs = ImportifyCliArgs
+    { icaCommon  :: !CommonOptions
+    , icaCommand :: !Command
+    } deriving (Show)
+
+data CommonOptions = CommonOptions
+    { coLoggingSeverity :: !Severity -- ^ Severity for logger
+    } deriving (Show)
 
 data Command
     = SingleFile SingleFileOptions
@@ -35,8 +46,25 @@ data CabalCacheOptions = CabalCacheOptions
     , ccoDependencies :: ![String] -- ^ Use specified dependencies overriding .cabal ones
     } deriving (Show)
 
-optionsParser :: Parser Command
-optionsParser = subparser $
+cliArgumentsParser :: Parser ImportifyCliArgs
+cliArgumentsParser = do
+    icaCommon  <- commonArgsParser
+    icaCommand <- commandParser
+    pure ImportifyCliArgs{..}
+
+commonArgsParser :: Parser CommonOptions
+commonArgsParser = do
+    coLoggingSeverity <- option auto $
+        metavar "SEVERITY"
+     <> long "logging-severity"
+     <> short 'l'
+     <> value Info
+     <> showDefault
+     <> help "Severity for logger"
+    pure CommonOptions{..}
+
+commandParser :: Parser Command
+commandParser = subparser $
     command "file"
             (info (helper <*> fileParser)
                   (fullDesc <> progDesc "Importify a single file."))
@@ -48,9 +76,9 @@ optionsParser = subparser $
 
 fileParser :: Parser Command
 fileParser = do
-    sfoFileName <- strArgument $
-        metavar "FILE" <>
-        help "File to importify"
+    sfoFileName <- strArgument
+      $ metavar "FILE"
+     <> help "File to importify"
     sfoOutput <- outputOptionsParser
     pure $ SingleFile SingleFileOptions{..}
   where
@@ -66,23 +94,23 @@ fileParser = do
 
 cacheParser :: Parser Command
 cacheParser = do
-    ccoPreserve <- switch $
-        long "preserve" <>
-        short 'p' <>
-        help "Don't remove downloaded package cache"
-    ccoDependencies <- many $ strOption $
-        metavar "[STRING]" <>
-        long "dependency" <>
-        short 'd' <>
-        help "List of manually specified dependencies that should be used \
+    ccoPreserve <- switch
+      $ long "preserve"
+     <> short 'p'
+     <> help "Don't remove downloaded package cache"
+    ccoDependencies <- many $ strOption
+      $ metavar "[STRING]"
+     <> long "dependency"
+     <> short 'd'
+     <> help "List of manually specified dependencies that should be used \
              \for caching instead of libraries from .cabal file. This option \
              \overrides default behavior."
     pure $ CabalCache CabalCacheOptions{..}
 
-optsInfo :: ParserInfo Command
+optsInfo :: ParserInfo ImportifyCliArgs
 optsInfo = info
-    (helper <*> optionsParser)
+    (helper <*> cliArgumentsParser)
     (fullDesc <> progDesc "Importify - manage Haskell imports easily")
 
-parseOptions :: IO Command
+parseOptions :: IO ImportifyCliArgs
 parseOptions = execParser optsInfo
