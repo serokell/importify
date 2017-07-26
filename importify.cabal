@@ -59,7 +59,6 @@ library
                      , Cabal
                      , containers
                      , directory
-                     , extra
                      , filepath
                      , fmt
                      , foldl

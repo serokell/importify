@@ -54,10 +54,10 @@ parseModuleAfterCPP :: [Extension]    -- ^ List of extensions from .cabal file
                     -> Path Abs File  -- ^ Path to module
                     -> IO $ Either ModuleParseException $ Module SrcSpanInfo
 parseModuleAfterCPP cabalExtensions includeFiles pathToModule =
-    fmap prettyParseResult $
-         parseFileWithCommentsAndCPP (defaultCpphsOptions {includes = includeFiles})
-                                     (defaultParseMode {extensions = cabalExtensions})
-                                     (fromAbsFile pathToModule)
+    prettyParseResult <$>
+      parseFileWithCommentsAndCPP (defaultCpphsOptions {includes = includeFiles})
+                                  (defaultParseMode {extensions = cabalExtensions})
+                                  (fromAbsFile pathToModule)
 
 autoexportedArgs :: forall l. Module l -> Maybe [String]
 autoexportedArgs = head . mapMaybe autoexporterPragma . modulePragmas
