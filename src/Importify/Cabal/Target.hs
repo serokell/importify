@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TupleSections #-}
 
 -- | Functions to retrieve and store mapping from modules to their
@@ -8,11 +9,16 @@ module Importify.Cabal.Target
        , TargetsMap
        , MapBundle
        , getMapBundle
+       , packageTargets
        ) where
 
 import           Universum                       hiding (fromString)
 
+import           Data.Aeson                      (FromJSON (..), FromJSONKey, ToJSON (..),
+                                                  ToJSONKey, Value (String), withText)
+import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HM
+import qualified Data.Text                       as T (split)
 import           Distribution.ModuleName         (ModuleName)
 import           Distribution.PackageDescription (Benchmark (..), BenchmarkInterface (..),
                                                   BuildInfo (..), CondTree,
@@ -25,22 +31,47 @@ import           Path                            (Abs, Dir, File, Path, fromAbsF
 
 import           Importify.Cabal.Extension       (showExt)
 import           Importify.Cabal.Module          (modulePaths)
+import           Importify.Cabal.Package         (extractFromTargets)
 
-
-type    TargetsMap = HashMap FilePath String
-type ExtensionsMap = HashMap String [String]
+type    TargetsMap = HashMap FilePath TargetId
+type ExtensionsMap = HashMap TargetId [String]
 type MapBundle     = (TargetsMap, ExtensionsMap)
 
 data TargetId = LibraryId
-              | ExecutableId String
-              | TestSuiteId  String
-              | BenchmarkId  String
+              | ExecutableId Text
+              | TestSuiteId  Text
+              | BenchmarkId  Text
+              deriving (Eq, Generic)
 
-cabalTargetId :: TargetId -> String
+instance Hashable TargetId
+
+instance ToJSON TargetId where
+    toJSON = String . cabalTargetId
+
+cabalTargetId :: TargetId -> Text
 cabalTargetId LibraryId               = "library"
-cabalTargetId (ExecutableId exeName)  = "executable@" ++ exeName
-cabalTargetId (TestSuiteId testName)  = "test-suite@" ++ testName
-cabalTargetId (BenchmarkId benchName) = "benchmark@"  ++ benchName
+cabalTargetId (ExecutableId exeName)  = "executable@" <> exeName
+cabalTargetId (TestSuiteId testName)  = "test-suite@" <> testName
+cabalTargetId (BenchmarkId benchName) = "benchmark@"  <> benchName
+
+instance FromJSON TargetId where
+    parseJSON = withText "targetId" $ \targetText -> do
+        let targetName = T.split (== '@') targetText
+        case targetName of
+           ["library"]              -> pure   LibraryId
+           ["executable", exeName]  -> pure $ ExecutableId exeName
+           ["test-suite", testName] -> pure $ TestSuiteId testName
+           ["benchmark", benchName] -> pure $ BenchmarkId benchName
+           _ -> fail $ "Unexpected target: " ++ toString targetText
+
+instance   ToJSONKey TargetId
+instance FromJSONKey TargetId
+
+packageTargets :: GenericPackageDescription -> [TargetId]
+packageTargets = extractFromTargets (const LibraryId)
+                                    (ExecutableId . toText . exeName)
+                                    (TestSuiteId . toText . testName)
+                                    (BenchmarkId . toText . benchmarkName)
 
 getMapBundle :: Path Abs Dir -> GenericPackageDescription -> IO MapBundle
 getMapBundle projectPath GenericPackageDescription{..} = do
@@ -99,12 +130,12 @@ getMapBundle projectPath GenericPackageDescription{..} = do
 -- | Generalized 'MapBundle' collector for executables, testsuites and
 -- benchmakrs parts of package.
 collectTargetsListMaps :: [(String, CondTree v c target)]
-                       -> (String -> TargetId)
+                       -> (Text -> TargetId)
                        -> (TargetId -> target -> IO MapBundle)
                        -> IO ([TargetsMap], [ExtensionsMap])
 collectTargetsListMaps treeList idConstructor mapBundler = do
     bundles <- forM treeList $ \(name, condTree) ->
-        mapBundler (idConstructor name) $ condTreeData condTree
+        mapBundler (idConstructor $ toText name) $ condTreeData condTree
     return $ unzip bundles
 
 collectTargetMaps :: (target -> IO [Path Abs File])
@@ -114,12 +145,12 @@ collectTargetMaps :: (target -> IO [Path Abs File])
                   -> IO MapBundle
 collectTargetMaps modulePathsExtractor buildInfoExtractor id target = do
     pathsToModules <- modulePathsExtractor target
-    return $ collectModuleMaps (cabalTargetId id)
+    return $ collectModuleMaps id
                                (map fromAbsFile pathsToModules)
                                (defaultExtensions $ buildInfoExtractor target)
 
-collectModuleMaps :: String -> [FilePath] -> [Extension] -> MapBundle
-collectModuleMaps targetName modules extensions =
-    ( HM.fromList $ map (, targetName) modules
-    , one (targetName, map showExt extensions)
+collectModuleMaps :: TargetId -> [FilePath] -> [Extension] -> MapBundle
+collectModuleMaps targetId modules extensions =
+    ( HM.fromList $ map (, targetId) modules
+    , one (targetId, map showExt extensions)
     )

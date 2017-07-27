@@ -2,7 +2,8 @@
 -- other miscellaneous stuff in .cabal files.
 
 module Importify.Cabal.Package
-       ( libraryIncludeDirs
+       ( extractFromTargets
+       , libraryIncludeDirs
        , packageDependencies
        , readCabal
        , withLibrary
@@ -55,15 +56,28 @@ packageDependencies = ordNub
                     . allBuildInfos
 
 allBuildInfos :: GenericPackageDescription -> [BuildInfo]
-allBuildInfos GenericPackageDescription{..} = concat
-    [ maybe [] (one . libBuildInfo . condTreeData) condLibrary
-    , collectBuildInfos          buildInfo condExecutables
-    , collectBuildInfos      testBuildInfo condTestSuites
-    , collectBuildInfos benchmarkBuildInfo condBenchmarks
+allBuildInfos = extractFromTargets       libBuildInfo
+                                            buildInfo
+                                        testBuildInfo
+                                   benchmarkBuildInfo
+
+-- | Extract some uniform data from every target if it's present.
+extractFromTargets :: (Library    -> r)  -- ^ 'Library' extractor
+                   -> (Executable -> r)  -- ^ 'Executable' extractor
+                   -> (TestSuite  -> r)  -- ^ 'TestSuite' extractor
+                   -> (Benchmark  -> r)  -- ^ 'Benchmakr' extractor
+                   -> GenericPackageDescription -- ^ Package
+                   -> [r]  -- ^ List of results collected from each target
+extractFromTargets fromLib fromExe fromTst fromBnc GenericPackageDescription{..} =
+  concat
+    [ maybe [] (one . fromLib . condTreeData) condLibrary
+    , mapTargets fromExe condExecutables
+    , mapTargets fromTst condTestSuites
+    , mapTargets fromBnc condBenchmarks
     ]
 
-collectBuildInfos :: (t -> BuildInfo) -> [(String, CondTree v c t)] -> [BuildInfo]
-collectBuildInfos extractor = map (extractor . condTreeData . snd)
+mapTargets :: (t -> r) -> [(String, CondTree v c t)] -> [r]
+mapTargets extractor = map (extractor . condTreeData . snd)
 
 -- This function works but isn't used anywhere
 {-

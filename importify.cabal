@@ -63,6 +63,7 @@ library
                      , filepath
                      , fmt
                      , foldl
+                     , hashable
                      , haskell-names
                      , haskell-src-exts
                      , hse-cpp
