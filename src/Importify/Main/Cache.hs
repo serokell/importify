@@ -6,7 +6,8 @@ module Importify.Main.Cache
 
 import           Universum
 
-import           Data.Aeson                      (decodeStrict, encode)
+import           Data.Aeson                      (decodeStrict)
+import           Data.Aeson.Encode.Pretty        (encodePretty)
 import qualified Data.ByteString                 as BS (readFile)
 import qualified Data.ByteString.Lazy            as LBS (writeFile)
 import qualified Data.Map                        as M
@@ -76,8 +77,8 @@ cacheProject preserveSources cabalFile = do
         -- Maps from full path to module
         (targetMaps, extensionMaps) <- getMapBundle projectPath
                                                     projectCabalDesc
-        LBS.writeFile targetsFile    $ encode targetMaps
-        LBS.writeFile extensionsFile $ encode extensionMaps
+        LBS.writeFile targetsFile    $ encodePretty targetMaps
+        LBS.writeFile extensionsFile $ encodePretty extensionMaps
 
         -- Libraries
         libVersions    <- stackListDependencies
@@ -228,4 +229,4 @@ updateModulesMap newCachedModules = do
                            <$> BS.readFile modulesFile
                           else pure mempty
     let mergedMaps = newCachedModules `M.union` existingImportsMap
-    LBS.writeFile modulesFile $ encode mergedMaps
+    LBS.writeFile modulesFile $ encodePretty mergedMaps
