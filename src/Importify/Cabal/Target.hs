@@ -7,7 +7,7 @@ module Importify.Cabal.Target
        ( ExtensionsMap
        , TargetsMap
        , MapBundle
-       , getExtensionMaps
+       , getMapBundle
        ) where
 
 import           Universum                       hiding (fromString)
@@ -38,12 +38,12 @@ data TargetId = LibraryId
 
 cabalTargetId :: TargetId -> String
 cabalTargetId LibraryId               = "library"
-cabalTargetId (ExecutableId exeName)  = "executable " ++ exeName
-cabalTargetId (TestSuiteId testName)  = "test-suite " ++ testName
-cabalTargetId (BenchmarkId benchName) = "benchmark "  ++ benchName
+cabalTargetId (ExecutableId exeName)  = "executable@" ++ exeName
+cabalTargetId (TestSuiteId testName)  = "test-suite@" ++ testName
+cabalTargetId (BenchmarkId benchName) = "benchmark@"  ++ benchName
 
-getExtensionMaps :: Path Abs Dir -> GenericPackageDescription -> IO MapBundle
-getExtensionMaps projectPath GenericPackageDescription{..} = do
+getMapBundle :: Path Abs Dir -> GenericPackageDescription -> IO MapBundle
+getMapBundle projectPath GenericPackageDescription{..} = do
     (libTM,    libEM)    <- libMaps
     (exeTMs,   exeEMs)   <- exeMaps
     (testTMs,  testEMs)  <- testMaps

@@ -7,8 +7,8 @@ module Importify.Main.Cache
 import           Universum
 
 import           Data.Aeson                      (decodeStrict, encode)
-import qualified Data.ByteString                 as BS
-import qualified Data.ByteString.Lazy            as LBS
+import qualified Data.ByteString                 as BS (readFile)
+import qualified Data.ByteString.Lazy            as LBS (writeFile)
 import qualified Data.Map                        as M
 import           Data.Version                    (showVersion)
 
@@ -32,7 +32,7 @@ import           Turtle                          (shell)
 
 import           Extended.Data.List              (mapMaybeM)
 import           Extended.System.Wlog            (printDebug, printInfo, printWarning)
-import           Importify.Cabal                 (getExtensionMaps, libraryExtensions,
+import           Importify.Cabal                 (getMapBundle, libraryExtensions,
                                                   libraryIncludeDirs, modulePaths,
                                                   packageDependencies, readCabal,
                                                   splitOnExposedAndOther,
@@ -74,8 +74,8 @@ cacheProject preserveSources cabalFile = do
         projectCabalDesc <- readCabal cabalPath
 
         -- Maps from full path to module
-        (targetMaps, extensionMaps) <- getExtensionMaps projectPath
-                                                        projectCabalDesc
+        (targetMaps, extensionMaps) <- getMapBundle projectPath
+                                                    projectCabalDesc
         LBS.writeFile targetsFile    $ encode targetMaps
         LBS.writeFile extensionsFile $ encode extensionMaps
 
