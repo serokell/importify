@@ -23,8 +23,8 @@ import           Importify.Syntax                (getModuleTitle)
 -- __First__ element of pair represents /exposed/ modules.
 -- __Second__ element of paris represents /other/ modules.
 splitOnExposedAndOther :: Library
-                       -> [HSE.Module HSE.SrcSpanInfo]
-                       -> ([HSE.Module HSE.SrcSpanInfo], [HSE.Module HSE.SrcSpanInfo])
+                       -> [HSE.Module l]
+                       -> ([HSE.Module l], [HSE.Module l])
 splitOnExposedAndOther Library{..} =
     partition ((`elem` exposedModules) . Cabal.fromString . getModuleTitle)
 

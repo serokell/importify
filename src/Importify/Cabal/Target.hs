@@ -5,11 +5,19 @@
 -- targets and extensions.
 
 module Importify.Cabal.Target
-       ( ExtensionsMap
+       ( -- * Maps from modules paths to cache parts
+         ExtensionsMap
        , TargetsMap
        , MapBundle
+
+         -- * Type for target id
+       , TargetId (..)
+
+         -- * Utilities to extract targets
+       , extractTargetBuildInfo
        , getMapBundle
        , packageTargets
+       , targetIdDir
        ) where
 
 import           Universum                       hiding (fromString)
@@ -41,18 +49,19 @@ data TargetId = LibraryId
               | ExecutableId Text
               | TestSuiteId  Text
               | BenchmarkId  Text
-              deriving (Eq, Generic)
+              deriving (Show, Eq, Generic)
 
 instance Hashable TargetId
 
 instance ToJSON TargetId where
-    toJSON = String . cabalTargetId
+    toJSON = String . targetIdDir
 
-cabalTargetId :: TargetId -> Text
-cabalTargetId LibraryId               = "library"
-cabalTargetId (ExecutableId exeName)  = "executable@" <> exeName
-cabalTargetId (TestSuiteId testName)  = "test-suite@" <> testName
-cabalTargetId (BenchmarkId benchName) = "benchmark@"  <> benchName
+-- | Directory name for corresponding target.
+targetIdDir :: TargetId -> Text
+targetIdDir LibraryId               = "library"
+targetIdDir (ExecutableId exeName)  = "executable@" <> exeName
+targetIdDir (TestSuiteId testName)  = "test-suite@" <> testName
+targetIdDir (BenchmarkId benchName) = "benchmark@"  <> benchName
 
 instance FromJSON TargetId where
     parseJSON = withText "targetId" $ \targetText -> do
@@ -67,11 +76,37 @@ instance FromJSON TargetId where
 instance   ToJSONKey TargetId
 instance FromJSONKey TargetId
 
+-- | Extract every 'TargetId' for given project description.
 packageTargets :: GenericPackageDescription -> [TargetId]
-packageTargets = extractFromTargets (const LibraryId)
-                                    (ExecutableId . toText . exeName)
-                                    (TestSuiteId . toText . testName)
-                                    (BenchmarkId . toText . benchmarkName)
+packageTargets GenericPackageDescription{..} =
+  concat
+    [ maybe [] (\_ -> [LibraryId]) condLibrary
+    , targetMap ExecutableId condExecutables
+    , targetMap TestSuiteId  condTestSuites
+    , targetMap BenchmarkId  condBenchmarks
+    ]
+  where
+    targetMap tid = map (tid . toText . fst)
+
+-- | Extracts 'BuildInfo' for given 'TargetId'.
+extractTargetBuildInfo
+    :: TargetId
+    -> GenericPackageDescription
+    -> Maybe BuildInfo
+extractTargetBuildInfo LibraryId = fmap (libBuildInfo . condTreeData) . condLibrary
+extractTargetBuildInfo (ExecutableId name) =
+    findTargetBuildInfo buildInfo name . condExecutables
+extractTargetBuildInfo (TestSuiteId name) =
+    findTargetBuildInfo testBuildInfo name . condTestSuites
+extractTargetBuildInfo (BenchmarkId name) =
+    findTargetBuildInfo benchmarkBuildInfo name . condBenchmarks
+
+findTargetBuildInfo :: (target -> info)
+                    -> Text
+                    -> [(String, CondTree v c target)]
+                    -> Maybe info
+findTargetBuildInfo toInfo name = fmap (toInfo . condTreeData . snd)
+                                . find ((== name) . toText . fst)
 
 getMapBundle :: Path Abs Dir -> GenericPackageDescription -> IO MapBundle
 getMapBundle projectPath GenericPackageDescription{..} = do

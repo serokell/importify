@@ -2,7 +2,7 @@
 -- separate.
 
 module Importify.Cabal.Extension
-       ( libraryExtensions
+       ( buildInfoExtensions
        , showExt
        , withHarmlessExtensions
        ) where
@@ -17,14 +17,12 @@ import           Language.Haskell.Exts.Extension (Extension (..), KnownExtension
 import           Text.Read                       (read)
 
 
--- | Get list of all extensions from 'Library' and convert them into
+-- | Get list of all extensions from 'BuildInfo' and convert them into
 -- 'HSE.Extension'.
-libraryExtensions :: Library -> [Extension]
-libraryExtensions library =
-    let BuildInfo{..} = libBuildInfo library
-    in map cabalExtToHseExt
-     $ filter isHseExt
-     $ defaultExtensions ++ otherExtensions
+buildInfoExtensions :: BuildInfo -> [Extension]
+buildInfoExtensions BuildInfo{..} = map cabalExtToHseExt
+                                  $ filter isHseExt
+                                  $ defaultExtensions ++ otherExtensions
 
 cabalExtToHseExt :: Cabal.Extension -> Extension
 cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show
