@@ -54,6 +54,7 @@ library
 
   build-depends:       base >= 4.7 && < 5
                      , aeson
+                     , aeson-pretty
                      , autoexporter
                      , bytestring
                      , Cabal
@@ -62,6 +63,7 @@ library
                      , filepath
                      , fmt
                      , foldl
+                     , hashable
                      , haskell-names
                      , haskell-src-exts
                      , hse-cpp

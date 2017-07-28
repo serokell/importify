@@ -4,6 +4,7 @@ module Extended.System.Wlog
        ( initImportifyLogger
        , printDebug
        , printInfo
+       , printNotice
        , printWarning
        ) where
 
@@ -11,8 +12,9 @@ import           Universum
 
 import           Lens.Micro.Mtl (zoom, (?=))
 import           System.Wlog    (LoggerConfig, LoggerNameBox, Severity (Warning),
-                                 consoleOutB, lcTree, logDebug, logInfo, logWarning,
-                                 ltSeverity, setupLogging, usingLoggerName, zoomLogger)
+                                 consoleOutB, lcTree, logDebug, logInfo, logNotice,
+                                 logWarning, ltSeverity, setupLogging, usingLoggerName,
+                                 zoomLogger)
 
 importifyLoggerConfig :: Severity -> LoggerConfig
 importifyLoggerConfig importifySeverity =
@@ -35,6 +37,10 @@ printDebug = withImportify  . logDebug
 -- | Prints 'Info' message.
 printInfo :: Text -> IO ()
 printInfo = withImportify  . logInfo
+
+-- | Prints 'Notice' message.
+printNotice :: Text -> IO ()
+printNotice = withImportify  . logNotice
 
 -- | Prints 'Warning' message.
 printWarning :: Text -> IO ()

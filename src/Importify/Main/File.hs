@@ -10,10 +10,8 @@ module Importify.Main.File
 
 import           Universum
 
-import           Data.Aeson                         (decode)
-import qualified Data.ByteString.Lazy               as BS
 import qualified Data.HashMap.Strict                as HM
-import qualified Data.Map                           as Map
+import qualified Data.Map                           as M
 
 import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
                                                      ModuleHead, ModuleName (..),
@@ -27,11 +25,12 @@ import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Path                               (Abs, File, Path, fromAbsFile,
                                                      fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
-import           System.Directory                   (doesFileExist)
 import           Turtle                             (cd)
 
-import           Importify.Cabal                    (MapBundle)
-import           Importify.Paths                    (cacheDir, cachePath, extensionsFile,
+import           Importify.Cabal                    (MapBundle, TargetId (LibraryId),
+                                                     TargetsMap, targetIdDir)
+import           Importify.Paths                    (cacheDir, cachePath,
+                                                     decodeFileOrMempty, extensionsFile,
                                                      getCurrentPath, modulesPath,
                                                      symbolsPath, targetsFile)
 import           Importify.Pretty                   (printLovelyImports)
@@ -65,62 +64,71 @@ doFile options srcPath = do
 
 doSource :: FilePath -> Text -> IO Text
 doSource srcFile src = do
-    extensionMaps <- readExtensionMaps
-    srcPath       <- parseRelFile srcFile
-    projectPath   <- getCurrentPath
-    let exts       = fromMaybe []
-                   $ getExtensions (projectPath </> srcPath) extensionMaps
+    mapBundle   <- readMapBundle
+    srcPath     <- parseRelFile srcFile
+    projectPath <- getCurrentPath
+    let exts     = fromMaybe []
+                 $ getExtensions (projectPath </> srcPath) mapBundle
 
-    let ast        = fromParseResult
-                   $ parseFileContentsWithExts exts
-                   $ toString src
+    -- TODO: better error handling here?
+    ast@(Module _ _ _ imports _) <- return  -- return here to throw exception
+                                  $ fromParseResult
+                                  $ parseFileContentsWithExts exts
+                                  $ toString src
 
-    doAst src ast
-
--- Meeeh, ugly code ;(
--- TODO: use MaybeT IO Text here?
-doAst :: Text -> Module SrcSpanInfo -> IO Text
-doAst src ast@(Module _ _ _ imports _) =
     case importSlice imports of
         Just (start, end) -> do
             let codeLines        = lines src
             let (preamble, rest) = splitAt (start - 1) codeLines
             let (impText, decls) = splitAt (end - start + 1) rest
 
-            newImports          <- removeUnusedImports ast imports
-            let printedImports   = printLovelyImports start end impText newImports
+            environment       <- loadEnvironment (fst mapBundle)
+            let newImports     = removeUnusedImports ast imports environment
+            let printedImports = printLovelyImports start end impText newImports
 
-            pure $ unlines preamble
-                <> unlines printedImports
-                <> unlines decls
+            return $ unlines preamble
+                  <> unlines printedImports
+                  <> unlines decls
 
-        Nothing -> pure src
-doAst _ _ = error "Source file is not Language.Haskell.Exts.Module(Module)"
+        Nothing -> return src
 
-getExtensions :: Path Abs File -> Maybe MapBundle -> Maybe [Extension]
-getExtensions (fromAbsFile -> moduleFile) maps = do
-    (targetMap, extensionsMap) <- maps
+getExtensions :: Path Abs File -> MapBundle -> Maybe [Extension]
+getExtensions (fromAbsFile -> moduleFile) (targetMap, extensionsMap) = do
     target     <- HM.lookup moduleFile targetMap
     extensions <- HM.lookup target extensionsMap
     pure $ map parseExtension extensions
 
-readExtensionMaps :: IO (Maybe MapBundle)
-readExtensionMaps = bracket_ stepIn
-                             stepOut
-                             readMapBundle
+readMapBundle :: IO MapBundle
+readMapBundle = bracket_ stepIn stepOut readBundle
   where
     stepIn  = cd (fromString cacheDir)
     stepOut = cd ".."
 
-    readMapBundle = do
-        targetsExist    <- doesFileExist targetsFile
-        extensionsExist <- doesFileExist extensionsFile
-        if not (targetsExist && extensionsExist) then
-            pure Nothing
-        else do
-            targetsMap    <- BS.readFile targetsFile
-            extensionsMap <- BS.readFile extensionsFile
-            pure $ liftA2 (,) (decode targetsMap) (decode extensionsMap)
+    readBundle = liftA2 (,)
+                        (decodeFileOrMempty targetsFile    return)
+                        (decodeFileOrMempty extensionsFile return)
+
+loadEnvironment :: TargetsMap -> IO Environment
+loadEnvironment targetMap = do
+    baseEnvironment <- loadBase
+
+    let cacheModuleFile = fromRelFile $ cachePath </> modulesPath
+    packages <- decodeFileOrMempty cacheModuleFile $ \importsMap -> do
+        let mapEntries = HM.toList importsMap
+        forM mapEntries $ \(modulePath, (package, moduleName)) -> do
+            packagePath     <- parseRelDir package
+            symbolsFilePath <- parseRelFile $ moduleName ++ ".symbols"
+            let moduleTarget = HM.lookupDefault LibraryId modulePath targetMap
+            targetPath      <- parseRelDir $ toString $ targetIdDir moduleTarget
+            let pathToSymbols = cachePath
+                            </> symbolsPath
+                            </> packagePath
+                            </> targetPath
+                            </> symbolsFilePath
+            moduleSymbols <- readSymbols (fromRelFile pathToSymbols)
+            pure (ModuleName () moduleName, moduleSymbols)
+
+    return $ M.union baseEnvironment (M.fromList packages)
 
 -- | Remove all unused entities in given module from given list of imports.
 -- Algorithm performs next steps:
@@ -133,10 +141,9 @@ readExtensionMaps = bracket_ stepIn
 removeUnusedImports
     :: Module SrcSpanInfo        -- ^ Module where symbols should be removed
     -> [ImportDecl SrcSpanInfo]  -- ^ Imports from module
-    -> IO [ImportDecl SrcSpanInfo]
-removeUnusedImports ast imports = do
-    environment       <- loadEnvironment
-
+    -> Environment
+    -> [ImportDecl SrcSpanInfo]
+removeUnusedImports ast imports environment = do
     -- return exports to search for qualified imports there later
     let (annotations, moduleHead) = annotateModule ast environment
 
@@ -159,37 +166,12 @@ removeUnusedImports ast imports = do
                                $ removeImports (UnusedSymbols unusedSymbols)
                                                (UnusedHidings unusedHidings)
                                                withoutUnusedImplicits
-    let withoutUnusedQualsAs   = removeUnusedQualifiedImports withoutUnusedSymbols
+    let withoutUnusedQuals     = removeUnusedQualifiedImports withoutUnusedSymbols
                                                               moduleHead
                                                               annotations
                                                               unusedImplicits
 
-    return withoutUnusedQualsAs
-
-loadEnvironment :: IO Environment
-loadEnvironment = do
-    base <- loadBase
-
-    let cacheModuleFile = fromRelFile $ cachePath </> modulesPath
-    isImportsExist <- doesFileExist cacheModuleFile
-
-    packages <- if isImportsExist then do
-                  importsMap    <- decode <$> BS.readFile cacheModuleFile
-                  let mapEntries = HM.toList $ fromMaybe (error "imports decoding failed")
-                                                          importsMap
-                  forM mapEntries $ \(moduleName, package) -> do
-                      packagePath <- parseRelDir package
-                      modulePath  <- parseRelFile $ moduleName ++ ".symbols"
-                      let pathToSymbols = cachePath
-                                      </> symbolsPath
-                                      </> packagePath
-                                      </> modulePath
-                      moduleSymbols <- readSymbols (fromRelFile pathToSymbols)
-                      pure (ModuleName () moduleName, moduleSymbols)
-                else
-                  pure mempty
-
-    return $ Map.union base (Map.fromList packages)
+    withoutUnusedQuals
 
 -- | Annotates module but drops import annotations because they can contain GlobalSymbol
 -- annotations and collectUnusedSymbols later does its job by looking for GlobalSymbol

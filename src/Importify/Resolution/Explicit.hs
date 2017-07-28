@@ -16,7 +16,6 @@ import           Language.Haskell.Names                   (NameInfo (Export, Glo
                                                            Scoped, resolve, symbolModule)
 import qualified Language.Haskell.Names                   as N (Symbol (..), symbolName)
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
-import           Language.Haskell.Names.SyntaxUtils       (dropAnn, getModuleName)
 
 import           Importify.Syntax                         (anyAnnotation)
 
@@ -64,15 +63,6 @@ collectUnusedSymbolsBy isUsed table = do
     -- 4. If not found ⇒ unused
     pure symbol
 
--- | Gather all symbols for given list of 'Module's. In reality those
--- modules represent all /exposed/ and /other/ modules for one package
--- returning only list of symbols for /exposed/ modules.
-resolveModules :: (Data l, Eq l) => [Module l] -> [Module l] -> [(ModuleName (), [N.Symbol])]
-resolveModules exposedModules otherModules =
-    let symbolsEnv     = resolve (exposedModules ++ otherModules) mempty
-        otherCleared   = map (dropAnn . getModuleName) otherModules
-
-        -- remove @otherModules@ from environment because only @exposed@ can be imported
-        exposedEnv     = foldl' (flip M.delete) symbolsEnv otherCleared
-        exposedSymbols = M.assocs exposedEnv
-    in exposedSymbols
+-- | Gather all symbols for given list of 'Module's.
+resolveModules :: (Data l, Eq l) => [Module l] -> [(ModuleName (), [N.Symbol])]
+resolveModules modules = M.toList $ resolve modules mempty

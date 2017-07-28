@@ -18,7 +18,8 @@ module Importify.Paths
        , testDataPath
        , testDataDir
 
-         -- * Utility functions to work with directories
+         -- * Utility functions to work with files and directories
+       , decodeFileOrMempty
        , doInsideDir
        , findCabalFile
        , getCurrentPath
@@ -26,14 +27,18 @@ module Importify.Paths
 
 import           Universum
 
-import           Path             (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
-                                   fromRelFile, parseAbsDir, parseRelFile, reldir,
-                                   relfile)
-import           Path.Internal    (Path (..))
-import           System.Directory (createDirectoryIfMissing, getCurrentDirectory,
-                                   listDirectory)
-import           System.FilePath  (takeExtension)
-import           Turtle           (cd, pwd)
+import           Data.Aeson           (FromJSON, eitherDecodeStrict)
+import qualified Data.ByteString      as BS (readFile)
+import           Path                 (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
+                                       fromRelFile, parseAbsDir, parseRelFile, reldir,
+                                       relfile)
+import           Path.Internal        (Path (..))
+import           System.Directory     (createDirectoryIfMissing, doesFileExist,
+                                       getCurrentDirectory, listDirectory)
+import           System.FilePath      (takeExtension)
+import           Turtle               (cd, pwd)
+
+import           Extended.System.Wlog (printNotice, printWarning)
 
 cachePath :: Path Rel Dir
 cachePath = [reldir|.importify/|]
@@ -93,3 +98,25 @@ doInsideDir dir action = do
                  cd $ fromString $ fromAbsDir dir)
              (cd thisDirectory)
              action
+
+-- | Tries to read file and then 'decode' it. If either of two phases
+-- fails then 'mempty' returned and warning is printed to console.
+decodeFileOrMempty :: (FromJSON t, Monoid m) => FilePath -> (t -> IO m) -> IO m
+decodeFileOrMempty file onDecodedContent = do
+    let textFile = toText file
+
+    isFileExist <- doesFileExist file
+    if isFileExist then
+        eitherDecodeStrict <$> BS.readFile file >>= \case
+            Left msg -> do
+                printWarning $ textFile
+                            <> " decoded incorrectly because of: "
+                            <> toText msg
+                return mempty
+            Right value -> onDecodedContent value
+    else do
+        let msg = textFile
+               <> " doesn't exist: "
+               <> "caching first time or previous caching failed"
+        printNotice msg
+        return mempty

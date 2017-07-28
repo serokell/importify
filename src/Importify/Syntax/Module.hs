@@ -1,8 +1,7 @@
 -- | Syntax utilities to work with modules and their names.
 
 module Importify.Syntax.Module
-       ( getModuleNameId
-       , getModuleTitle
+       ( getModuleTitle
        , isInsideExport
        , modulePragmas
        ) where
