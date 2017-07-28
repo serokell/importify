@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 -- | Contains implementation of @importify cache@ command.
 
 module Importify.Main.Cache
@@ -6,52 +8,46 @@ module Importify.Main.Cache
 
 import           Universum
 
-import           Data.Aeson                      (decodeStrict)
 import           Data.Aeson.Encode.Pretty        (encodePretty)
-import qualified Data.ByteString                 as BS (readFile)
 import qualified Data.ByteString.Lazy            as LBS (writeFile)
 import qualified Data.HashMap.Strict             as HM
-import qualified Data.Map                        as M
 import           Data.Version                    (showVersion)
 
 import           Distribution.Package            (PackageIdentifier (..))
 import           Distribution.PackageDescription (BuildInfo (includeDirs), GenericPackageDescription (packageDescription),
-                                                  Library (..),
                                                   PackageDescription (package))
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
                                                   indent, listF)
-import           Language.Haskell.Exts           (Extension, Module, ModuleName (..),
-                                                  SrcSpanInfo)
+import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Path                            (Abs, Dir, File, Path, Rel, fromAbsDir,
                                                   fromAbsFile, fromRelDir, fromRelFile,
-                                                  parseAbsDir, parseAbsFile, parseRelDir,
-                                                  parseRelFile, (</>))
+                                                  parseAbsFile, parseRelDir, parseRelFile,
+                                                  (</>))
 import           System.Directory                (createDirectoryIfMissing,
-                                                  doesDirectoryExist, doesFileExist,
-                                                  getCurrentDirectory,
+                                                  doesDirectoryExist, getCurrentDirectory,
                                                   removeDirectoryRecursive)
 import           System.FilePath                 (dropExtension)
 import           Turtle                          (shell)
 
 import           Extended.Data.List              (mapMaybeM)
 import           Extended.System.Wlog            (printDebug, printInfo, printWarning)
-import           Importify.Cabal                 (TargetId (LibraryId),
+import           Importify.Cabal                 (ModulesMap, TargetId (LibraryId),
                                                   buildInfoExtensions,
                                                   extractTargetBuildInfo, getMapBundle,
-                                                  modulePaths, packageDependencies,
-                                                  packageTargets, readCabal,
-                                                  splitOnExposedAndOther, targetIdDir,
+                                                  packageDependencies, packageTargets,
+                                                  readCabal, targetIdDir,
                                                   withHarmlessExtensions)
 import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny)
-import           Importify.Paths                 (cachePath, doInsideDir, extensionsFile,
+import           Importify.Paths                 (cachePath, decodeFileOrMempty,
+                                                  doInsideDir, extensionsFile,
                                                   findCabalFile, getCurrentPath,
                                                   modulesFile, symbolsPath, targetsFile)
 import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
 import           Importify.Stack                 (ghcIncludePath, stackListDependencies,
                                                   upgradeWithVersions)
-import           Importify.Syntax                (debugAST)
+import           Importify.Syntax                (getModuleTitle)
 
 -- | Caches packages information into local .importify directory.
 doCache :: Bool -> [String] -> IO ()
@@ -103,13 +99,13 @@ cacheProject preserveSources cabalFile = do
                                                    fullProjectName
                                                    True
 
-        let importsMap = M.unions (projectResolutionMap:dependenciesResolutionMaps)
+        let importsMap = HM.unions (projectResolutionMap:dependenciesResolutionMaps)
         updateModulesMap importsMap
 
 unpackAndCacheDependencies :: Path Abs Dir
                            -> Bool
                            -> [String]
-                           -> IO [Map String Text]
+                           -> IO [ModulesMap]
 unpackAndCacheDependencies importifyPath preserveSources dependencies =
     mapM libraryResolver =<< mapMaybeM isNotUnpacked dependencies
   where
@@ -125,13 +121,13 @@ unpackAndCacheDependencies importifyPath preserveSources dependencies =
         else
             return $ Just textLibName
 
-    libraryResolver :: Text -> IO (Map String Text)
+    libraryResolver :: Text -> IO ModulesMap
     libraryResolver = collectDependenciesResolution importifyPath preserveSources
 
 collectDependenciesResolution :: Path Abs Dir
                               -> Bool
                               -> Text
-                              -> IO (Map String Text)
+                              -> IO ModulesMap
 collectDependenciesResolution importifyPath preserve libName = do
     _exitCode <- shell ("stack unpack " <> libName) empty
 
@@ -175,7 +171,7 @@ createProjectCache :: GenericPackageDescription
                    -- ^ Package name with version
                    -> Bool
                    -- ^ True if project itself is cached
-                   -> IO (Map String Text)
+                   -> IO ModulesMap
 createProjectCache
     packageCabalDesc
     packagePath
@@ -190,15 +186,15 @@ createProjectCache
     createDirectoryIfMissing True $ fromAbsDir packageCachePath
 
     -- Maps from full path to target and from target to list of extensions
-    (targetMap, extensionMap) <- getMapBundle packagePath packageCabalDesc
+    (targetMap, extensionsMap) <- getMapBundle packagePath packageCabalDesc
 
     -- Cache MapBundle only for working project
     when isWorkingProject $ do
         LBS.writeFile targetsFile    $ encodePretty targetMap
-        LBS.writeFile extensionsFile $ encodePretty extensionMap
+        LBS.writeFile extensionsFile $ encodePretty extensionsMap
 
     -- [IMRF-70]: move this to ReaderT config
-    ghcIncludeDir  <- runMaybeT ghcIncludePath
+    ghcIncludeDir <- runMaybeT ghcIncludePath
 
     let moduleToTargetPairs = HM.toList targetMap
     concatForM targetIds $ \targetId -> do
@@ -220,8 +216,9 @@ createProjectCache
         let packageTargetPath = packageCachePath </> targetPath
         createDirectoryIfMissing True $ fromAbsDir packageTargetPath
 
-        let resolvedModules = resolveModules targetModules
-        fmap M.fromList $ forM resolvedModules $ \( ModuleName () moduleTitle
+        let moduleToPathMap = HM.fromList $ map (first getModuleTitle) targetModules
+        let resolvedModules = resolveModules $ map fst targetModules
+        fmap HM.fromList $ forM resolvedModules $ \( ModuleName () moduleTitle
                                                   , resolvedSymbols) -> do
             modSymbolsPath     <- parseRelFile $ moduleTitle ++ ".symbols"
             let moduleCachePath = packageTargetPath </> modSymbolsPath
@@ -229,13 +226,17 @@ createProjectCache
             -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
             writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
-            pure (moduleTitle, packageName)
+            let modulePath = fromMaybe (error $ toText $ "Unknown module: " ++ moduleTitle)
+                           $ HM.lookup moduleTitle moduleToPathMap
+            pure (fromAbsFile modulePath, (packageName, moduleTitle))
 
 parseTargetModules :: Path Abs Dir    -- ^ Path like @~/.../.importify/containers-0.5@
                    -> [Path Abs File] -- ^ Paths to modules
                    -> BuildInfo       -- ^ BuildInfo of current target
                    -> Maybe FilePath  -- ^ Path to ghc bundled headers
-                   -> IO ([ModuleParseException], [Module SrcSpanInfo])
+                   -> IO ( [ModuleParseException]
+                         , [(Module SrcSpanInfo, Path Abs File)]
+                         )
 parseTargetModules packagePath pathsToModules targetInfo ghcIncludeDir = do
     -- get include directories for cpphs
     includeDirPaths   <- mapM parseRelDir $ includeDirs targetInfo
@@ -243,16 +244,17 @@ parseTargetModules packagePath pathsToModules targetInfo ghcIncludeDir = do
 
     let includeDirs  = pkgIncludeDirs ++ toList ghcIncludeDir
     let extensions   = withHarmlessExtensions $ buildInfoExtensions targetInfo
-    let moduleParser = parseModuleWithPreprocessor extensions includeDirs
+
+    let moduleParser path = do
+            parseRes <- parseModuleWithPreprocessor extensions
+                                                    includeDirs
+                                                    path
+            return $ second (,path) parseRes
 
     partitionEithers <$> mapM moduleParser pathsToModules
 
-updateModulesMap :: Map String Text -> IO ()
+updateModulesMap :: ModulesMap -> IO ()
 updateModulesMap newCachedModules = do
-    isModulesFileExist <- doesFileExist modulesFile
-    existingImportsMap <- if isModulesFileExist
-                          then fromMaybe (error "Invalid modules file") . decodeStrict
-                           <$> BS.readFile modulesFile
-                          else pure mempty
-    let mergedMaps = newCachedModules `M.union` existingImportsMap
+    existingImportsMap <- decodeFileOrMempty modulesFile return
+    let mergedMaps      = newCachedModules `HM.union` existingImportsMap
     LBS.writeFile modulesFile $ encodePretty mergedMaps

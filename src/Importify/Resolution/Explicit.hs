@@ -16,7 +16,6 @@ import           Language.Haskell.Names                   (NameInfo (Export, Glo
                                                            Scoped, resolve, symbolModule)
 import qualified Language.Haskell.Names                   as N (Symbol (..), symbolName)
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
-import           Language.Haskell.Names.SyntaxUtils       (dropAnn, getModuleName)
 
 import           Importify.Syntax                         (anyAnnotation)
 
@@ -66,7 +65,4 @@ collectUnusedSymbolsBy isUsed table = do
 
 -- | Gather all symbols for given list of 'Module's.
 resolveModules :: (Data l, Eq l) => [Module l] -> [(ModuleName (), [N.Symbol])]
-resolveModules modules =
-    let symbolsEnv     = resolve modules mempty
-        exposedSymbols = M.assocs symbolsEnv
-    in exposedSymbols
+resolveModules modules = M.toList $ resolve modules mempty

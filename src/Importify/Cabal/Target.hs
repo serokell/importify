@@ -7,6 +7,7 @@
 module Importify.Cabal.Target
        ( -- * Maps from modules paths to cache parts
          ExtensionsMap
+       , ModulesMap
        , TargetsMap
        , MapBundle
 
@@ -39,8 +40,9 @@ import           Path                            (Abs, Dir, File, Path, fromAbsF
 
 import           Importify.Cabal.Extension       (showExt)
 import           Importify.Cabal.Module          (modulePaths)
-import           Importify.Cabal.Package         (extractFromTargets)
 
+-- | Mapping from module path to its package and module name.
+type    ModulesMap = HashMap FilePath (Text, String)
 type    TargetsMap = HashMap FilePath TargetId
 type ExtensionsMap = HashMap TargetId [String]
 type MapBundle     = (TargetsMap, ExtensionsMap)

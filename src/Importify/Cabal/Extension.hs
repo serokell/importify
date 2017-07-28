@@ -10,7 +10,7 @@ module Importify.Cabal.Extension
 import           Universum
 
 import qualified Distribution.ModuleName         as Cabal
-import           Distribution.PackageDescription (BuildInfo (..), Library (..))
+import           Distribution.PackageDescription (BuildInfo (..))
 import qualified Language.Haskell.Extension      as Cabal (Extension (..),
                                                            KnownExtension (..))
 import           Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
