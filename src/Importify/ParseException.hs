@@ -11,7 +11,7 @@ import           Universum
 
 import           Fmt                   (Builder, blockListF, build, fmt, fmtLn, indent,
                                         listF, ( #| ), (|#))
-import           Language.Haskell.Exts (ParseResult (..), prettyPrint, SrcLoc)
+import           Language.Haskell.Exts (ParseResult (..), SrcLoc, prettyPrint)
 
 import           Extended.Data.Str     (charWrap, wordWrap)
 import           Extended.System.Wlog  (printWarning)
