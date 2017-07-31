@@ -1,23 +1,34 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 -- | Utilities which allows to use @stack@ tools for different
 -- dependencies stuff.
 
 module Importify.Stack
-       ( ghcIncludePath
+       ( LocalPackage (..)
+       , ghcIncludePath
        , stackListDependencies
+       , stackListPackages
        , upgradeWithVersions
        ) where
 
 import           Universum
 
-import qualified Control.Foldl       as Fold (head, list)
-import qualified Data.HashMap.Strict as HM
-import           Path                (dirname, fromAbsDir, mkRelDir, parent, parseAbsDir,
-                                      (</>))
-import           System.Directory    (doesDirectoryExist)
-import           Turtle              (Line, Shell, inproc, lineToText)
-import qualified Turtle              (fold)
+import qualified Control.Foldl        as Fold (head, list)
+import qualified Data.HashMap.Strict  as HM
+import           Data.List            (notElem)
+import           Data.Yaml            (FromJSON (parseJSON), Parser, Value (Object),
+                                       decodeEither', prettyPrintParseException,
+                                       withObject, (.:))
+import           Path                 (Abs, Dir, Path, PathException, dirname, fromAbsDir,
+                                       mkRelDir, parent, parseAbsDir, (</>))
+import           System.Directory     (doesDirectoryExist)
+import           System.FilePath      (splitPath)
+import           Turtle               (Line, Shell, inproc, lineToText, linesToText)
+import qualified Turtle               (fold)
+
+import           Extended.System.Wlog (printWarning)
+import           Importify.Syntax     (debugAST)
 
 shStack :: [Text] -> Shell Line
 shStack args = inproc "stack" args empty
@@ -38,10 +49,12 @@ ghcIncludePath :: MaybeT IO FilePath
 ghcIncludePath = do
     ghcBinLine <- MaybeT $ Turtle.fold (shStack pathArgs) Fold.head
 
-    -- ghcBinText looks like /home/user/.stack/programs/x86_64-linux/ghc-8.0.2/bin
+    -- ghcBinText ≡ /home/user/.stack/programs/x86_64-linux/ghc-8.0.2/bin
     ghcBinText    <- parseAbsDir $ toString $ lineToText ghcBinLine
     let ghcProgram = parent ghcBinText   -- w/o bin
     let ghcName    = dirname ghcProgram  -- ≡ ghc-8.0.2
+
+    -- ghcInclude ≡ /home/user/.stack/programs/x86_64-linux/ghc-8.0.2/lib/ghc-8.0.2/include
     let ghcInclude = ghcProgram
                  </> $(mkRelDir "lib/")
                  </> ghcName
@@ -78,3 +91,50 @@ upgradeWithVersions versions = go
     go (lib:libs) = case HM.lookup lib versions of
         Nothing      -> lib                   : go libs
         Just version -> lib <> "-" <> version : go libs
+
+-- | Queries list of all local packages for project. If some errors
+-- occur then warning is printed into console and empty list returned.
+stackListPackages :: IO [LocalPackage]
+stackListPackages = do
+    pkgsYaml    <- linesToText <$> Turtle.fold (shStack ["query"]) Fold.list
+    let parseRes = decodeEither' $ encodeUtf8 pkgsYaml
+    case parseRes of
+        Left exception -> do
+            printWarning $ toText $ prettyPrintParseException exception
+            return []
+        Right (StackQuery packages) -> do
+            localPackages <- mapM toPackage packages `catch` parseErrorHandler
+            let projectPackages = filter (isLocalPackage . lpPath) localPackages
+            return projectPackages
+  where
+    toPackage :: (Text, (FilePath, Text)) -> IO LocalPackage
+    toPackage (lpName, (path, lpVersion)) = do
+        lpPath <- parseAbsDir path
+        return LocalPackage{..}
+
+    parseErrorHandler :: PathException -> IO [LocalPackage]
+    parseErrorHandler exception = do
+        printWarning $ "'stack query' exception: " <> show exception
+        return []
+
+    isLocalPackage :: Path Abs Dir -> Bool
+    isLocalPackage = notElem ".stack-work/" . splitPath . fromAbsDir
+
+-- | This data type represents package returned by @stack query@ command.
+data LocalPackage = LocalPackage
+    { lpName    :: Text          -- ^ @importify@
+    , lpPath    :: Path Abs Dir  -- ^ @\/home\/user\/importify\/@
+    , lpVersion :: Text          -- ^ 1.0
+    } deriving (Show)
+
+newtype StackQuery = StackQuery [(Text, (FilePath, Text))]
+    deriving Show
+
+instance FromJSON StackQuery where
+    parseJSON = withObject "stack query" $ \obj -> do
+        Just (Object locals) <- pure $ HM.lookup "locals" obj
+        packages <- forM locals $ withObject "package" $ \pkgObj -> do
+            pkgPath    :: FilePath <- pkgObj .: "path"
+            pkgVersion :: Text     <- pkgObj .: "version"
+            pure (pkgPath, pkgVersion)
+        pure $ StackQuery $ HM.toList packages
