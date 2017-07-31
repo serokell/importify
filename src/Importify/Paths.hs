@@ -31,7 +31,7 @@ import           Data.Aeson           (FromJSON, eitherDecodeStrict)
 import qualified Data.ByteString      as BS (readFile)
 import           Path                 (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
                                        fromRelFile, parseAbsDir, parseRelFile, reldir,
-                                       relfile)
+                                       relfile, (</>))
 import           Path.Internal        (Path (..))
 import           System.Directory     (createDirectoryIfMissing, doesFileExist,
                                        getCurrentDirectory, listDirectory)
@@ -78,12 +78,13 @@ getCurrentPath = do
     parseAbsDir thisDirectory
 
 -- | Returns relative path to cabal file under given directory.
-findCabalFile :: FilePath -> IO $ Maybe $ Path Rel File
+findCabalFile :: Path Abs Dir -> IO $ Maybe $ Path Abs File
 findCabalFile projectPath = do
-    projectDirectoryContent <- listDirectory projectPath
+    projectDirectoryContent <- listDirectory $ fromAbsDir projectPath
     let cabalFiles           = filter ((== ".cabal") . takeExtension)
                                       projectDirectoryContent
-    traverse parseRelFile $ head cabalFiles
+    cabalFilePath <- traverse parseRelFile $ head cabalFiles
+    return $ fmap (projectPath </>) cabalFilePath
 
 createCacheDir :: Path Abs Dir -> IO ()
 createCacheDir importifyPath = do

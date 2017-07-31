@@ -7,6 +7,7 @@
 module Importify.Stack
        ( LocalPackage (..)
        , ghcIncludePath
+       , pkgName
        , stackListDependencies
        , stackListPackages
        , upgradeWithVersions
@@ -126,6 +127,10 @@ data LocalPackage = LocalPackage
     , lpPath    :: Path Abs Dir  -- ^ @\/home\/user\/importify\/@
     , lpVersion :: Text          -- ^ 1.0
     } deriving (Show)
+
+-- | Show full name of 'LocalPackage' with version.
+pkgName :: LocalPackage -> Text
+pkgName LocalPackage{..} = lpName <> "-" <> lpVersion
 
 newtype StackQuery = StackQuery [(Text, (FilePath, Text))]
     deriving Show

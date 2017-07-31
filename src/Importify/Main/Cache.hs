@@ -11,9 +11,9 @@ import           Universum
 import           Data.Aeson.Encode.Pretty        (encodePretty)
 import qualified Data.ByteString.Lazy            as LBS (writeFile)
 import qualified Data.HashMap.Strict             as HM
+import           Data.List                       (notElem)
 import           Data.Version                    (showVersion)
 
-import           Distribution.Package            (PackageIdentifier (..))
 import           Distribution.PackageDescription (BuildInfo (includeDirs), GenericPackageDescription (packageDescription),
                                                   PackageDescription (package))
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
@@ -45,18 +45,26 @@ import           Importify.Paths                 (cachePath, decodeFileOrMempty,
                                                   modulesFile, symbolsPath, targetsFile)
 import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
-import           Importify.Stack                 (ghcIncludePath, stackListDependencies,
-                                                  upgradeWithVersions)
-import           Importify.Syntax                (getModuleTitle)
+import           Importify.Stack                 (LocalPackage (..), ghcIncludePath,
+                                                  pkgName, stackListDependencies,
+                                                  stackListPackages, upgradeWithVersions)
+import           Importify.Syntax                (debugAST, getModuleTitle)
 
 -- | Caches packages information into local .importify directory.
 doCache :: Bool -> [String] -> IO ()
-doCache preserveSources [] = do
-    thisDirectory <- getCurrentDirectory
-    findCabalFile thisDirectory >>= \case
-        Nothing -> printWarning "No .cabal file in this directory! Aborting. Please, \
-                                \run this command from your project root directory."
-        Just cabalFile -> cacheProject preserveSources cabalFile
+doCache preserveSources [] = stackListPackages >>= \case
+    [] -> printWarning "No packages found :( This could happen due to next reasons:\n\
+                       \    1. Not running from project root directory.\n\
+                       \    2. 'stack query' command failure.\n\
+                       \    3. Our failure in parsing 'stack query' output."
+    packages -> do
+        -- [IMRF-70]: Move this to ReaderT config
+        projectPath <- getCurrentPath
+        let importifyPath = projectPath </> cachePath
+        forM_ packages $ \package -> do
+            printInfo $ "Caching package: " <> pkgName package
+            cacheProject preserveSources importifyPath (map (toString.pkgName) packages) package
+
 doCache preserveSources explicitDependencies = do
     printInfo "Using explicitly specifined list of dependencies for caching..."
     projectPath      <- getCurrentPath
@@ -66,22 +74,21 @@ doCache preserveSources explicitDependencies = do
                                          preserveSources
                                          explicitDependencies
 
-cacheProject :: Bool -> Path Rel File -> IO ()
-cacheProject preserveSources cabalFile = do
-    -- TODO: remove code duplication
-    projectPath      <- getCurrentPath
-    let cabalPath     = fromAbsFile $ projectPath </> cabalFile
-    let importifyPath = projectPath </> cachePath
+cacheProject :: Bool -> Path Abs Dir -> [String] -> LocalPackage -> IO ()
+cacheProject preserveSources importifyPath localPackages pkg@LocalPackage{..} = do
+    Just cabalPath <- findCabalFile lpPath
+    let cabalFile   = fromAbsFile cabalPath
 
     doInsideDir importifyPath $ do
-        projectCabalDesc <- readCabal cabalPath
+        projectCabalDesc <- readCabal cabalFile
 
         -- Libraries
+        -- [IMRF-70]: Move to ReaderT config
         libVersions    <- stackListDependencies
-        let projectName = dropExtension $ fromRelFile cabalFile
+        let packageName = pkgName pkg
         let libraries   = sort
+                        $ filter (`notElem` localPackages)
                         $ upgradeWithVersions libVersions
-                        $ filter (/= projectName)
                         $ packageDependencies projectCabalDesc
         printInfo $ fmt $ "Caching next dependencies: " <> listF libraries
 
@@ -90,13 +97,11 @@ cacheProject preserveSources cabalFile = do
                                                                  preserveSources
                                                                  libraries
 
-        let PackageIdentifier{..} = package $ packageDescription projectCabalDesc
-        let fullProjectName       = toText $ projectName ++ '-':showVersion pkgVersion
         projectResolutionMap <- createProjectCache projectCabalDesc
-                                                   projectPath
+                                                   lpPath
                                                    (importifyPath </> symbolsPath)
                                                    (packageTargets projectCabalDesc)
-                                                   fullProjectName
+                                                   packageName
                                                    True
 
         let importsMap = HM.unions (projectResolutionMap:dependenciesResolutionMaps)
@@ -134,13 +139,12 @@ collectDependenciesResolution importifyPath preserve libName = do
     let stringLibName         = toString libName
     packagePath              <- parseRelDir stringLibName
     let downloadedPackagePath = importifyPath </> packagePath
-    mCabalFileName           <- findCabalFile stringLibName
 
+    -- finding path to unpacked package .cabal file
+    mCabalFileName   <- findCabalFile downloadedPackagePath
     let cabalFileName = fromMaybe (error $ "No .cabal file inside: " <> libName)
                                   mCabalFileName
-    packageCabalDesc <- readCabal
-                      $ fromAbsFile
-                      $ downloadedPackagePath </> cabalFileName
+    packageCabalDesc <- readCabal $ fromAbsFile cabalFileName
 
     let symbolsCachePath = importifyPath </> symbolsPath
     packageModules <- createProjectCache packageCabalDesc
