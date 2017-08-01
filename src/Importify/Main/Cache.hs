@@ -1,4 +1,7 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 -- | Contains implementation of @importify cache@ command.
 
@@ -17,7 +20,7 @@ import           Data.Version                    (showVersion)
 import           Distribution.PackageDescription (BuildInfo (includeDirs), GenericPackageDescription (packageDescription),
                                                   PackageDescription (package))
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
-                                                  indent, listF)
+                                                  indent, listF, ( #| ), (|#))
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Path                            (Abs, Dir, File, Path, Rel, fromAbsDir,
@@ -30,7 +33,6 @@ import           System.Directory                (createDirectoryIfMissing,
 import           System.FilePath                 (dropExtension)
 import           Turtle                          (shell)
 
-import           Extended.Data.List              (mapMaybeM)
 import           Extended.System.Wlog            (printDebug, printInfo, printWarning)
 import           Importify.Cabal                 (ModulesMap, TargetId (LibraryId),
                                                   buildInfoExtensions,
@@ -45,124 +47,177 @@ import           Importify.Paths                 (cachePath, decodeFileOrMempty,
                                                   modulesFile, symbolsPath, targetsFile)
 import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
-import           Importify.Stack                 (LocalPackage (..), ghcIncludePath,
+import           Importify.Stack                 (LocalPackages (..), QueryPackage (..),
+                                                  RemotePackages (..), ghcIncludePath,
                                                   pkgName, stackListDependencies,
                                                   stackListPackages, upgradeWithVersions)
-import           Importify.Syntax                (debugAST, getModuleTitle)
+import           Importify.Syntax                (debugAST, debugLabel, getModuleTitle)
 
 -- | Caches packages information into local .importify directory.
-doCache :: Bool -> [String] -> IO ()
-doCache preserveSources [] = stackListPackages >>= \case
-    [] -> printWarning "No packages found :( This could happen due to next reasons:\n\
-                       \    1. Not running from project root directory.\n\
-                       \    2. 'stack query' command failure.\n\
-                       \    3. Our failure in parsing 'stack query' output."
-    packages -> do
-        -- [IMRF-70]: Move this to ReaderT config
-        projectPath <- getCurrentPath
-        let importifyPath = projectPath </> cachePath
-        forM_ packages $ \package -> do
-            printInfo $ "Caching package: " <> pkgName package
-            cacheProject preserveSources importifyPath (map (toString.pkgName) packages) package
-
+doCache :: Bool -> [Text] -> IO ()
+doCache preserveSources [] = do
+    (localPackages@(LocalPackages locals), remotePackages) <- stackListPackages
+    if null locals
+    then printWarning "No packages found :( This could happen due to next reasons:\n\
+                      \    1. Not running from project root directory.\n\
+                      \    2. 'stack query' command failure.\n\
+                      \    3. Our failure in parsing 'stack query' output."
+    else cacheProject preserveSources localPackages remotePackages
 doCache preserveSources explicitDependencies = do
-    printInfo "Using explicitly specifined list of dependencies for caching..."
+    printInfo "Using explicitly specified list of dependencies for caching..."
     projectPath      <- getCurrentPath
     let importifyPath = projectPath </> cachePath
     doInsideDir importifyPath $
-        () <$ unpackAndCacheDependencies importifyPath
-                                         preserveSources
-                                         explicitDependencies
+        () <$ cacheDependenciesWith importifyPath
+                                    identity
+                                    (unpackThenResolveModulesMap preserveSources)
+                                    explicitDependencies
 
-cacheProject :: Bool -> Path Abs Dir -> [String] -> LocalPackage -> IO ()
-cacheProject preserveSources importifyPath localPackages pkg@LocalPackage{..} = do
-    Just cabalPath <- findCabalFile lpPath
-    let cabalFile   = fromAbsFile cabalPath
+cacheProject :: Bool -> LocalPackages -> RemotePackages -> IO ()
+cacheProject preserveSources (LocalPackages locals) (RemotePackages remotes) = do
+    -- [IMRF-70]: Move this to ReaderT config
+    projectPath <- getCurrentPath
+    let importifyPath = projectPath </> cachePath
+
+    localDescriptions   <- mapM localPackageDescription locals
+    hackageDependencies <- extractHackageDependencies localDescriptions
+                                                      (locals ++ remotes)
 
     doInsideDir importifyPath $ do
-        projectCabalDesc <- readCabal cabalFile
+        -- 1. Unpack hackage dependencies then cache them
+        printInfo $ "Caching total "#|length hackageDependencies|#
+                    " dependencies from Hackage: "#|listF hackageDependencies|#""
+        hackageMaps <- cacheDependenciesWith importifyPath
+                                             identity
+                                             (unpackThenResolveModulesMap preserveSources)
+                                             hackageDependencies
 
-        -- Libraries
-        -- [IMRF-70]: Move to ReaderT config
-        libVersions    <- stackListDependencies
-        let packageName = pkgName pkg
-        let libraries   = sort
-                        $ filter (`notElem` localPackages)
-                        $ upgradeWithVersions libVersions
-                        $ packageDependencies projectCabalDesc
-        printInfo $ fmt $ "Caching next dependencies: " <> listF libraries
+        -- 2. Unpack all remote non-hackage dependencies (e.g. from GitHub)
+        remoteMaps <- cacheDependenciesWith importifyPath
+                                            pkgName
+                                            (\path pkg -> cachePackage path
+                                                                       (qpPath pkg)
+                                                                       (pkgName pkg)
+                                                                       False)
+                                            remotes
 
-        -- download & unpack sources, then cache and delete
-        dependenciesResolutionMaps <- unpackAndCacheDependencies importifyPath
-                                                                 preserveSources
-                                                                 libraries
+        -- 3. Unpack finally all local packages
+        localMaps <- forM locals $ \localPackage -> do
+            printInfo $ "Caching package: " <> pkgName localPackage
+            cachePackage importifyPath
+                         (qpPath localPackage)
+                         (pkgName localPackage)
+                         True
 
-        projectResolutionMap <- createProjectCache projectCabalDesc
-                                                   lpPath
-                                                   (importifyPath </> symbolsPath)
-                                                   (packageTargets projectCabalDesc)
-                                                   packageName
-                                                   True
+        updateModulesMap $ (HM.unions localMaps)
+                `HM.union` (HM.unions remoteMaps)
+                `HM.union` (HM.unions hackageMaps)
 
-        let importsMap = HM.unions (projectResolutionMap:dependenciesResolutionMaps)
-        updateModulesMap importsMap
+localPackageDescription :: QueryPackage -> IO GenericPackageDescription
+localPackageDescription QueryPackage{..} = do
+    Just cabalPath <- findCabalFile qpPath
+    let cabalFile   = fromAbsFile cabalPath
+    readCabal cabalFile
 
-unpackAndCacheDependencies :: Path Abs Dir
-                           -> Bool
-                           -> [String]
-                           -> IO [ModulesMap]
-unpackAndCacheDependencies importifyPath preserveSources dependencies =
-    mapM libraryResolver =<< mapMaybeM isNotUnpacked dependencies
+extractHackageDependencies :: [GenericPackageDescription]
+                           -> [QueryPackage]
+                           -> IO [Text]
+extractHackageDependencies descriptions (map pkgName -> nonHackagePackages) = do
+    libVersions     <- stackListDependencies
+    let versifier    = upgradeWithVersions libVersions
+                     . map toText
+                     . packageDependencies
+    let dependencies = concatMap versifier descriptions
+
+    let uniqueDependencies = sort
+                           $ filter (`notElem` nonHackagePackages)
+                           $ hashNub dependencies
+
+    return uniqueDependencies
+
+-- | Collect cache of list of given dependencies. If given dependency
+-- is already cached then it's ignored and debug message is printed.
+cacheDependenciesWith :: forall d .
+                         Path Abs Dir
+                      -- ^ Absolute path to .importify folder
+                      -> (d -> Text)
+                      -- ^ How to get dependency name?
+                      -> (Path Abs Dir -> d -> IO ModulesMap)
+                      -- ^ How to cache dependency (unpack for StackDependency)
+                      -> [d]
+                      -- ^ List of dependencies that should be cached
+                      -> IO [ModulesMap]
+cacheDependenciesWith
+    importifyPath
+    dependencyName
+    resolver
+  = go
   where
-    isNotUnpacked :: String -> IO (Maybe Text)
-    isNotUnpacked libName = do
-        libraryPath       <- parseRelDir libName
+    go :: [d] -> IO [ModulesMap]
+    go []     = return []
+    go (d:ds) = do
+        let depName = dependencyName d
+        isAlreadyCached depName >>= \case
+            True  -> printDebug (depName <> " is already cached") *> go ds
+            False -> liftM2 (:) (dependencyResolver d) (go ds)
+
+    isAlreadyCached :: Text -> IO Bool
+    isAlreadyCached libName = do
+        libraryPath       <- parseRelDir $ toString libName
         let libSymbolsPath = symbolsPath </> libraryPath
-        isAlreadyUnpacked <- doesDirectoryExist (fromRelDir libSymbolsPath)
-        let textLibName    = toText libName
-        if isAlreadyUnpacked then do
-            printDebug $ textLibName <> " is already cached"
-            return Nothing
-        else
-            return $ Just textLibName
+        doesDirectoryExist (fromRelDir libSymbolsPath)
 
-    libraryResolver :: Text -> IO ModulesMap
-    libraryResolver = collectDependenciesResolution importifyPath preserveSources
+    dependencyResolver :: d -> IO ModulesMap
+    dependencyResolver = resolver importifyPath
 
-collectDependenciesResolution :: Path Abs Dir
-                              -> Bool
-                              -> Text
-                              -> IO ModulesMap
-collectDependenciesResolution importifyPath preserve libName = do
+unpackThenResolveModulesMap
+    :: Bool
+    -> Path Abs Dir
+    -> Text
+    -> IO ModulesMap
+unpackThenResolveModulesMap preserve importifyPath libName = do
     _exitCode <- shell ("stack unpack " <> libName) empty
 
     let stringLibName         = toString libName
     packagePath              <- parseRelDir stringLibName
     let downloadedPackagePath = importifyPath </> packagePath
 
-    -- finding path to unpacked package .cabal file
-    mCabalFileName   <- findCabalFile downloadedPackagePath
-    let cabalFileName = fromMaybe (error $ "No .cabal file inside: " <> libName)
-                                  mCabalFileName
-    packageCabalDesc <- readCabal $ fromAbsFile cabalFileName
-
-    let symbolsCachePath = importifyPath </> symbolsPath
-    packageModules <- createProjectCache packageCabalDesc
-                                         downloadedPackagePath
-                                         symbolsCachePath
-                                         [LibraryId]
-                                         libName
-                                         False
+    packageModules <- cachePackage importifyPath
+                                   downloadedPackagePath
+                                   libName
+                                   False
 
     unless preserve $  -- TODO: use bracket here
         removeDirectoryRecursive stringLibName
 
     pure packageModules
 
+-- | Find .cabal file by given path to package and then collect 'ModulesMap'.
+cachePackage :: Path Abs Dir  -- ^ Path to .importify folder
+             -> Path Abs Dir  -- ^ Path to package
+             -> Text          -- ^ Package name
+             -> Bool          -- ^ Is package itself is caching
+             -> IO ModulesMap
+cachePackage importifyPath packagePath libName isWorkingProject = do
+    -- finding path to unpacked package .cabal file
+    mCabalFileName   <- findCabalFile packagePath
+    let cabalFileName = fromMaybe (error $ "No .cabal file inside: " <> libName)
+                                  mCabalFileName
+
+    packageCabalDesc <- readCabal $ fromAbsFile cabalFileName
+
+    let symbolsCachePath = importifyPath </> symbolsPath
+    createPackageCache packageCabalDesc
+                       packagePath
+                       symbolsCachePath
+                       [LibraryId]
+                       libName
+                       isWorkingProject
+
 -- | Creates @./.impority/symbols/<package> folder where all symbols
 -- for given library stored. This function used for both library packages
 -- and project package itself.
-createProjectCache :: GenericPackageDescription
+createPackageCache :: GenericPackageDescription
                    -- ^ Package descriptions
                    -> Path Abs Dir
                    -- ^ Path to package root
@@ -174,9 +229,9 @@ createProjectCache :: GenericPackageDescription
                    -> Text
                    -- ^ Package name with version
                    -> Bool
-                   -- ^ True if project itself is cached
+                   -- ^ True if project itself is caching now
                    -> IO ModulesMap
-createProjectCache
+createPackageCache
     packageCabalDesc
     packagePath
     symbolsCachePath
@@ -191,6 +246,7 @@ createProjectCache
 
     -- Maps from full path to target and from target to list of extensions
     (targetMap, extensionsMap) <- getMapBundle packagePath packageCabalDesc
+
 
     -- Cache MapBundle only for working project
     when isWorkingProject $ do
@@ -246,14 +302,14 @@ parseTargetModules packagePath pathsToModules targetInfo ghcIncludeDir = do
     includeDirPaths   <- mapM parseRelDir $ includeDirs targetInfo
     let pkgIncludeDirs = map (fromAbsDir . (packagePath </>)) includeDirPaths
 
-    let includeDirs  = pkgIncludeDirs ++ toList ghcIncludeDir
-    let extensions   = withHarmlessExtensions $ buildInfoExtensions targetInfo
+    let includeDirs = pkgIncludeDirs ++ toList ghcIncludeDir
+    let extensions  = withHarmlessExtensions $ buildInfoExtensions targetInfo
 
     let moduleParser path = do
             parseRes <- parseModuleWithPreprocessor extensions
                                                     includeDirs
                                                     path
-            return $ second (,path) parseRes
+            return $ second (, path) parseRes
 
     partitionEithers <$> mapM moduleParser pathsToModules
 

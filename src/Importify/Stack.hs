@@ -5,7 +5,10 @@
 -- dependencies stuff.
 
 module Importify.Stack
-       ( LocalPackage (..)
+       ( QueryPackage   (..)
+       , LocalPackages  (..)
+       , RemotePackages (..)
+
        , ghcIncludePath
        , pkgName
        , stackListDependencies
@@ -17,7 +20,7 @@ import           Universum
 
 import qualified Control.Foldl        as Fold (head, list)
 import qualified Data.HashMap.Strict  as HM
-import           Data.List            (notElem)
+import           Data.List            (notElem, partition)
 import           Data.Yaml            (FromJSON (parseJSON), Parser, Value (Object),
                                        decodeEither', prettyPrintParseException,
                                        withObject, (.:))
@@ -71,10 +74,10 @@ guardM f = guard =<< f
 
 -- | Extract all dependencies with versions using
 -- @stack list-dependencies@ shell command.
-stackListDependencies :: IO (HashMap String String)
+stackListDependencies :: IO (HashMap Text Text)
 stackListDependencies = do
-    dependencies <- Turtle.fold (shStack depsArgs) Fold.list
-    let wordifyDeps = map (map toString . words . lineToText) dependencies
+    dependencies   <- Turtle.fold (shStack depsArgs) Fold.list
+    let wordifyDeps = map (words . lineToText) dependencies
     let pairifyDeps = pairifyList wordifyDeps
     return $ HM.fromList pairifyDeps
   where
@@ -85,7 +88,7 @@ stackListDependencies = do
 
 -- | Takes mapping from package names to their versions and list of
 -- packages adding version to each package which is inside dictionary.
-upgradeWithVersions :: HashMap String String -> [String] -> [String]
+upgradeWithVersions :: HashMap Text Text -> [Text] -> [Text]
 upgradeWithVersions versions = go
   where
     go        []  = []
@@ -95,51 +98,58 @@ upgradeWithVersions versions = go
 
 -- | Queries list of all local packages for project. If some errors
 -- occur then warning is printed into console and empty list returned.
-stackListPackages :: IO [LocalPackage]
+stackListPackages :: IO (LocalPackages, RemotePackages)
 stackListPackages = do
     pkgsYaml    <- linesToText <$> Turtle.fold (shStack ["query"]) Fold.list
     let parseRes = decodeEither' $ encodeUtf8 pkgsYaml
     case parseRes of
         Left exception -> do
             printWarning $ toText $ prettyPrintParseException exception
-            return []
-        Right (StackQuery packages) -> do
+            return mempty
+        Right (StackQueryResult packages) -> do
             localPackages <- mapM toPackage packages `catch` parseErrorHandler
-            let projectPackages = filter (isLocalPackage . lpPath) localPackages
-            return projectPackages
+            let (locals, remotes) = partition (isLocalPackage . qpPath) localPackages
+            return (LocalPackages locals, RemotePackages remotes)
   where
-    toPackage :: (Text, (FilePath, Text)) -> IO LocalPackage
-    toPackage (lpName, (path, lpVersion)) = do
-        lpPath <- parseAbsDir path
-        return LocalPackage{..}
+    toPackage :: (Text, (FilePath, Text)) -> IO QueryPackage
+    toPackage (qpName, (path, qpVersion)) = do
+        qpPath <- parseAbsDir path
+        return QueryPackage{..}
 
-    parseErrorHandler :: PathException -> IO [LocalPackage]
-    parseErrorHandler exception = do
-        printWarning $ "'stack query' exception: " <> show exception
-        return []
+    parseErrorHandler :: PathException -> IO [QueryPackage]
+    parseErrorHandler exception =
+        [] <$ printWarning ("'stack query' exception: " <> show exception)
 
     isLocalPackage :: Path Abs Dir -> Bool
     isLocalPackage = notElem ".stack-work/" . splitPath . fromAbsDir
 
 -- | This data type represents package returned by @stack query@ command.
-data LocalPackage = LocalPackage
-    { lpName    :: Text          -- ^ @importify@
-    , lpPath    :: Path Abs Dir  -- ^ @\/home\/user\/importify\/@
-    , lpVersion :: Text          -- ^ 1.0
-    } deriving (Show)
+data QueryPackage = QueryPackage
+    { qpName    :: Text          -- ^ @importify@
+    , qpPath    :: Path Abs Dir  -- ^ @\/home\/user\/importify\/@
+    , qpVersion :: Text          -- ^ 1.0
+    } deriving (Eq, Show)
 
--- | Show full name of 'LocalPackage' with version.
-pkgName :: LocalPackage -> Text
-pkgName LocalPackage{..} = lpName <> "-" <> lpVersion
+-- | Show full name of 'QueryPackage' with version.
+pkgName :: QueryPackage -> Text
+pkgName QueryPackage{..} = qpName <> "-" <> qpVersion
 
-newtype StackQuery = StackQuery [(Text, (FilePath, Text))]
+-- | Local subpackages from exactly this project.
+newtype LocalPackages = LocalPackages [QueryPackage]
+    deriving (Eq, Monoid)
+
+-- | Remote packages, from GitHub or other locations.
+newtype RemotePackages = RemotePackages [QueryPackage]
+    deriving (Eq, Monoid)
+
+newtype StackQueryResult = StackQueryResult [(Text, (FilePath, Text))]
     deriving Show
 
-instance FromJSON StackQuery where
+instance FromJSON StackQueryResult where
     parseJSON = withObject "stack query" $ \obj -> do
         Just (Object locals) <- pure $ HM.lookup "locals" obj
         packages <- forM locals $ withObject "package" $ \pkgObj -> do
             pkgPath    :: FilePath <- pkgObj .: "path"
             pkgVersion :: Text     <- pkgObj .: "version"
             pure (pkgPath, pkgVersion)
-        pure $ StackQuery $ HM.toList packages
+        pure $ StackQueryResult $ HM.toList packages

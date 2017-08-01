@@ -20,17 +20,11 @@ import           Text.Read                       (read)
 -- | Get list of all extensions from 'BuildInfo' and convert them into
 -- 'HSE.Extension'.
 buildInfoExtensions :: BuildInfo -> [Extension]
-buildInfoExtensions BuildInfo{..} = map cabalExtToHseExt
-                                  $ filter isHseExt
+buildInfoExtensions BuildInfo{..} = mapMaybe cabalExtToHseExt
                                   $ defaultExtensions ++ otherExtensions
 
-cabalExtToHseExt :: Cabal.Extension -> Extension
-cabalExtToHseExt = {- trace ("Arg = " ++ show ext ++ "") -} read . show
-
-isHseExt :: Cabal.Extension -> Bool
-isHseExt (Cabal.EnableExtension Cabal.NegativeLiterals) = False
-isHseExt (Cabal.EnableExtension Cabal.Unsafe)           = False
-isHseExt _                                              = True
+cabalExtToHseExt :: Cabal.Extension -> Maybe Extension
+cabalExtToHseExt = readMaybe . show
 
 showExt :: Cabal.Extension -> String
 showExt (Cabal.EnableExtension ext)   = show ext

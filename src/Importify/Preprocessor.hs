@@ -13,15 +13,16 @@ import           Universum
 
 import qualified Autoexporter              (mainWithArgs)
 import           Language.Haskell.Exts     (Extension, Module,
-                                            ModulePragma (OptionsPragma), ParseMode (..),
-                                            SrcSpanInfo, Tool (GHC), defaultParseMode)
+                                            ModulePragma (OptionsPragma),
+                                            ParseMode (extensions), SrcSpanInfo,
+                                            Tool (GHC), defaultParseMode)
 import           Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpphsOptions,
                                             parseFileWithCommentsAndCPP)
 import           Path                      (Abs, File, Path, fromAbsFile, (-<.>))
 import           System.Directory          (removeFile)
 
 import           Importify.ParseException  (ModuleParseException, prettyParseResult)
-import           Importify.Syntax          (modulePragmas)
+import           Importify.Syntax          (debugLabel, modulePragmas)
 
 -- | Parse module after preproccessing this module with possibly
 -- custom preprocessor. It first calls parsing with CPP, then reads
