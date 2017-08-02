@@ -73,7 +73,7 @@ doCache preserveSources explicitDependencies = do
     doInsideDir importifyPath $
         () <$ cacheDependenciesWith importifyPath
                                     identity
-                                    (unpackThenResolveModulesMap preserveSources)
+                                    (unpackCacher preserveSources)
                                     explicitDependencies
 
 cacheProject :: Bool -> LocalPackages -> RemotePackages -> IO ()
@@ -92,16 +92,13 @@ cacheProject preserveSources (LocalPackages locals) (RemotePackages remotes) = d
                     " dependencies from Hackage: "#|listF hackageDependencies|#""
         hackageMaps <- cacheDependenciesWith importifyPath
                                              identity
-                                             (unpackThenResolveModulesMap preserveSources)
+                                             (unpackCacher preserveSources)
                                              hackageDependencies
 
         -- 2. Unpack all remote non-hackage dependencies (e.g. from GitHub)
         remoteMaps <- cacheDependenciesWith importifyPath
                                             pkgName
-                                            (\path pkg -> cachePackage path
-                                                                       (qpPath pkg)
-                                                                       (pkgName pkg)
-                                                                       False)
+                                            remoteCacher
                                             remotes
 
         -- 3. Unpack finally all local packages
@@ -173,12 +170,13 @@ cacheDependenciesWith
     dependencyResolver :: d -> IO ModulesMap
     dependencyResolver = resolver importifyPath
 
-unpackThenResolveModulesMap
+-- | This function is passed to 'cacheDependenciesWith' for Hackage dependencies.
+unpackCacher
     :: Bool
     -> Path Abs Dir
     -> Text
     -> IO ModulesMap
-unpackThenResolveModulesMap preserve importifyPath libName = do
+unpackCacher preserve importifyPath libName = do
     _exitCode <- shell ("stack unpack " <> libName) empty
 
     let stringLibName         = toString libName
@@ -194,6 +192,13 @@ unpackThenResolveModulesMap preserve importifyPath libName = do
         removeDirectoryRecursive stringLibName
 
     pure packageModules
+
+-- | This function is passed to 'cacheDependenciesWith' for 'RemotePackages'.
+remoteCacher :: Path Abs Dir -> QueryPackage -> IO ModulesMap
+remoteCacher importifyPath package = do
+    let packageName = pkgName package
+    printInfo $ "Caching remote package: " <> packageName
+    cachePackage importifyPath (qpPath package) packageName False
 
 -- | Find .cabal file by given path to package and then collect 'ModulesMap'.
 cachePackage :: Path Abs Dir  -- ^ Path to .importify folder
@@ -213,7 +218,6 @@ cachePackage importifyPath packagePath libName isWorkingProject = do
     createPackageCache packageCabalDesc
                        packagePath
                        symbolsCachePath
-                       [LibraryId]
                        libName
                        isWorkingProject
 
@@ -227,8 +231,6 @@ createPackageCache :: GenericPackageDescription
                    -> Path Abs Dir
                    -- ^ Absolute path to .importify/symbols
                    -- [IMRF-70]: this should be removed after introducing ReaderT
-                   -> [TargetId]
-                   -- ^ List of targets that should be cached
                    -> Text
                    -- ^ Package name with version
                    -> Bool
@@ -238,7 +240,6 @@ createPackageCache
     packageCabalDesc
     packagePath
     symbolsCachePath
-    targetIds
     packageName
     isWorkingProject
   = do
@@ -260,6 +261,9 @@ createPackageCache
     ghcIncludeDir <- runMaybeT ghcIncludePath
 
     let moduleToTargetPairs = HM.toList targetMap
+    let targetIds = if isWorkingProject
+                    then packageTargets packageCabalDesc
+                    else [LibraryId]
     concatForM targetIds $ \targetId -> do
         let thisTargetModules = map fst
                               $ filter ((== targetId) . snd) moduleToTargetPairs
