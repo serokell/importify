@@ -15,10 +15,13 @@ import           Data.Aeson.Encode.Pretty        (encodePretty)
 import qualified Data.ByteString.Lazy            as LBS (writeFile)
 import qualified Data.HashMap.Strict             as HM
 import           Data.List                       (notElem)
+import           Data.Maybe                      (fromJust)
 import           Data.Version                    (showVersion)
 
 import           Distribution.PackageDescription (BuildInfo (includeDirs), GenericPackageDescription (packageDescription),
-                                                  PackageDescription (package))
+                                                  PackageDescription (package),
+                                                  condLibrary, condTreeData, cppOptions,
+                                                  libBuildInfo)
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
                                                   indent, listF, ( #| ), (|#))
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
