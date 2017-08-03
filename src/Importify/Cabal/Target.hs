@@ -23,8 +23,12 @@ module Importify.Cabal.Target
 
 import           Universum                       hiding (fromString)
 
-import           Data.Aeson                      (FromJSON (..), FromJSONKey, ToJSON (..),
-                                                  ToJSONKey, Value (String), withText)
+import           Data.Aeson                      (FromJSON (parseJSON),
+                                                  FromJSONKey (fromJSONKey),
+                                                  FromJSONKeyFunction (FromJSONKeyTextParser),
+                                                  ToJSON (toJSON), ToJSONKey (toJSONKey),
+                                                  Value (String), withText)
+import           Data.Aeson.Types                (Parser, toJSONKeyText)
 import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.Text                       as T (split)
@@ -58,6 +62,9 @@ instance Hashable TargetId
 instance ToJSON TargetId where
     toJSON = String . targetIdDir
 
+instance ToJSONKey TargetId where
+    toJSONKey = toJSONKeyText targetIdDir
+
 -- | Directory name for corresponding target.
 targetIdDir :: TargetId -> Text
 targetIdDir LibraryId               = "library"
@@ -66,17 +73,20 @@ targetIdDir (TestSuiteId testName)  = "test-suite@" <> testName
 targetIdDir (BenchmarkId benchName) = "benchmark@"  <> benchName
 
 instance FromJSON TargetId where
-    parseJSON = withText "targetId" $ \targetText -> do
-        let targetName = T.split (== '@') targetText
-        case targetName of
-           ["library"]              -> pure   LibraryId
-           ["executable", exeName]  -> pure $ ExecutableId exeName
-           ["test-suite", testName] -> pure $ TestSuiteId testName
-           ["benchmark", benchName] -> pure $ BenchmarkId benchName
-           _ -> fail $ "Unexpected target: " ++ toString targetText
+    parseJSON = withText "targetId" targetIdParser
 
-instance   ToJSONKey TargetId
-instance FromJSONKey TargetId
+instance FromJSONKey TargetId where
+    fromJSONKey = FromJSONKeyTextParser targetIdParser
+
+targetIdParser :: Text -> Parser TargetId
+targetIdParser targetText = do
+    let targetName = T.split (== '@') targetText
+    case targetName of
+        ["library"]              -> pure   LibraryId
+        ["executable", exeName]  -> pure $ ExecutableId exeName
+        ["test-suite", testName] -> pure $ TestSuiteId testName
+        ["benchmark", benchName] -> pure $ BenchmarkId benchName
+        _                        -> fail $ "Unexpected target: " ++ toString targetText
 
 -- | Extract every 'TargetId' for given project description.
 packageTargets :: GenericPackageDescription -> [TargetId]
