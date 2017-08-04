@@ -2,7 +2,8 @@
 -- other miscellaneous stuff in .cabal files.
 
 module Importify.Cabal.Package
-       ( packageDependencies
+       ( extractFromTargets
+       , packageDependencies
        , readCabal
        ) where
 

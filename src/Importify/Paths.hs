@@ -1,5 +1,6 @@
-{-# LANGUAGE QuasiQuotes   #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE QuasiQuotes    #-}
+{-# LANGUAGE TypeOperators  #-}
 
 -- | This module contains common utilities for working with importify cache.
 
@@ -13,8 +14,6 @@ module Importify.Paths
        , modulesPath
        , symbolsDir
        , symbolsPath
-       , targetsFile
-       , targetsPath
        , testDataPath
        , testDataDir
 
@@ -29,6 +28,7 @@ import           Universum
 
 import           Data.Aeson           (FromJSON, eitherDecodeStrict)
 import qualified Data.ByteString      as BS (readFile)
+import           Fmt                  (( #| ), (|#))
 import           Path                 (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
                                        fromRelFile, parseAbsDir, parseRelFile, reldir,
                                        relfile, (</>))
@@ -50,11 +50,6 @@ modulesPath = [relfile|modules|]
 symbolsPath :: Path Rel Dir
 symbolsPath = [reldir|symbols/|]
 
--- | Path to JSON-encoded Map from project module name to
--- its target (i.e. __library__, __executable__).
-targetsPath :: Path Rel File
-targetsPath = [relfile|targets|]
-
 -- | Path to golden tests.
 testDataPath :: Path Rel Dir
 testDataPath = [reldir|test/test-data/|]
@@ -63,12 +58,11 @@ testDataPath = [reldir|test/test-data/|]
 extensionsPath :: Path Rel File
 extensionsPath = [relfile|extensions|]
 
-cacheDir, extensionsFile, modulesFile, symbolsDir, targetsFile, testDataDir :: FilePath
+cacheDir, extensionsFile, modulesFile, symbolsDir, testDataDir :: FilePath
 cacheDir       = fromRelDir  cachePath
 extensionsFile = fromRelFile extensionsPath
 modulesFile    = fromRelFile modulesPath
 symbolsDir     = fromRelDir  symbolsPath
-targetsFile    = fromRelFile targetsPath
 testDataDir    = fromRelDir  testDataPath
 
 -- | Get absolute path to given directory.
@@ -102,22 +96,21 @@ doInsideDir dir action = do
 
 -- | Tries to read file and then 'decode' it. If either of two phases
 -- fails then 'mempty' returned and warning is printed to console.
-decodeFileOrMempty :: (FromJSON t, Monoid m) => FilePath -> (t -> IO m) -> IO m
+decodeFileOrMempty :: forall t m .
+                      (FromJSON t, Monoid m)
+                   => FilePath     -- ^ Path to json data
+                   -> (t -> IO m)  -- ^ Action from decoded value
+                   -> IO m
 decodeFileOrMempty file onDecodedContent = do
     let textFile = toText file
 
     isFileExist <- doesFileExist file
     if isFileExist then
         eitherDecodeStrict <$> BS.readFile file >>= \case
-            Left msg -> do
-                printWarning $ textFile
-                            <> " decoded incorrectly because of: "
-                            <> toText msg
-                return mempty
             Right value -> onDecodedContent value
+            Left msg    -> do
+              let warning = textFile|#" decoded incorrectly because of: "#|msg|#""
+              mempty <$ printWarning warning
     else do
-        let msg = textFile
-               <> " doesn't exist: "
-               <> "caching first time or previous caching failed"
-        printNotice msg
-        return mempty
+        let msg = textFile|#" doesn't exist: caching first time or previous caching failed"
+        mempty <$ printNotice msg

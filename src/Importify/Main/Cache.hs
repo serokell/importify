@@ -15,46 +15,43 @@ import           Data.Aeson.Encode.Pretty        (encodePretty)
 import qualified Data.ByteString.Lazy            as LBS (writeFile)
 import qualified Data.HashMap.Strict             as HM
 import           Data.List                       (notElem)
-import           Data.Maybe                      (fromJust)
-import           Data.Version                    (showVersion)
 
-import           Distribution.PackageDescription (BuildInfo (includeDirs), GenericPackageDescription (packageDescription),
-                                                  PackageDescription (package),
-                                                  condLibrary, condTreeData, cppOptions,
-                                                  libBuildInfo)
+import           Distribution.PackageDescription (BuildInfo (includeDirs),
+                                                  GenericPackageDescription)
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
-                                                  indent, listF, ( #| ), (|#))
+                                                  indent, listF, ( #| ), ( #|| ), (|#),
+                                                  (||#))
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
-import           Path                            (Abs, Dir, File, Path, Rel, fromAbsDir,
-                                                  fromAbsFile, fromRelDir, fromRelFile,
-                                                  parseAbsFile, parseRelDir, parseRelFile,
-                                                  (</>))
+import           Path                            (Abs, Dir, File, Path, fromAbsDir,
+                                                  fromAbsFile, fromRelDir, parseAbsFile,
+                                                  parseRelDir, parseRelFile, (</>))
 import           System.Directory                (createDirectoryIfMissing,
-                                                  doesDirectoryExist, getCurrentDirectory,
+                                                  doesDirectoryExist,
                                                   removeDirectoryRecursive)
-import           System.FilePath                 (dropExtension)
 import           Turtle                          (shell)
 
 import           Extended.System.Wlog            (printDebug, printInfo, printWarning)
-import           Importify.Cabal                 (ModulesMap, TargetId (LibraryId),
+import           Importify.Cabal                 (ModulesBundle (..), ModulesMap,
+                                                  TargetId (LibraryId),
                                                   buildInfoExtensions,
-                                                  extractTargetBuildInfo, getMapBundle,
-                                                  packageDependencies, packageTargets,
+                                                  extractTargetBuildInfo,
+                                                  extractTargetsMap, packageDependencies,
+                                                  packageExtensions, packageTargets,
                                                   readCabal, targetIdDir,
                                                   withHarmlessExtensions)
 import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny)
 import           Importify.Paths                 (cachePath, decodeFileOrMempty,
-                                                  doInsideDir, extensionsFile,
+                                                  doInsideDir, extensionsPath,
                                                   findCabalFile, getCurrentPath,
-                                                  modulesFile, symbolsPath, targetsFile)
+                                                  modulesFile, symbolsPath)
 import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
 import           Importify.Stack                 (LocalPackages (..), QueryPackage (..),
                                                   RemotePackages (..), ghcIncludePath,
                                                   pkgName, stackListDependencies,
                                                   stackListPackages, upgradeWithVersions)
-import           Importify.Syntax                (debugAST, debugLabel, getModuleTitle)
+import           Importify.Syntax                (getModuleTitle)
 
 -- | Caches packages information into local .importify directory.
 doCache :: Bool -> [Text] -> IO ()
@@ -158,7 +155,7 @@ cacheDependenciesWith
     go (d:ds) = do
         let depName = dependencyName d
         isAlreadyCached depName >>= \case
-            True  -> printDebug (depName <> " is already cached") *> go ds
+            True  -> printDebug (depName|#" is already cached") *> go ds
             False -> liftM2 (:) (dependencyResolver d) (go ds)
 
     isAlreadyCached :: Text -> IO Bool
@@ -248,28 +245,31 @@ createPackageCache
     let packageCachePath = symbolsCachePath </> packageNamePath
     createDirectoryIfMissing True $ fromAbsDir packageCachePath
 
+
     -- Maps from full path to target and from target to list of extensions
-    (targetMap, extensionsMap) <- getMapBundle packagePath packageCabalDesc
+    targetsMap <- extractTargetsMap packagePath packageCabalDesc
 
+    let targetIds = if isWorkingProject
+                    then packageTargets packageCabalDesc
+                    else [LibraryId]
 
-    -- Cache MapBundle only for working project
+    -- Cache and store extensions only for working project inside package directory
     when isWorkingProject $ do
-        LBS.writeFile targetsFile    $ encodePretty targetMap
-        LBS.writeFile extensionsFile $ encodePretty extensionsMap
+        let extensionsMap    = packageExtensions targetIds packageCabalDesc
+        let pathToExtensions = packageCachePath </> extensionsPath
+        LBS.writeFile (fromAbsFile pathToExtensions) $ encodePretty extensionsMap
 
     -- [IMRF-70]: move this to ReaderT config
     ghcIncludeDir <- runMaybeT ghcIncludePath
 
-    let moduleToTargetPairs = HM.toList targetMap
-    let targetIds = if isWorkingProject
-                    then packageTargets packageCabalDesc
-                    else [LibraryId]
+    let moduleToTargetPairs = HM.toList targetsMap
     concatForM targetIds $ \targetId -> do
         let thisTargetModules = map fst
                               $ filter ((== targetId) . snd) moduleToTargetPairs
         targetPaths <- mapM parseAbsFile thisTargetModules
 
-        let targetInfo = fromMaybe (error $ "No such target: " <> show targetId)
+        -- TODO: implement Buildable for targetId
+        let targetInfo = fromMaybe (error $ "No such target: "#||targetId||#"")
                        $ extractTargetBuildInfo targetId packageCabalDesc
 
         (errors, targetModules) <- parseTargetModules packagePath
@@ -286,16 +286,17 @@ createPackageCache
         let moduleToPathMap = HM.fromList $ map (first getModuleTitle) targetModules
         let resolvedModules = resolveModules $ map fst targetModules
         fmap HM.fromList $ forM resolvedModules $ \( ModuleName () moduleTitle
-                                                  , resolvedSymbols) -> do
+                                                   , resolvedSymbols) -> do
             modSymbolsPath     <- parseRelFile $ moduleTitle ++ ".symbols"
             let moduleCachePath = packageTargetPath </> modSymbolsPath
 
             -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
             writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
-            let modulePath = fromMaybe (error $ toText $ "Unknown module: " ++ moduleTitle)
+            let modulePath = fromMaybe (error $ "Unknown module: "#|moduleTitle|#"")
                            $ HM.lookup moduleTitle moduleToPathMap
-            pure (fromAbsFile modulePath, (packageName, moduleTitle))
+            let bundle     = ModulesBundle packageName moduleTitle targetId
+            pure (fromAbsFile modulePath, bundle)
 
 parseTargetModules :: Path Abs Dir    -- ^ Path like @~/.../.importify/containers-0.5@
                    -> [Path Abs File] -- ^ Paths to modules

@@ -89,6 +89,7 @@ library
                        LambdaCase
                        NoImplicitPrelude
                        OverloadedStrings
+                       PartialTypeSignatures
                        RecordWildCards
 
 executable importify

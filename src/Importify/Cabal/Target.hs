@@ -8,15 +8,15 @@ module Importify.Cabal.Target
        ( -- * Maps from modules paths to cache parts
          ExtensionsMap
        , ModulesMap
-       , TargetsMap
-       , MapBundle
 
-         -- * Type for target id
-       , TargetId (..)
+         -- * Target types
+       , ModulesBundle (..)
+       , TargetId      (..)
 
          -- * Utilities to extract targets
        , extractTargetBuildInfo
-       , getMapBundle
+       , extractTargetsMap
+       , packageExtensions
        , packageTargets
        , targetIdDir
        ) where
@@ -27,7 +27,8 @@ import           Data.Aeson                      (FromJSON (parseJSON),
                                                   FromJSONKey (fromJSONKey),
                                                   FromJSONKeyFunction (FromJSONKeyTextParser),
                                                   ToJSON (toJSON), ToJSONKey (toJSONKey),
-                                                  Value (String), withText)
+                                                  Value (String), object, withObject,
+                                                  withText, (.:), (.=))
 import           Data.Aeson.Types                (Parser, toJSONKeyText)
 import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HM
@@ -39,22 +40,21 @@ import           Distribution.PackageDescription (Benchmark (..), BenchmarkInter
                                                   GenericPackageDescription (..),
                                                   Library (..), TestSuite (..),
                                                   TestSuiteInterface (..), condTreeData)
-import           Language.Haskell.Extension      (Extension (..))
+import           Language.Haskell.Exts           (prettyExtension)
 import           Path                            (Abs, Dir, File, Path, fromAbsFile)
 
-import           Importify.Cabal.Extension       (showExt)
+import           Importify.Cabal.Extension       (buildInfoExtensions)
 import           Importify.Cabal.Module          (modulePaths)
 
 -- | Mapping from module path to its package and module name.
-type    ModulesMap = HashMap FilePath (Text, String)
-type    TargetsMap = HashMap FilePath TargetId
-type ExtensionsMap = HashMap TargetId [String]
-type MapBundle     = (TargetsMap, ExtensionsMap)
+type    ModulesMap = HashMap FilePath ModulesBundle  -- cached globally
+type    TargetsMap = HashMap FilePath TargetId       -- not cached
+type ExtensionsMap = HashMap TargetId [String]       -- cached per project package
 
 data TargetId = LibraryId
-              | ExecutableId Text
-              | TestSuiteId  Text
-              | BenchmarkId  Text
+              | ExecutableId !Text
+              | TestSuiteId  !Text
+              | BenchmarkId  !Text
               deriving (Show, Eq, Generic)
 
 instance Hashable TargetId
@@ -88,6 +88,28 @@ targetIdParser targetText = do
         ["benchmark", benchName] -> pure $ BenchmarkId benchName
         _                        -> fail $ "Unexpected target: " ++ toString targetText
 
+-- | All data for given module. This is needed to locate all required
+-- information about module by its path.
+data ModulesBundle = ModulesBundle
+    { mbPackage :: !Text      -- ^ Module package, like @importify-1.0@
+    , mbModule  :: !String    -- ^ Full module name, like @Importify.Main@
+    , mbTarget  :: !TargetId  -- ^ Target of module
+    } deriving (Show)
+
+instance ToJSON ModulesBundle where
+    toJSON ModulesBundle{..} = object
+        [ "package" .= mbPackage
+        , "module"  .= mbModule
+        , "target"  .= mbTarget
+        ]
+
+instance FromJSON ModulesBundle where
+    parseJSON = withObject "ModulesBundle" $ \obj -> do
+        mbPackage <- obj .: "package"
+        mbModule  <- obj .: "module"
+        mbTarget  <- obj .: "target"
+        pure ModulesBundle{..}
+
 -- | Extract every 'TargetId' for given project description.
 packageTargets :: GenericPackageDescription -> [TargetId]
 packageTargets GenericPackageDescription{..} =
@@ -120,16 +142,26 @@ findTargetBuildInfo :: (target -> info)
 findTargetBuildInfo toInfo name = fmap (toInfo . condTreeData . snd)
                                 . find ((== name) . toText . fst)
 
-getMapBundle :: Path Abs Dir -> GenericPackageDescription -> IO MapBundle
-getMapBundle projectPath GenericPackageDescription{..} = do
-    (libTM,    libEM)    <- libMaps
-    (exeTMs,   exeEMs)   <- exeMaps
-    (testTMs,  testEMs)  <- testMaps
-    (benchTMs, benchEMs) <- benchMaps
+-- | Extracts mapping from each package target to its extensions enabled by default.
+packageExtensions :: [TargetId] -> GenericPackageDescription -> ExtensionsMap
+packageExtensions targetIds desc = mconcat $ mapMaybe targetToExtensions targetIds
+  where
+    targetToExtensions :: TargetId -> Maybe ExtensionsMap
+    targetToExtensions targetId = toMap targetId <$> extractTargetBuildInfo targetId desc
 
-    return ( HM.unions $ libTM : exeTMs ++ testTMs ++ benchTMs
-           , HM.unions $ libEM : exeEMs ++ testEMs ++ benchEMs
-           )
+    toMap :: TargetId -> BuildInfo -> ExtensionsMap
+    toMap targetId info = one (targetId, map prettyExtension $ buildInfoExtensions info)
+
+-- | This function extracts 'ModulesMap' from given package by given
+-- full path to project root directory.
+extractTargetsMap :: Path Abs Dir -> GenericPackageDescription -> IO TargetsMap
+extractTargetsMap projectPath GenericPackageDescription{..} = do
+    libTM    <- libMap
+    exeTMs   <- exeMaps
+    testTMs  <- testMaps
+    benchTMs <- benchMaps
+
+    return $ HM.unions $ libTM : exeTMs ++ testTMs ++ benchTMs
   where
     projectPaths :: BuildInfo -> Either [ModuleName] FilePath -> IO [Path Abs File]
     projectPaths = modulePaths projectPath
@@ -151,53 +183,46 @@ getMapBundle projectPath GenericPackageDescription{..} = do
         BenchmarkExeV10 _ path -> Right path
         BenchmarkUnsupported _ -> Left []
 
-    libMaps :: IO MapBundle
-    libMaps = maybe mempty
-                    ( collectTargetMaps libPaths
-                                        libBuildInfo
-                                        LibraryId
-                    . condTreeData)
-                    condLibrary
-    exeMaps :: IO ([TargetsMap], [ExtensionsMap])
+    libMap :: IO TargetsMap
+    libMap = maybe mempty
+                   ( collectTargetsMap libPaths
+                                       LibraryId
+                   . condTreeData)
+                   condLibrary
+
+    exeMaps :: IO [TargetsMap]
     exeMaps = collectTargetsListMaps condExecutables
                                      ExecutableId
-                                     (collectTargetMaps exePaths buildInfo)
+                                     (collectTargetsMap exePaths)
 
-    testMaps :: IO ([TargetsMap], [ExtensionsMap])
+    testMaps :: IO [TargetsMap]
     testMaps = collectTargetsListMaps condTestSuites
                                       TestSuiteId
-                                      (collectTargetMaps testPaths testBuildInfo)
+                                      (collectTargetsMap testPaths)
 
-    benchMaps :: IO ([TargetsMap], [ExtensionsMap])
+    benchMaps :: IO [TargetsMap]
     benchMaps = collectTargetsListMaps condBenchmarks
                                        BenchmarkId
-                                       (collectTargetMaps benchPaths benchmarkBuildInfo)
+                                       (collectTargetsMap benchPaths)
 
 
--- | Generalized 'MapBundle' collector for executables, testsuites and
--- benchmakrs parts of package.
+-- | Generalized 'TargetsMap' collector for executables, testsuites and
+-- benchmakrs of package.
 collectTargetsListMaps :: [(String, CondTree v c target)]
                        -> (Text -> TargetId)
-                       -> (TargetId -> target -> IO MapBundle)
-                       -> IO ([TargetsMap], [ExtensionsMap])
-collectTargetsListMaps treeList idConstructor mapBundler = do
-    bundles <- forM treeList $ \(name, condTree) ->
+                       -> (TargetId -> target -> IO TargetsMap)
+                       -> IO [TargetsMap]
+collectTargetsListMaps treeList idConstructor mapBundler =
+    forM treeList $ \(name, condTree) ->
         mapBundler (idConstructor $ toText name) $ condTreeData condTree
-    return $ unzip bundles
 
-collectTargetMaps :: (target -> IO [Path Abs File])
-                  -> (target -> BuildInfo)
+collectTargetsMap :: (target -> IO [Path Abs File])
                   -> TargetId
                   -> target
-                  -> IO MapBundle
-collectTargetMaps modulePathsExtractor buildInfoExtractor id target = do
+                  -> IO TargetsMap
+collectTargetsMap modulePathsExtractor targetId target = do
     pathsToModules <- modulePathsExtractor target
-    return $ collectModuleMaps id
-                               (map fromAbsFile pathsToModules)
-                               (defaultExtensions $ buildInfoExtractor target)
-
-collectModuleMaps :: TargetId -> [FilePath] -> [Extension] -> MapBundle
-collectModuleMaps targetId modules extensions =
-    ( HM.fromList $ map (, targetId) modules
-    , one (targetId, map showExt extensions)
-    )
+    return $ constructModulesMap (map fromAbsFile pathsToModules)
+  where
+    constructModulesMap :: [FilePath] -> TargetsMap
+    constructModulesMap = HM.fromList . map (, targetId)

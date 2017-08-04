@@ -32,7 +32,6 @@ import           Turtle               (Line, Shell, inproc, lineToText, linesToT
 import qualified Turtle               (fold)
 
 import           Extended.System.Wlog (printWarning)
-import           Importify.Syntax     (debugAST)
 
 shStack :: [Text] -> Shell Line
 shStack args = inproc "stack" args empty

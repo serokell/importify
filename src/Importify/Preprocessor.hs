@@ -12,7 +12,6 @@ module Importify.Preprocessor
 import           Universum
 
 import qualified Autoexporter              (mainWithArgs)
-import           Control.Exception.Base    (ErrorCall)
 import           Language.Haskell.Exts     (Extension, Module,
                                             ModulePragma (OptionsPragma),
                                             ParseMode (extensions), SrcSpanInfo,
@@ -23,7 +22,7 @@ import           Path                      (Abs, File, Path, fromAbsFile, (-<.>)
 import           System.Directory          (removeFile)
 
 import           Importify.ParseException  (ModuleParseException (MPE), prettyParseResult)
-import           Importify.Syntax          (debugLabel, modulePragmas)
+import           Importify.Syntax          (modulePragmas)
 
 -- | Parse module after preproccessing this module with possibly
 -- custom preprocessor. It first calls parsing with CPP, then reads
