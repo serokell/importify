@@ -42,8 +42,8 @@ data SingleFileOptions = SingleFileOptions
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
-    { ccoPreserve     :: !Bool     -- ^ Don't delete downloaded package cache
-    , ccoDependencies :: ![String] -- ^ Use specified dependencies overriding .cabal ones
+    { ccoPreserve     :: !Bool    -- ^ Don't delete downloaded package cache
+    , ccoDependencies :: ![Text]  -- ^ Use specified dependencies overriding .cabal ones
     } deriving (Show)
 
 cliArgumentsParser :: Parser ImportifyCliArgs
@@ -98,7 +98,7 @@ cacheParser = do
       $ long "preserve"
      <> short 'p'
      <> help "Don't remove downloaded package cache"
-    ccoDependencies <- many $ strOption
+    ccoDependencies <- fmap (map toText) $ many $ strOption
       $ metavar "[STRING]"
      <> long "dependency"
      <> short 'd'

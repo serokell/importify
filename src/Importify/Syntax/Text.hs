@@ -2,7 +2,8 @@
 
 module Importify.Syntax.Text
        ( stripEndLineComment
-       , debugAST
+       , debugAST    -- TODO: move into Extended.Debug*
+       , debugLabel  -- TODO: move into Extended.Debug*
        ) where
 
 import           Universum
@@ -18,9 +19,7 @@ stripEndLineComment line = case T.breakOnAll "--" line of
     ((stripped,_):_) -> stripped
 
 -- | Helper function to debug different parts of AST processing.
---
--- TODO: better utility with logging?
-{-# WARNING debugAST "'debugAst' remains in code" #-}
+{-# WARNING debugAST "'debugAST' remains in code" #-}
 debugAST :: Show a => Text -> a -> IO ()
 debugAST header msg = do
     let preamble = "-------------------- // " <> header <> " // --------------------\n"
@@ -33,3 +32,10 @@ debugAST header msg = do
   where
     lineNumber :: Int -> Text
     lineNumber = fmt . padLeftF 4 ' '  -- padding 4 should be enough (no bigger 9999)
+
+-- | Helper function to print labels to discover error position.
+{-# WARNING debugLabel "'debugLabel' remains in code" #-}
+debugLabel :: Text -> IO ()
+debugLabel label = do
+    let surroundedLabel = "##################### " <> label <> " #####################"
+    putText surroundedLabel

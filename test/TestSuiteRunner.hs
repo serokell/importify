@@ -38,7 +38,6 @@ makeTestGroup testDir = do
     testDirPaths     <- runIO $ mapM parseRelFile =<<
                                 listDirectory (fromRelDir testCasesPath)
     let testHsOnly = sort $ filter ((== ".hs") . fileExtension) testDirPaths
-
     describe ("subfolder: " ++ testDir) $ mapM_ (makeTest testCasesPath) testHsOnly
 
 makeTest :: Path Rel Dir -> Path Rel File -> Spec
