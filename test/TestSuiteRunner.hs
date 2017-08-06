@@ -4,26 +4,27 @@ module Main where
 
 import           Universum
 
-import           Data.Algorithm.Diff  (Diff (Both), getDiff)
-import           Data.List            (partition, sort)
-import           Path                 (Dir, File, Path, Rel, fileExtension, fromRelDir,
-                                       fromRelFile, parseRelDir, parseRelFile, (-<.>),
-                                       (</>))
-import           System.Directory     (listDirectory)
-import           System.Environment   (withArgs)
-import           System.Wlog          (Severity (Info))
+import           Data.Algorithm.Diff   (Diff (Both), getDiff)
+import           Data.List             (partition, sort)
+import           Path                  (Dir, File, Path, Rel, fileExtension, fromRelDir,
+                                        fromRelFile, parseRelDir, parseRelFile, (-<.>),
+                                        (</>))
+import           System.Directory      (listDirectory)
+import           System.Environment    (withArgs)
+import           System.Wlog           (Severity (Info))
 
-import           Test.Hspec           (Spec, describe, hspec, it, runIO, shouldBe, xit)
+import           Test.Hspec            (Spec, describe, hspec, it, runIO, shouldBe, xit)
 
-import           Extended.System.Wlog (initImportifyLogger)
-import           Importify.Main       (doCache, doSource)
-import           Importify.Paths      (testDataPath)
+import           Extended.System.Wlog  (initImportifyLogger)
+import           Importify.Environment (runCache)
+import           Importify.Main        (doCacheProject, doSource)
+import           Importify.Path        (testDataPath)
 
 main :: IO ()
 main = do
     (cacheArgs, hspecArgs) <- splitCmdOptions <$> getArgs
     initImportifyLogger Info
-    when (null cacheArgs) $ doCache False []
+    when (null cacheArgs) $ runCache False doCacheProject
 
     testFolders <- listDirectory (fromRelDir testDataPath)
     withArgs hspecArgs $ hspec $ mapM_ makeTestGroup testFolders

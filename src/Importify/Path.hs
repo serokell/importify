@@ -1,13 +1,14 @@
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE QuasiQuotes    #-}
-{-# LANGUAGE TypeOperators  #-}
+{-# LANGUAGE ExplicitForAll   #-}
+{-# LANGUAGE QuasiQuotes      #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators    #-}
 
 -- | This module contains common utilities for working with importify cache.
 
-module Importify.Paths
+module Importify.Path
        ( -- * Predefined directories
-         cacheDir
-       , cachePath
+         importifyDir
+       , importifyPath
        , extensionsFile
        , extensionsPath
        , modulesFile
@@ -40,8 +41,8 @@ import           Turtle               (cd, pwd)
 
 import           Extended.System.Wlog (printNotice, printWarning)
 
-cachePath :: Path Rel Dir
-cachePath = [reldir|.importify/|]
+importifyPath :: Path Rel Dir
+importifyPath = [reldir|.importify/|]
 
 -- | Path to file that stores mapping from module names to their packages.
 modulesPath :: Path Rel File
@@ -58,8 +59,8 @@ testDataPath = [reldir|test/test-data/|]
 extensionsPath :: Path Rel File
 extensionsPath = [relfile|extensions|]
 
-cacheDir, extensionsFile, modulesFile, symbolsDir, testDataDir :: FilePath
-cacheDir       = fromRelDir  cachePath
+importifyDir, extensionsFile, modulesFile, symbolsDir, testDataDir :: FilePath
+importifyDir   = fromRelDir  importifyPath
 extensionsFile = fromRelFile extensionsPath
 modulesFile    = fromRelFile modulesPath
 symbolsDir     = fromRelDir  symbolsPath
@@ -72,8 +73,8 @@ getCurrentPath = do
     parseAbsDir thisDirectory
 
 -- | Returns relative path to cabal file under given directory.
-findCabalFile :: Path Abs Dir -> IO $ Maybe $ Path Abs File
-findCabalFile projectPath = do
+findCabalFile :: MonadIO m => Path Abs Dir -> m $ Maybe $ Path Abs File
+findCabalFile projectPath = liftIO $ do
     projectDirectoryContent <- listDirectory $ fromAbsDir projectPath
     let cabalFiles           = filter ((== ".cabal") . takeExtension)
                                       projectDirectoryContent
@@ -81,32 +82,32 @@ findCabalFile projectPath = do
     return $ fmap (projectPath </>) cabalFilePath
 
 createCacheDir :: Path Abs Dir -> IO ()
-createCacheDir importifyPath = do
-    let importifyDir = fromAbsDir importifyPath
-    createDirectoryIfMissing True importifyDir -- creates ./.importify
+createCacheDir cachePath = do
+    let cacheDir = fromAbsDir cachePath
+    createDirectoryIfMissing True cacheDir -- creates ./.importify
 
 -- | Create given directory and perform given action inside it.
-doInsideDir :: Path Abs Dir -> IO () -> IO ()
+doInsideDir :: (MonadIO m, MonadMask m) => Path Abs Dir -> m () -> m ()
 doInsideDir dir action = do
     thisDirectory <- pwd
-    bracket_ (do createCacheDir dir
-                 cd $ fromString $ fromAbsDir dir)
+    bracket_ (liftIO $ do createCacheDir dir
+                          cd $ fromString $ fromAbsDir dir)
              (cd thisDirectory)
              action
 
 -- | Tries to read file and then 'decode' it. If either of two phases
 -- fails then 'mempty' returned and warning is printed to console.
-decodeFileOrMempty :: forall t m .
-                      (FromJSON t, Monoid m)
-                   => FilePath     -- ^ Path to json data
-                   -> (t -> IO m)  -- ^ Action from decoded value
-                   -> IO m
+decodeFileOrMempty :: forall t m f .
+                      (FromJSON t, Monoid m, MonadIO f)
+                   => FilePath    -- ^ Path to json data
+                   -> (t -> f m)  -- ^ Action from decoded value
+                   -> f m
 decodeFileOrMempty file onDecodedContent = do
     let textFile = toText file
 
-    isFileExist <- doesFileExist file
+    isFileExist <- liftIO $ doesFileExist file
     if isFileExist then
-        eitherDecodeStrict <$> BS.readFile file >>= \case
+        eitherDecodeStrict <$> (liftIO $ BS.readFile file) >>= \case
             Right value -> onDecodedContent value
             Left msg    -> do
               let warning = textFile|#" decoded incorrectly because of: "#|msg|#""

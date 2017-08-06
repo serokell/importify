@@ -42,7 +42,7 @@ data SingleFileOptions = SingleFileOptions
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
-    { ccoPreserve     :: !Bool    -- ^ Don't delete downloaded package cache
+    { ccoSaveSources  :: !Bool    -- ^ Don't delete downloaded package cache
     , ccoDependencies :: ![Text]  -- ^ Use specified dependencies overriding .cabal ones
     } deriving (Show)
 
@@ -94,7 +94,7 @@ fileParser = do
 
 cacheParser :: Parser Command
 cacheParser = do
-    ccoPreserve <- switch
+    ccoSaveSources <- switch
       $ long "preserve"
      <> short 'p'
      <> help "Don't remove downloaded package cache"

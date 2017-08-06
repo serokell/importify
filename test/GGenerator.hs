@@ -13,7 +13,7 @@ import           System.Directory  (removeFile)
 import           Test.Tasty.Golden (findByExtension, writeBinaryFile)
 
 import           Importify.Main    (doSource)
-import           Importify.Paths   (testDataDir)
+import           Importify.Path    (testDataDir)
 
 main :: IO ()
 main = do

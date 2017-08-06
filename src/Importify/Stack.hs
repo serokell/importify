@@ -1,3 +1,4 @@
+{-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
@@ -73,7 +74,7 @@ guardM f = guard =<< f
 
 -- | Extract all dependencies with versions using
 -- @stack list-dependencies@ shell command.
-stackListDependencies :: IO (HashMap Text Text)
+stackListDependencies :: MonadIO m => m (HashMap Text Text)
 stackListDependencies = do
     dependencies   <- Turtle.fold (shStack depsArgs) Fold.list
     let wordifyDeps = map (words . lineToText) dependencies
@@ -97,7 +98,8 @@ upgradeWithVersions versions = go
 
 -- | Queries list of all local packages for project. If some errors
 -- occur then warning is printed into console and empty list returned.
-stackListPackages :: IO (LocalPackages, RemotePackages)
+stackListPackages :: forall m . (MonadIO m, MonadCatch m)
+                  => m (LocalPackages, RemotePackages)
 stackListPackages = do
     pkgsYaml    <- linesToText <$> Turtle.fold (shStack ["query"]) Fold.list
     let parseRes = decodeEither' $ encodeUtf8 pkgsYaml
@@ -110,12 +112,12 @@ stackListPackages = do
             let (locals, remotes) = partition (isLocalPackage . qpPath) localPackages
             return (LocalPackages locals, RemotePackages remotes)
   where
-    toPackage :: (Text, (FilePath, Text)) -> IO QueryPackage
+    toPackage :: (Text, (FilePath, Text)) -> m QueryPackage
     toPackage (qpName, (path, qpVersion)) = do
         qpPath <- parseAbsDir path
         return QueryPackage{..}
 
-    parseErrorHandler :: PathException -> IO [QueryPackage]
+    parseErrorHandler :: PathException -> m [QueryPackage]
     parseErrorHandler exception =
         [] <$ printWarning ("'stack query' exception: " <> show exception)
 

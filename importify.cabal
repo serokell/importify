@@ -26,11 +26,12 @@ library
                            Importify.Cabal.Module
                            Importify.Cabal.Package
                            Importify.Cabal.Target
+                       Importify.Environment
                        Importify.Main
                            Importify.Main.Cache
                            Importify.Main.File
                        Importify.ParseException
-                       Importify.Paths
+                       Importify.Path
                        Importify.Preprocessor
                        Importify.Pretty
                        Importify.Resolution
@@ -51,6 +52,7 @@ library
   other-modules:       Extended.Data.Bool
                        Extended.Data.List
                        Extended.Data.Str
+                       Extended.Lens.TH
 
   build-depends:       base >= 4.7 && < 5
                      , aeson
@@ -68,10 +70,13 @@ library
                      , haskell-src-exts
                      , hse-cpp
                      , log-warper
+                     , microlens
                      , microlens-mtl
+                     , microlens-th
                      , path
                      , pretty-simple
                      , syb
+                     , template-haskell
                      , text
                      , text-format
                      , turtle
