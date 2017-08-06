@@ -20,8 +20,9 @@ import           Distribution.PackageDescription       (Benchmark (benchmarkBuil
 import           Distribution.PackageDescription.Parse (readPackageDescription)
 import           Distribution.Verbosity                (normal)
 
-readCabal :: FilePath -> IO GenericPackageDescription
-readCabal = readPackageDescription normal
+-- | Parse 'GenericPackageDescription' from given path to .cabal file.
+readCabal :: MonadIO m => FilePath -> m GenericPackageDescription
+readCabal = liftIO . readPackageDescription normal
 
 dependencyName :: Dependency -> String
 dependencyName (Dependency PackageName{..} _) = unPackageName

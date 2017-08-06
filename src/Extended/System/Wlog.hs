@@ -24,24 +24,24 @@ importifyLoggerConfig importifySeverity =
             ltSeverity ?= importifySeverity
 
 -- | Initializes importify logger.
-initImportifyLogger :: Severity -> IO ()
+initImportifyLogger :: MonadIO m => Severity -> m ()
 initImportifyLogger = setupLogging . importifyLoggerConfig
 
 withImportify :: LoggerNameBox m a -> m a
 withImportify = usingLoggerName "importify"
 
 -- | Prints 'System.Wlog.Debug' message.
-printDebug :: Text -> IO ()
-printDebug = withImportify  . logDebug
+printDebug :: MonadIO m => Text -> m ()
+printDebug = liftIO . withImportify  . logDebug
 
 -- | Prints 'Info' message.
-printInfo :: Text -> IO ()
-printInfo = withImportify  . logInfo
+printInfo :: MonadIO m => Text -> m ()
+printInfo = liftIO . withImportify  . logInfo
 
 -- | Prints 'Notice' message.
-printNotice :: Text -> IO ()
-printNotice = withImportify  . logNotice
+printNotice :: MonadIO m => Text -> m ()
+printNotice = liftIO . withImportify  . logNotice
 
 -- | Prints 'Warning' message.
-printWarning :: Text -> IO ()
-printWarning = withImportify . logWarning
+printWarning :: MonadIO m => Text -> m ()
+printWarning = liftIO . withImportify . logWarning

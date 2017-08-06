@@ -28,8 +28,8 @@ import           Path                               (fromAbsFile, fromRelFile,
 
 import           Importify.Cabal                    (ExtensionsMap, ModulesBundle (..),
                                                      ModulesMap, TargetId, targetIdDir)
-import           Importify.Paths                    (cachePath, decodeFileOrMempty,
-                                                     extensionsPath, getCurrentPath,
+import           Importify.Path                     (decodeFileOrMempty, extensionsPath,
+                                                     getCurrentPath, importifyPath,
                                                      modulesPath, symbolsPath)
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedImplicitImports,
@@ -90,7 +90,7 @@ doSource srcFile src = do
 readModulesMap :: IO ModulesMap
 readModulesMap = decodeFileOrMempty modFile pure
   where
-    modFile = fromRelFile $ cachePath </> modulesPath
+    modFile = fromRelFile $ importifyPath </> modulesPath
 
 readExtensions :: FilePath -> ModulesMap -> IO [Extension]
 readExtensions srcFile modulesMap = do
@@ -102,7 +102,7 @@ readExtensions srcFile modulesMap = do
         Just ModulesBundle{..} -> do
             packagePath <- parseRelDir $ toString mbPackage
             let pathToExtensions = projectPath
-                               </> cachePath
+                               </> importifyPath
                                </> symbolsPath
                                </> packagePath
                                </> extensionsPath
@@ -124,7 +124,7 @@ loadEnvironment modulesMap = do
         packagePath     <- parseRelDir  $ toString mbPackage
         symbolsFilePath <- parseRelFile $ mbModule ++ ".symbols"
         targetPath      <- parseRelDir $ toString $ targetIdDir mbTarget
-        let pathToSymbols = cachePath
+        let pathToSymbols = importifyPath
                         </> symbolsPath
                         </> packagePath
                         </> targetPath
