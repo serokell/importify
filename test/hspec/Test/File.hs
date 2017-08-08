@@ -1,6 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Main where
+-- | Tests for @importify file@ command.
+
+module Test.File
+       ( runFileTests
+       ) where
 
 import           Universum
 
@@ -20,8 +24,8 @@ import           Importify.Environment (runCache)
 import           Importify.Main        (doCacheProject, doSource)
 import           Importify.Path        (testDataPath)
 
-main :: IO ()
-main = do
+runFileTests :: IO ()
+runFileTests = do
     (cacheArgs, hspecArgs) <- splitCmdOptions <$> getArgs
     initImportifyLogger Info
     when (null cacheArgs) $ runCache False doCacheProject

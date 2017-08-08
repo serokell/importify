@@ -137,8 +137,9 @@ executable golden-generator
 
 test-suite importify-test
   type:                exitcode-stdio-1.0
-  main-is:             TestSuiteRunner.hs
-  hs-source-dirs:      test
+  hs-source-dirs:      test/hspec
+  main-is:             Runner.hs
+  other-modules:       Test.File
 
   build-depends:       base, importify
                      , Diff
