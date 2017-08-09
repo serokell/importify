@@ -3,38 +3,28 @@
 -- | Tests for @importify file@ command.
 
 module Test.File
-       ( runFileTests
+       ( spec
        ) where
 
 import           Universum
 
-import           Data.Algorithm.Diff   (Diff (Both), getDiff)
-import           Data.List             (partition, sort)
-import           Path                  (Dir, File, Path, Rel, fileExtension, fromRelDir,
-                                        fromRelFile, parseRelDir, parseRelFile, (-<.>),
-                                        (</>))
-import           System.Directory      (listDirectory)
-import           System.Environment    (withArgs)
-import           System.Wlog           (Severity (Info))
+import           Data.Algorithm.Diff (Diff (Both), getDiff)
+import           Data.List           (sort)
+import           Path                (Dir, File, Path, Rel, fileExtension, fromRelDir,
+                                      fromRelFile, parseRelDir, parseRelFile, (-<.>),
+                                      (</>))
+import           System.Directory    (listDirectory)
+import           System.Wlog         (Severity)
 
-import           Test.Hspec            (Spec, describe, hspec, it, runIO, shouldBe, xit)
+import           Test.Hspec          (Spec, describe, it, runIO, shouldBe, xit)
 
-import           Extended.System.Wlog  (initImportifyLogger)
-import           Importify.Environment (runCache)
-import           Importify.Main        (doCacheProject, doSource)
-import           Importify.Path        (testDataPath)
+import           Importify.Main      (doSource)
+import           Importify.Path      (testDataPath)
 
-runFileTests :: IO ()
-runFileTests = do
-    (cacheArgs, hspecArgs) <- splitCmdOptions <$> getArgs
-    initImportifyLogger Info
-    when (null cacheArgs) $ runCache False doCacheProject
-
-    testFolders <- listDirectory (fromRelDir testDataPath)
-    withArgs hspecArgs $ hspec $ mapM_ makeTestGroup testFolders
-
-splitCmdOptions :: [String] -> ([String], [String])
-splitCmdOptions = partition (== "--no-cache")
+spec :: Spec
+spec = do
+    testFolders <- runIO $ listDirectory (fromRelDir testDataPath)
+    describe "file:unused" $ mapM_ makeTestGroup testFolders
 
 makeTestGroup :: FilePath -> Spec
 makeTestGroup testDir = do

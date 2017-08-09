@@ -2,7 +2,28 @@ module Main where
 
 import           Universum
 
-import           Test.File (runFileTests)
+import           Data.List             (partition)
+import           System.Environment    (withArgs)
+import           System.Wlog           (Severity (Info))
+
+import           Test.Hspec            (hspec)
+
+import           Extended.System.Wlog  (initImportifyLogger)
+import           Importify.Environment (runCache)
+import           Importify.Main        (doCacheProject)
+
+import qualified Test.Cache
+import qualified Test.File
 
 main :: IO ()
-main = runFileTests
+main = do
+    (cacheArgs, hspecArgs) <- splitCmdOptions <$> getArgs
+    initImportifyLogger Info
+    when (null cacheArgs) $ runCache False doCacheProject
+
+    withArgs hspecArgs $ hspec $ do
+       Test.Cache.modulesMapSpec
+       Test.File.spec
+
+splitCmdOptions :: [String] -> ([String], [String])
+splitCmdOptions = partition (== "--no-cache")

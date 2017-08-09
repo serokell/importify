@@ -1,5 +1,5 @@
 name:                importify
-version:             0.0.1
+version:             1.0
 synopsis:            Tool for haskell imports refactoring
 description:         Please see README.md
 homepage:            https://github.com/serokell/importify
@@ -70,9 +70,7 @@ library
                      , haskell-src-exts
                      , hse-cpp
                      , log-warper
-                     , microlens
-                     , microlens-mtl
-                     , microlens-th
+                     , microlens-platform
                      , path
                      , pretty-simple
                      , syb
@@ -139,15 +137,19 @@ test-suite importify-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test/hspec
   main-is:             Runner.hs
-  other-modules:       Test.File
+  other-modules:       Test.Cache
+                       Test.File
 
   build-depends:       base, importify
                      , Diff
                      , directory
+                     , filepath
                      , hspec
                      , log-warper
+                     , microlens-platform
                      , path
                      , universum
+                     , unordered-containers
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   if os(linux)

@@ -28,13 +28,12 @@ module Importify.Environment
 
 import           Universum
 
-import           Lens.Micro       (SimpleGetter, to)
-import           Lens.Micro.TH    (makeLensesWith)
-import           Path             (Abs, Dir, Path, (</>))
+import           Lens.Micro.Platform (SimpleGetter, makeLensesWith, to)
+import           Path                (Abs, Dir, Path, (</>))
 
-import           Extended.Lens.TH (fieldsVerboseLensRules)
-import           Importify.Path   (getCurrentPath, importifyPath, symbolsPath)
-import           Importify.Stack  (ghcIncludePath)
+import           Extended.Lens.TH    (fieldsVerboseLensRules)
+import           Importify.Path      (getCurrentPath, importifyPath, symbolsPath)
+import           Importify.Stack     (ghcIncludePath)
 
 -- | 'ReaderT' + 'IO' monad described here:
 -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
