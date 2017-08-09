@@ -9,7 +9,7 @@ import           Universum
 import           Data.Char                  (toUpper)
 import           Data.List                  (stripPrefix)
 import           Language.Haskell.TH.Syntax (Name, mkName, nameBase)
-import           Lens.Micro.TH              (DefName (MethodName), LensRules,
+import           Lens.Micro.Platform        (DefName (MethodName), LensRules,
                                              camelCaseFields, lensField, makeLensesWith)
 
 -- | A field namer for 'fieldsVerboseLensRules'.

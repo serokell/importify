@@ -94,7 +94,7 @@ data ModulesBundle = ModulesBundle
     { mbPackage :: !Text      -- ^ Module package, like @importify-1.0@
     , mbModule  :: !String    -- ^ Full module name, like @Importify.Main@
     , mbTarget  :: !TargetId  -- ^ Target of module
-    } deriving (Show)
+    } deriving (Show, Eq)
 
 instance ToJSON ModulesBundle where
     toJSON ModulesBundle{..} = object

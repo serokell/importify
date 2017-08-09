@@ -10,11 +10,11 @@ module Extended.System.Wlog
 
 import           Universum
 
-import           Lens.Micro.Mtl (zoom, (?=))
-import           System.Wlog    (LoggerConfig, LoggerNameBox, Severity (Warning),
-                                 consoleOutB, lcTree, logDebug, logInfo, logNotice,
-                                 logWarning, ltSeverity, setupLogging, usingLoggerName,
-                                 zoomLogger)
+import           Lens.Micro.Platform (zoom, (?=))
+import           System.Wlog         (LoggerConfig, LoggerNameBox, Severity (Warning),
+                                      consoleOutB, lcTree, logDebug, logInfo, logNotice,
+                                      logWarning, ltSeverity, setupLogging,
+                                      usingLoggerName, zoomLogger)
 
 importifyLoggerConfig :: Severity -> LoggerConfig
 importifyLoggerConfig importifySeverity =

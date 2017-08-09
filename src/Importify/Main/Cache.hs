@@ -25,7 +25,7 @@ import           Fmt                             (Builder, blockListF, build, fm
                                                   (||#))
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
-import           Lens.Micro                      (to)
+import           Lens.Micro.Platform             (to)
 import           Path                            (Abs, Dir, File, Path, fromAbsDir,
                                                   fromAbsFile, fromRelDir, parseAbsFile,
                                                   parseRelDir, parseRelFile, (</>))
@@ -44,19 +44,18 @@ import           Importify.Cabal                 (ModulesBundle (..), ModulesMap
                                                   readCabal, targetIdDir,
                                                   withHarmlessExtensions)
 import           Importify.Environment           (CacheEnvironment, HasGhcIncludeDir,
-                                                  HasPathToImportify,                 RIO,
-                                                  ghcIncludeDir, pathToImportify,
-                                                  pathToSymbols, saveSources)
+                                                  HasPathToImportify, RIO, ghcIncludeDir,
+                                                  pathToImportify, pathToSymbols,
+                                                  saveSources)
 import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny)
 import           Importify.Path                  (decodeFileOrMempty, doInsideDir,
                                                   extensionsPath, findCabalFile,
-                                                                  modulesFile,
-                                                  symbolsPath)
+                                                  modulesFile, symbolsPath)
 import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
 import           Importify.Stack                 (LocalPackages (..), QueryPackage (..),
-                                                  RemotePackages (..),
-                                                  pkgName, stackListDependencies,
+                                                  RemotePackages (..), pkgName,
+                                                  stackListDependencies,
                                                   stackListPackages, upgradeWithVersions)
 import           Importify.Syntax                (getModuleTitle)
 
