@@ -36,7 +36,7 @@ import           Path                 (Abs, Dir, File, Rel, fromAbsDir, fromRelD
 import           Path.Internal        (Path (..))
 import           System.Directory     (createDirectoryIfMissing, doesFileExist,
                                        getCurrentDirectory, listDirectory)
-import           System.FilePath      (takeExtension)
+import           System.FilePath      (combine, takeExtension)
 import           Turtle               (cd, pwd)
 
 import           Extended.System.Wlog (printNotice, printWarning)
@@ -103,15 +103,17 @@ decodeFileOrMempty :: forall t m f .
                    -> (t -> f m)  -- ^ Action from decoded value
                    -> f m
 decodeFileOrMempty file onDecodedContent = do
-    let textFile = toText file
-
     isFileExist <- liftIO $ doesFileExist file
+    curDir      <- liftIO getCurrentDirectory
+    let fullPath = curDir `combine` file
+
     if isFileExist then
         eitherDecodeStrict <$> (liftIO $ BS.readFile file) >>= \case
             Right value -> onDecodedContent value
             Left msg    -> do
-              let warning = textFile|#" decoded incorrectly because of: "#|msg|#""
+              let warning = "File '"#|fullPath|#"' decoded incorrectly because of: "#|msg|#""
               mempty <$ printWarning warning
     else do
-        let msg = textFile|#" doesn't exist: caching first time or previous caching failed"
+        let msg = "File '"#|fullPath|#
+                  "' doesn't exist: caching first time or previous caching failed"
         mempty <$ printNotice msg
