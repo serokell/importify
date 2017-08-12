@@ -22,15 +22,13 @@ import           Data.List                       (notElem)
 import           Distribution.PackageDescription (BuildInfo (includeDirs),
                                                   GenericPackageDescription)
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
-                                                  indent, listF, ( #| ), ( #|| ), (|#),
-                                                  (||#))
+                                                  indent, listF, (+|), (+||), (|+), (||+))
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Lens.Micro.Platform             (to)
 import           Path                            (Abs, Dir, File, Path, fromAbsDir,
-                                                  fromAbsFile, fromRelDir,
-                                                  parseAbsFile, parseRelDir, parseRelFile,
-                                                  (</>))
+                                                  fromAbsFile, fromRelDir, parseAbsFile,
+                                                  parseRelDir, parseRelFile, (</>))
 import           System.Directory                (createDirectoryIfMissing,
                                                   doesDirectoryExist,
                                                   removeDirectoryRecursive)
@@ -96,8 +94,8 @@ cacheProject (LocalPackages locals) (RemotePackages remotes) = do
     importifyPath <- view pathToImportify
     doInsideDir importifyPath $ do
         -- 1. Unpack hackage dependencies then cache them
-        printInfo $ "Caching total "#|length hackageDependencies|#
-                    " dependencies from Hackage: "#|listF hackageDependencies|#""
+        printInfo $ "Caching total "+|length hackageDependencies|+
+                    " dependencies from Hackage: "+|listF hackageDependencies|+""
         hackageMaps <- cacheDependenciesWith identity
                                              unpackCacher
                                              hackageDependencies
@@ -158,7 +156,7 @@ cacheDependenciesWith dependencyName dependencyResolver = go
     go (d:ds) = do
         let depName = dependencyName d
         isAlreadyCached depName >>= \case
-            True  -> printDebug (depName|#" is already cached") *> go ds
+            True  -> printDebug (depName|+" is already cached") *> go ds
             False -> liftM2 (:) (dependencyResolver d) (go ds)
 
     isAlreadyCached :: Text -> RIO env Bool
@@ -255,7 +253,7 @@ createPackageCache
         targetPaths <- mapM parseAbsFile thisTargetModules
 
         -- TODO: implement Buildable for targetId
-        let targetInfo = fromMaybe (error $ "No such target: "#||targetId||#"")
+        let targetInfo = fromMaybe (error $ "No such target: "+||targetId||+"")
                        $ extractTargetBuildInfo targetId packageCabalDesc
 
         (errors, targetModules) <- parseTargetModules packagePath
@@ -278,7 +276,7 @@ createPackageCache
             -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
             liftIO $ writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
-            let modulePath = fromMaybe (error $ "Unknown module: "#|moduleTitle|#"")
+            let modulePath = fromMaybe (error $ "Unknown module: "+|moduleTitle|+"")
                            $ HM.lookup moduleTitle moduleToPathMap
             let bundle     = ModulesBundle packageName moduleTitle targetId
             pure (fromAbsFile modulePath, bundle)

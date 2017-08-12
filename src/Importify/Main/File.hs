@@ -14,7 +14,7 @@ import           Universum
 import qualified Data.HashMap.Strict                as HM
 import qualified Data.Map                           as M
 
-import           Fmt                                (fmt, ( #| ), (|#))
+import           Fmt                                (fmt, (+|), (|+))
 import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
                                                      ModuleHead, ModuleName (..),
                                                      SrcSpanInfo, exactPrint,
@@ -79,7 +79,7 @@ importifyFileContent srcPath = do
     extensions <- readExtensions absSrcPath modulesMap
 
     whenNothing_ (HM.lookup (fromAbsFile absSrcPath) modulesMap) $
-        printNotice $ "File '"#|srcFile|#"' is not cached: new file or caching error"
+        printNotice $ "File '"+|srcFile|+"' is not cached: new file or caching error"
 
     src <- readFile srcFile
     let parseResult = eitherParseResult
@@ -87,7 +87,7 @@ importifyFileContent srcPath = do
                     $ toString src
 
     case parseResult of
-        Left exception -> return $ Left $ IFE $ setMpeFile srcFile exception |# ""
+        Left exception -> return $ Left $ IFE $ setMpeFile srcFile exception |+ ""
         Right ast      -> importifyAst src modulesMap ast
 
 importifyAst :: Text
