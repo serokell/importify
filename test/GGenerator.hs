@@ -12,7 +12,7 @@ import           Path              (fromRelFile, parseRelFile, (-<.>))
 import           System.Directory  (removeFile)
 import           Test.Tasty.Golden (findByExtension, writeBinaryFile)
 
-import           Importify.Main    (doSource)
+import           Importify.Main    (importifyFileContent)
 import           Importify.Path    (testDataDir)
 
 main :: IO ()
@@ -41,7 +41,7 @@ generateGoldenTests :: IO ()
 generateGoldenTests = do
     testCaseFiles <- findByExtension [".hs"] testDataDir
     forM_ testCaseFiles $ \testCaseFile -> do
-       modifiedSrc  <- doSource testCaseFile =<< readFile testCaseFile
-       testCasePath <- parseRelFile testCaseFile
-       goldenPath   <- testCasePath -<.> "golden"
+       testCasePath      <- parseRelFile testCaseFile
+       Right modifiedSrc <- importifyFileContent testCasePath
+       goldenPath        <- testCasePath -<.> "golden"
        writeBinaryFile (fromRelFile goldenPath) (toString modifiedSrc)

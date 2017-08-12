@@ -5,8 +5,8 @@
 
 module Importify.Main.File
        ( OutputOptions (..)
-       , doFile
-       , doSource
+       , importifyFileOptions
+       , importifyFileContent
        ) where
 
 import           Universum
@@ -14,20 +14,24 @@ import           Universum
 import qualified Data.HashMap.Strict                as HM
 import qualified Data.Map                           as M
 
+import           Fmt                                (fmt, (+|), (|+))
 import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
                                                      ModuleHead, ModuleName (..),
                                                      SrcSpanInfo, exactPrint,
-                                                     fromParseResult, parseExtension,
+                                                     parseExtension,
                                                      parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Path                               (fromAbsFile, fromRelFile,
-                                                     parseRelDir, parseRelFile, (</>))
+import           Path                               (Abs, File, Path, Rel, fromAbsFile,
+                                                     fromRelFile, parseRelDir,
+                                                     parseRelFile, (</>))
 
+import           Extended.System.Wlog               (printError, printNotice)
 import           Importify.Cabal                    (ExtensionsMap, ModulesBundle (..),
                                                      ModulesMap, TargetId, targetIdDir)
+import           Importify.ParseException           (eitherParseResult, setMpeFile)
 import           Importify.Path                     (decodeFileOrMempty, extensionsPath,
                                                      getCurrentPath, importifyPath,
                                                      modulesPath, symbolsPath)
@@ -50,28 +54,49 @@ data OutputOptions = ToConsole        -- ^ Print to console
                    | ToFile FilePath  -- ^ Print to specified file
                    deriving (Show)
 
-doFile :: OutputOptions -> FilePath -> IO ()
-doFile options srcFile = do
-    src         <- readFile srcFile
-    modifiedSrc <- doSource srcFile src
+newtype ImportifyFileException = IFE Text
 
-    case options of
+-- | Run @importify file@ command with given options.
+importifyFileOptions :: OutputOptions -> FilePath -> IO ()
+importifyFileOptions options srcFile =
+    parseRelFile srcFile >>= importifyFileContent >>= handleOptions
+  where
+    handleOptions :: Either ImportifyFileException Text -> IO ()
+    handleOptions (Left (IFE msg))    = printError msg
+    handleOptions (Right modifiedSrc) = case options of
         ToConsole -> putText modifiedSrc
         InPlace   -> writeFile srcFile modifiedSrc
         ToFile to -> writeFile to      modifiedSrc
 
-doSource :: FilePath -> Text -> IO Text
-doSource srcFile src = do
+-- | Return result of @importify file@ command.
+importifyFileContent :: Path Rel File -> IO (Either ImportifyFileException Text)
+importifyFileContent srcPath = do
+    let srcFile    = fromRelFile srcPath
+    curDir        <- getCurrentPath
+    let absSrcPath = curDir </> srcPath
+
     modulesMap <- readModulesMap
-    extensions <- readExtensions srcFile modulesMap
+    extensions <- readExtensions absSrcPath modulesMap
 
-    -- TODO: better error handling here?
-    ast@(Module _ _ _ imports _) <- return  -- return here to throw exception
-                                  $ fromParseResult
-                                  $ parseFileContentsWithExts extensions
-                                  $ toString src
+    whenNothing_ (HM.lookup (fromAbsFile absSrcPath) modulesMap) $
+        printNotice $ "File '"+|srcFile|+"' is not cached: new file or caching error"
 
-    case importSlice imports of
+    src <- readFile srcFile
+    let parseResult = eitherParseResult
+                    $ parseFileContentsWithExts extensions
+                    $ toString src
+
+    case parseResult of
+        Left exception -> return $ Left $ IFE $ setMpeFile srcFile exception |+ ""
+        Right ast      -> importifyAst src modulesMap ast
+
+importifyAst :: Text
+             -> ModulesMap
+             -> Module SrcSpanInfo
+             -> IO (Either ImportifyFileException Text)
+importifyAst src modulesMap ast@(Module _ _ _ imports _) =
+    Right <$> case importSlice imports of
+        Nothing           -> return src
         Just (start, end) -> do
             let codeLines        = lines src
             let (preamble, rest) = splitAt (start - 1) codeLines
@@ -84,23 +109,20 @@ doSource srcFile src = do
             return $ unlines preamble
                   <> unlines printedImports
                   <> unlines decls
-
-        Nothing -> return src
+importifyAst _ _ _ = return $ Left $ IFE "Module wasn't parser correctly"
 
 readModulesMap :: IO ModulesMap
 readModulesMap = decodeFileOrMempty modFile pure
   where
     modFile = fromRelFile $ importifyPath </> modulesPath
 
-readExtensions :: FilePath -> ModulesMap -> IO [Extension]
-readExtensions srcFile modulesMap = do
-    srcFilePath <- parseRelFile srcFile
-    projectPath <- getCurrentPath
-    let srcPath  = projectPath </> srcFilePath
+readExtensions :: Path Abs File -> ModulesMap -> IO [Extension]
+readExtensions srcPath modulesMap = do
     case HM.lookup (fromAbsFile srcPath) modulesMap of
         Nothing                -> return []
         Just ModulesBundle{..} -> do
             packagePath <- parseRelDir $ toString mbPackage
+            projectPath <- getCurrentPath
             let pathToExtensions = projectPath
                                </> importifyPath
                                </> symbolsPath

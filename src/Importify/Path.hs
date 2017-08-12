@@ -29,7 +29,7 @@ import           Universum
 
 import           Data.Aeson           (FromJSON, eitherDecodeStrict)
 import qualified Data.ByteString      as BS (readFile)
-import           Fmt                  (( #| ), (|#))
+import           Fmt                  ((+|), (|+))
 import           Path                 (Abs, Dir, File, Rel, fromAbsDir, fromRelDir,
                                        fromRelFile, parseAbsDir, parseRelFile, reldir,
                                        relfile, (</>))
@@ -111,9 +111,9 @@ decodeFileOrMempty file onDecodedContent = do
         eitherDecodeStrict <$> (liftIO $ BS.readFile file) >>= \case
             Right value -> onDecodedContent value
             Left msg    -> do
-              let warning = "File '"#|fullPath|#"' decoded incorrectly because of: "#|msg|#""
+              let warning = "File '"+|fullPath|+"' decoded incorrectly because of: "+|msg|+""
               mempty <$ printWarning warning
     else do
-        let msg = "File '"#|fullPath|#
+        let msg = "File '"+|fullPath|+
                   "' doesn't exist: caching first time or previous caching failed"
         mempty <$ printNotice msg

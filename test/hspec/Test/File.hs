@@ -18,7 +18,7 @@ import           System.Wlog         (Severity)
 
 import           Test.Hspec          (Spec, describe, it, runIO, shouldBe, xit)
 
-import           Importify.Main      (doSource)
+import           Importify.Main      (importifyFileContent)
 import           Importify.Path      (testDataPath)
 
 spec :: Spec
@@ -50,9 +50,8 @@ loadTestDataDiff testDirPath testCasePath = do
     let fullPathToTest = testDirPath </> testCasePath
     goldenExamplePath <- fullPathToTest -<.> ".golden"
 
-    testCasePathContent <- readFile (fromRelFile fullPathToTest)
-    importifiedSrc      <- doSource (fromRelFile testCasePath) testCasePathContent
-    goldenExampleSrc    <- readFile (fromRelFile goldenExamplePath)
+    goldenExampleSrc     <- readFile (fromRelFile goldenExamplePath)
+    Right importifiedSrc <- importifyFileContent fullPathToTest
 
     return $ filter isDivergent $ getDiff (lines importifiedSrc)
                                           (lines goldenExampleSrc)

@@ -1,14 +1,15 @@
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE ViewPatterns        #-}
 
 -- | Contains implementation of @importify cache@ command.
 
 module Importify.Main.Cache
-       ( doCacheList
-       , doCacheProject
+       ( importifyCacheList
+       , importifyCacheProject
        ) where
 
 import           Universum
@@ -21,8 +22,7 @@ import           Data.List                       (notElem)
 import           Distribution.PackageDescription (BuildInfo (includeDirs),
                                                   GenericPackageDescription)
 import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
-                                                  indent, listF, ( #| ), ( #|| ), (|#),
-                                                  (||#))
+                                                  indent, listF, (+|), (+||), (|+), (||+))
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Lens.Micro.Platform             (to)
@@ -47,7 +47,8 @@ import           Importify.Environment           (CacheEnvironment, HasGhcInclud
                                                   HasPathToImportify, RIO, ghcIncludeDir,
                                                   pathToImportify, pathToSymbols,
                                                   saveSources)
-import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny)
+import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny,
+                                                  setMpeFile)
 import           Importify.Path                  (decodeFileOrMempty, doInsideDir,
                                                   extensionsPath, findCabalFile,
                                                   modulesFile, symbolsPath)
@@ -63,8 +64,8 @@ import           Importify.Syntax                (getModuleTitle)
 -- with versions and caches only them under @.importify@ folder inside
 -- current directory ignoring .cabal file for project. This function
 -- doesn't update mapping from module paths.
-doCacheList :: NonEmpty Text -> RIO CacheEnvironment ()
-doCacheList explicitDependencies = do
+importifyCacheList :: NonEmpty Text -> RIO CacheEnvironment ()
+importifyCacheList explicitDependencies = do
     printInfo "Using explicitly specified list of dependencies for caching..."
     importifyPath <- view pathToImportify
     doInsideDir importifyPath $
@@ -74,8 +75,8 @@ doCacheList explicitDependencies = do
 
 -- | Caches packages information into local .importify directory by
 -- reading this information from @<package-name>.cabal@ file.
-doCacheProject :: RIO CacheEnvironment ()
-doCacheProject = do
+importifyCacheProject :: RIO CacheEnvironment ()
+importifyCacheProject = do
     (localPackages@(LocalPackages locals), remotePackages) <- stackListPackages
     if null locals
     then printWarning "No packages found :( This could happen due to next reasons:\n\
@@ -93,8 +94,8 @@ cacheProject (LocalPackages locals) (RemotePackages remotes) = do
     importifyPath <- view pathToImportify
     doInsideDir importifyPath $ do
         -- 1. Unpack hackage dependencies then cache them
-        printInfo $ "Caching total "#|length hackageDependencies|#
-                    " dependencies from Hackage: "#|listF hackageDependencies|#""
+        printInfo $ "Caching total "+|length hackageDependencies|+
+                    " dependencies from Hackage: "+|listF hackageDependencies|+""
         hackageMaps <- cacheDependenciesWith identity
                                              unpackCacher
                                              hackageDependencies
@@ -155,7 +156,7 @@ cacheDependenciesWith dependencyName dependencyResolver = go
     go (d:ds) = do
         let depName = dependencyName d
         isAlreadyCached depName >>= \case
-            True  -> printDebug (depName|#" is already cached") *> go ds
+            True  -> printDebug (depName|+" is already cached") *> go ds
             False -> liftM2 (:) (dependencyResolver d) (go ds)
 
     isAlreadyCached :: Text -> RIO env Bool
@@ -252,7 +253,7 @@ createPackageCache
         targetPaths <- mapM parseAbsFile thisTargetModules
 
         -- TODO: implement Buildable for targetId
-        let targetInfo = fromMaybe (error $ "No such target: "#||targetId||#"")
+        let targetInfo = fromMaybe (error $ "No such target: "+||targetId||+"")
                        $ extractTargetBuildInfo targetId packageCabalDesc
 
         (errors, targetModules) <- parseTargetModules packagePath
@@ -275,7 +276,7 @@ createPackageCache
             -- creates ./.importify/symbols/<package>/<Module.Name>.symbols
             liftIO $ writeSymbols (fromAbsFile moduleCachePath) resolvedSymbols
 
-            let modulePath = fromMaybe (error $ "Unknown module: "#|moduleTitle|#"")
+            let modulePath = fromMaybe (error $ "Unknown module: "+|moduleTitle|+"")
                            $ HM.lookup moduleTitle moduleToPathMap
             let bundle     = ModulesBundle packageName moduleTitle targetId
             pure (fromAbsFile modulePath, bundle)
@@ -301,7 +302,9 @@ parseTargetModules packagePath pathsToModules targetInfo = do
               parseModuleWithPreprocessor extensions
                                           includeDirs
                                           path
-            return $ second (, path) parseRes
+            return $ bimap (setMpeFile $ fromAbsFile path)  -- Update error
+                           (, path)                         -- Update result
+                           parseRes
 
     partitionEithers <$> mapM moduleParser pathsToModules
 

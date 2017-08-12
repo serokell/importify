@@ -21,7 +21,7 @@ import           Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpph
 import           Path                      (Abs, File, Path, fromAbsFile, (-<.>))
 import           System.Directory          (removeFile)
 
-import           Importify.ParseException  (ModuleParseException (MPE), prettyParseResult)
+import           Importify.ParseException  (ModuleParseException (MPE), eitherParseResult)
 import           Importify.Syntax          (modulePragmas)
 
 -- | Parse module after preproccessing this module with possibly
@@ -72,10 +72,10 @@ parseModuleAfterCPP :: [Extension]    -- ^ List of extensions from .cabal file
                     -> Path Abs File  -- ^ Path to module
                     -> IO $ Either ModuleParseException $ Module SrcSpanInfo
 parseModuleAfterCPP cabalExtensions includeFiles pathToModule =
-    prettyParseResult <$>
-      parseFileWithCommentsAndCPP (defaultCpphsOptions {includes = includeFiles})
-                                  (defaultParseMode {extensions = cabalExtensions})
-                                  (fromAbsFile pathToModule)
+     second fst . eitherParseResult
+ <$> parseFileWithCommentsAndCPP (defaultCpphsOptions {includes = includeFiles})
+                                 (defaultParseMode {extensions = cabalExtensions})
+                                 (fromAbsFile pathToModule)
 
 autoexportedArgs :: forall l. Module l -> Maybe [String]
 autoexportedArgs = head . mapMaybe autoexporterPragma . modulePragmas
