@@ -3,20 +3,22 @@
 
 module Importify.ParseException
        ( ModuleParseException (..)
-       , prettyParseResult
+       , eitherParseResult
        , reportErrorsIfAny
+       , setMpeFile
        ) where
 
 import           Universum
 
 import           Fmt                   (Builder, blockListF, build, fmt, fmtLn, indent,
                                         listF, ( #| ), (|#))
-import           Language.Haskell.Exts (ParseResult (..), SrcLoc, prettyPrint)
+import           Language.Haskell.Exts (ParseResult (..), SrcLoc (srcFilename),
+                                        prettyPrint)
 
 import           Extended.Data.Str     (charWrap, wordWrap)
 import           Extended.System.Wlog  (printWarning)
 
-data ModuleParseException = MPE SrcLoc !String
+data ModuleParseException = MPE !SrcLoc !String
     deriving (Show)
 
 instance Exception ModuleParseException
@@ -27,11 +29,16 @@ instance Buildable ModuleParseException where
                           #| indent 4 (build $ wordWrap 80 reason)
                           |# ""
 
+-- | Updates file name of error location. Sometimes error location
+-- looks like @- Location: : -1: -1@ which is not very helpful.
+setMpeFile :: FilePath -> ModuleParseException -> ModuleParseException
+setMpeFile modulePath (MPE loc msg) = MPE (loc {srcFilename = modulePath}) msg
+
 -- | Converts 'ParseResult' into 'Either' making error look pretty.
-prettyParseResult :: ParseResult (ast, comments)
-                  -> Either ModuleParseException ast
-prettyParseResult (ParseOk (moduleAst, _)) = Right moduleAst
-prettyParseResult (ParseFailed loc reason) = Left $ MPE loc reason
+eitherParseResult :: ParseResult res
+                  -> Either ModuleParseException res
+eitherParseResult (ParseOk res)            = Right res
+eitherParseResult (ParseFailed loc reason) = Left $ MPE loc reason
 
 -- | Pretty printing 'NonEmpty' list of errors in really nice way.
 prettyParseErrors :: Text -> NonEmpty ModuleParseException -> Text

@@ -13,7 +13,8 @@ import           Universum
 
 import           Extended.System.Wlog  (initImportifyLogger)
 import           Importify.Environment (runCache)
-import           Importify.Main        (doCacheList, doCacheProject, doFile)
+import           Importify.Main        (importifyCacheList, importifyCacheProject,
+                                        importifyFileOptions)
 
 import           Options               (CabalCacheOptions (..), Command (..),
                                         ImportifyCliArgs (..), SingleFileOptions (..),
@@ -29,10 +30,10 @@ main = do
 
 importifySingleFile :: SingleFileOptions -> IO ()
 importifySingleFile SingleFileOptions{..} =
-    doFile sfoOutput sfoFileName
+    importifyFileOptions sfoOutput sfoFileName
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =
     runCache ccoSaveSources $ case ccoDependencies of
-        []     -> doCacheProject
-        (d:ds) -> doCacheList (d :| ds)
+        []     -> importifyCacheProject
+        (d:ds) -> importifyCacheList (d :| ds)

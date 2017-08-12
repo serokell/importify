@@ -1,14 +1,15 @@
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE ViewPatterns        #-}
 
 -- | Contains implementation of @importify cache@ command.
 
 module Importify.Main.Cache
-       ( doCacheList
-       , doCacheProject
+       ( importifyCacheList
+       , importifyCacheProject
        ) where
 
 import           Universum
@@ -27,8 +28,9 @@ import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSp
 import           Language.Haskell.Names          (writeSymbols)
 import           Lens.Micro.Platform             (to)
 import           Path                            (Abs, Dir, File, Path, fromAbsDir,
-                                                  fromAbsFile, fromRelDir, parseAbsFile,
-                                                  parseRelDir, parseRelFile, (</>))
+                                                  fromAbsFile, fromRelDir,
+                                                  parseAbsFile, parseRelDir, parseRelFile,
+                                                  (</>))
 import           System.Directory                (createDirectoryIfMissing,
                                                   doesDirectoryExist,
                                                   removeDirectoryRecursive)
@@ -47,7 +49,8 @@ import           Importify.Environment           (CacheEnvironment, HasGhcInclud
                                                   HasPathToImportify, RIO, ghcIncludeDir,
                                                   pathToImportify, pathToSymbols,
                                                   saveSources)
-import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny)
+import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny,
+                                                  setMpeFile)
 import           Importify.Path                  (decodeFileOrMempty, doInsideDir,
                                                   extensionsPath, findCabalFile,
                                                   modulesFile, symbolsPath)
@@ -63,8 +66,8 @@ import           Importify.Syntax                (getModuleTitle)
 -- with versions and caches only them under @.importify@ folder inside
 -- current directory ignoring .cabal file for project. This function
 -- doesn't update mapping from module paths.
-doCacheList :: NonEmpty Text -> RIO CacheEnvironment ()
-doCacheList explicitDependencies = do
+importifyCacheList :: NonEmpty Text -> RIO CacheEnvironment ()
+importifyCacheList explicitDependencies = do
     printInfo "Using explicitly specified list of dependencies for caching..."
     importifyPath <- view pathToImportify
     doInsideDir importifyPath $
@@ -74,8 +77,8 @@ doCacheList explicitDependencies = do
 
 -- | Caches packages information into local .importify directory by
 -- reading this information from @<package-name>.cabal@ file.
-doCacheProject :: RIO CacheEnvironment ()
-doCacheProject = do
+importifyCacheProject :: RIO CacheEnvironment ()
+importifyCacheProject = do
     (localPackages@(LocalPackages locals), remotePackages) <- stackListPackages
     if null locals
     then printWarning "No packages found :( This could happen due to next reasons:\n\
@@ -301,7 +304,9 @@ parseTargetModules packagePath pathsToModules targetInfo = do
               parseModuleWithPreprocessor extensions
                                           includeDirs
                                           path
-            return $ second (, path) parseRes
+            return $ bimap (setMpeFile $ fromAbsFile path)  -- Update error
+                           (, path)                         -- Update result
+                           parseRes
 
     partitionEithers <$> mapM moduleParser pathsToModules
 
