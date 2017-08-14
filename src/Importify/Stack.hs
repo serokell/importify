@@ -27,7 +27,7 @@ import           Data.Yaml            (FromJSON (parseJSON), Parser, Value (Obje
                                        withObject, (.:))
 import           Path                 (Abs, Dir, Path, PathException, dirname, fromAbsDir,
                                        mkRelDir, parent, parseAbsDir, (</>))
-import           System.Directory     (doesDirectoryExist)
+import           Path.IO              (doesDirExist)
 import           System.FilePath      (splitPath)
 import           Turtle               (Line, Shell, inproc, lineToText, linesToText)
 import qualified Turtle               (fold)
@@ -49,7 +49,7 @@ depsArgs = ["list-dependencies", "--test", "--bench"]
 -- This function needed to tell dependencies about files like @"MachDeps.h"@.
 --
 -- TODO: use GHC path from project?
-ghcIncludePath :: MaybeT IO FilePath
+ghcIncludePath :: MaybeT IO (Path Abs Dir)
 ghcIncludePath = do
     ghcBinLine <- MaybeT $ Turtle.fold (shStack pathArgs) Fold.head
 
@@ -59,13 +59,12 @@ ghcIncludePath = do
     let ghcName    = dirname ghcProgram  -- ≡ ghc-8.0.2
 
     -- ghcInclude ≡ /home/user/.stack/programs/x86_64-linux/ghc-8.0.2/lib/ghc-8.0.2/include
-    let ghcInclude = ghcProgram
-                 </> $(mkRelDir "lib/")
-                 </> ghcName
-                 </> $(mkRelDir "include/")
+    let ghcIncludeDir = ghcProgram
+                    </> $(mkRelDir "lib/")
+                    </> ghcName
+                    </> $(mkRelDir "include/")
 
-    let ghcIncludeDir = fromAbsDir ghcInclude
-    guardM $ liftIO $ doesDirectoryExist ghcIncludeDir
+    guardM $ doesDirExist ghcIncludeDir
     return ghcIncludeDir
 
 -- TODO: remove after universum update to 0.6

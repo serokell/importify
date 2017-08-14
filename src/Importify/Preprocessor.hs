@@ -19,7 +19,7 @@ import           Language.Haskell.Exts     (Extension, Module,
 import           Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpphsOptions,
                                             parseFileWithCommentsAndCPP)
 import           Path                      (Abs, File, Path, fromAbsFile, (-<.>))
-import           System.Directory          (removeFile)
+import           Path.IO                   (removeFile)
 
 import           Importify.ParseException  (ModuleParseException (MPE), eitherParseResult)
 import           Importify.Syntax          (modulePragmas)
@@ -43,11 +43,10 @@ parseModuleWithPreprocessor extensions includeFiles pathToModule =
         Just autoArgs -> do
           let modulePath       = fromAbsFile pathToModule
           outputFilePath      <- pathToModule -<.> ".auto"
-          let outputFileName   = fromAbsFile outputFilePath
-          let preprocessorArgs = [modulePath, modulePath, outputFileName]
+          let preprocessorArgs = [modulePath, modulePath, fromAbsFile outputFilePath]
           Autoexporter.mainWithArgs (preprocessorArgs ++ autoArgs)
           parseModuleAfterCPP extensions includeFiles outputFilePath
-            <* removeFile outputFileName
+            <* removeFile outputFilePath
   where
     -- This forcer is used because without it @cppHandler@ below doesn't catch exception.
     errorForcer res = evaluateWHNF (show res :: String) >> return res

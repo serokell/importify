@@ -10,10 +10,10 @@ import           Universum
 
 import           Data.Algorithm.Diff (Diff (Both), getDiff)
 import           Data.List           (sort)
-import           Path                (Dir, File, Path, Rel, fileExtension, fromRelDir,
-                                      fromRelFile, parseRelDir, parseRelFile, (-<.>),
-                                      (</>))
-import           System.Directory    (listDirectory)
+import           Path                (Dir, File, Path, Rel, dirname, fileExtension,
+                                      filename, fromRelDir, fromRelFile, mkRelFile,
+                                      (-<.>), (</>))
+import           Path.IO             (listDir)
 import           System.Wlog         (Severity)
 
 import           Test.Hspec          (Spec, describe, it, runIO, shouldBe, xit)
@@ -23,26 +23,28 @@ import           Importify.Path      (testDataPath)
 
 spec :: Spec
 spec = do
-    testFolders <- runIO $ listDirectory (fromRelDir testDataPath)
-    describe "file:unused" $ mapM_ makeTestGroup testFolders
+    (testFolders, _) <- runIO $ listDir testDataPath
+    describe "file:unused" $
+        mapM_ (makeTestGroup . (testDataPath </> ) . dirname) testFolders
 
-makeTestGroup :: FilePath -> Spec
-makeTestGroup testDir = do
-    testDirPath      <- runIO $ parseRelDir testDir
-    let testCasesPath = testDataPath </> testDirPath
-    testDirPaths     <- runIO $ mapM parseRelFile =<<
-                                listDirectory (fromRelDir testCasesPath)
-    let testHsOnly = sort $ filter ((== ".hs") . fileExtension) testDirPaths
-    describe ("subfolder: " ++ testDir) $ mapM_ (makeTest testCasesPath) testHsOnly
+makeTestGroup :: Path Rel Dir -> Spec
+makeTestGroup testCasesPath = do
+    (_, testDirPaths) <- runIO $ listDir testCasesPath
+    let testHsOnly     = sort
+                       $ filter ((== ".hs") . fileExtension)
+                       $ map filename testDirPaths
+
+    describe ("subfolder: " ++ fromRelDir testCasesPath) $
+        mapM_ (makeTest testCasesPath) testHsOnly
 
 makeTest :: Path Rel Dir -> Path Rel File -> Spec
 makeTest testDirPath testCasePath = do
     diff <- runIO $ loadTestDataDiff testDirPath testCasePath
-    let filename = fromRelFile testCasePath
-    (if elem filename pendingTests then xit else it) filename $ diff `shouldBe` []
+    let testType = if elem testCasePath pendingTests then xit else it
+    testType (fromRelFile testCasePath) $ diff `shouldBe` []
 
-pendingTests :: [String]
-pendingTests = ["01-ImportBothUsedQualified.hs" -- Importify can't modify source yet
+pendingTests :: [Path Rel File]
+pendingTests = [$(mkRelFile "01-ImportBothUsedQualified.hs") -- Importify can't modify source yet
                ]
 
 loadTestDataDiff :: Path Rel Dir -> Path Rel File -> IO [Diff Text]

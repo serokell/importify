@@ -13,9 +13,9 @@ import           Distribution.ModuleName         (ModuleName, fromString, toFile
 import qualified Distribution.ModuleName         as Cabal
 import           Distribution.PackageDescription (BuildInfo (..), Library (..))
 import qualified Language.Haskell.Exts           as HSE
-import           Path                            (Abs, Dir, File, Path, Rel, fromAbsFile,
-                                                  parseRelDir, parseRelFile, (</>))
-import           System.Directory                (doesFileExist)
+import           Path                            (Abs, Dir, File, Path, Rel, parseRelDir,
+                                                  parseRelFile, (</>))
+import           Path.IO                         (doesFileExist)
 
 import           Importify.Syntax                (getModuleTitle)
 
@@ -68,4 +68,4 @@ modulePaths packagePath BuildInfo{..} extra = do
           keepExistingModules $ addDir (packagePath </> dir) modPaths
 
     keepExistingModules :: [Path Abs File] -> IO [Path Abs File]
-    keepExistingModules = filterM (doesFileExist . fromAbsFile)
+    keepExistingModules = filterM doesFileExist

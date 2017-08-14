@@ -30,9 +30,10 @@ import           Universum
 
 import           Lens.Micro.Platform (SimpleGetter, makeLensesWith, to)
 import           Path                (Abs, Dir, Path, (</>))
+import           Path.IO             (getCurrentDir)
 
 import           Extended.Lens.TH    (fieldsVerboseLensRules)
-import           Importify.Path      (getCurrentPath, importifyPath, symbolsPath)
+import           Importify.Path      (importifyPath, symbolsPath)
 import           Importify.Stack     (ghcIncludePath)
 
 -- | 'ReaderT' + 'IO' monad described here:
@@ -48,7 +49,7 @@ data CacheEnvironment = CacheEnvironment
       _pathToImportify :: !(Path Abs Dir)
 
       -- | Path to GHC .h files
-    , _ghcIncludeDir   :: !(Maybe FilePath)
+    , _ghcIncludeDir   :: !(Maybe (Path Abs Dir))
 
       -- | 'True' if unpacked sources should be stored locally as well
     , _saveSources     :: !Bool
@@ -57,7 +58,7 @@ data CacheEnvironment = CacheEnvironment
 makeLensesWith fieldsVerboseLensRules ''CacheEnvironment
 
 type HasPathToImportify env = HasPolyPathToImportify env (Path Abs Dir)
-type HasGhcIncludeDir   env = HasPolyGhcIncludeDir   env (Maybe FilePath)
+type HasGhcIncludeDir   env = HasPolyGhcIncludeDir   env (Maybe (Path Abs Dir))
 type HasSaveSources     env = HasPolySaveSources     env Bool
 
 -- | Getter of @~\/path\/to\/project\/.importify\/symbols@ folder.
@@ -68,7 +69,7 @@ pathToSymbols = pathToImportify.to (</> symbolsPath)
 -- project directory and searches for ghc include path.
 runCache :: Bool -> RIO CacheEnvironment () -> IO ()
 runCache _saveSources cacheAction = do
-    projectPath         <- getCurrentPath
+    projectPath         <- getCurrentDir
     let _pathToImportify = projectPath </> importifyPath
     _ghcIncludeDir      <- runMaybeT ghcIncludePath
     usingReaderT CacheEnvironment{..} $ runRIO cacheAction
