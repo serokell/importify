@@ -27,14 +27,15 @@ import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Path                               (Abs, File, Path, Rel, fromAbsFile,
                                                      fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
+import           Path.IO                            (getCurrentDir)
 
 import           Extended.System.Wlog               (printError, printNotice)
 import           Importify.Cabal                    (ExtensionsMap, ModulesBundle (..),
                                                      ModulesMap, TargetId, targetIdDir)
 import           Importify.ParseException           (eitherParseResult, setMpeFile)
 import           Importify.Path                     (decodeFileOrMempty, extensionsPath,
-                                                     getCurrentPath, importifyPath,
-                                                     modulesPath, symbolsPath)
+                                                     importifyPath, modulesPath,
+                                                     symbolsPath)
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedImplicitImports,
                                                      collectUnusedSymbolsBy, hidingUsedIn,
@@ -72,7 +73,7 @@ importifyFileOptions options srcFile =
 importifyFileContent :: Path Rel File -> IO (Either ImportifyFileException Text)
 importifyFileContent srcPath = do
     let srcFile    = fromRelFile srcPath
-    curDir        <- getCurrentPath
+    curDir        <- getCurrentDir
     let absSrcPath = curDir </> srcPath
 
     modulesMap <- readModulesMap
@@ -112,9 +113,7 @@ importifyAst src modulesMap ast@(Module _ _ _ imports _) =
 importifyAst _ _ _ = return $ Left $ IFE "Module wasn't parser correctly"
 
 readModulesMap :: IO ModulesMap
-readModulesMap = decodeFileOrMempty modFile pure
-  where
-    modFile = fromRelFile $ importifyPath </> modulesPath
+readModulesMap = decodeFileOrMempty (importifyPath </> modulesPath) pure
 
 readExtensions :: Path Abs File -> ModulesMap -> IO [Extension]
 readExtensions srcPath modulesMap = do
@@ -122,7 +121,7 @@ readExtensions srcPath modulesMap = do
         Nothing                -> return []
         Just ModulesBundle{..} -> do
             packagePath <- parseRelDir $ toString mbPackage
-            projectPath <- getCurrentPath
+            projectPath <- getCurrentDir
             let pathToExtensions = projectPath
                                </> importifyPath
                                </> symbolsPath
@@ -131,7 +130,7 @@ readExtensions srcPath modulesMap = do
 
             let lookupExtensions = fromMaybe [] . getExtensions mbTarget
             decodeFileOrMempty @ExtensionsMap
-                               (fromAbsFile pathToExtensions)
+                               pathToExtensions
                                (return . lookupExtensions)
 
 getExtensions :: TargetId -> ExtensionsMap -> Maybe [Extension]

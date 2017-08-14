@@ -61,7 +61,6 @@ library
                      , bytestring
                      , Cabal
                      , containers
-                     , directory
                      , filepath
                      , fmt
                      , foldl
@@ -72,6 +71,7 @@ library
                      , log-warper
                      , microlens-platform
                      , path
+                     , path-io
                      , pretty-simple
                      , syb
                      , template-haskell
@@ -121,8 +121,8 @@ executable golden-generator
   main-is:             GGenerator.hs
 
   build-depends:       base, importify
-                     , directory
                      , path
+                     , path-io
                      , tasty-golden
                      , universum
 
@@ -142,12 +142,12 @@ test-suite importify-test
 
   build-depends:       base, importify
                      , Diff
-                     , directory
                      , filepath
                      , hspec
                      , log-warper
                      , microlens-platform
                      , path
+                     , path-io
                      , universum
                      , unordered-containers
 

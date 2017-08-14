@@ -9,7 +9,7 @@ module Main where
 import           Universum
 
 import           Path              (fromRelFile, parseRelFile, (-<.>))
-import           System.Directory  (removeFile)
+import           Path.IO           (removeFile)
 import           Test.Tasty.Golden (findByExtension, writeBinaryFile)
 
 import           Importify.Main    (importifyFileContent)
@@ -27,7 +27,7 @@ main = do
 cleanGoldenExamples :: IO ()
 cleanGoldenExamples = do
     goldenExamples <- findByExtension [".golden"] testDataDir
-    mapM_ removeFile goldenExamples
+    mapM_ (parseRelFile >=> removeFile) goldenExamples
 
 generateGoldenTestsPrompt :: Bool -> IO ()
 generateGoldenTestsPrompt True  = generateGoldenTests

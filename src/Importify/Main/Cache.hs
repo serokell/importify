@@ -27,11 +27,9 @@ import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSp
 import           Language.Haskell.Names          (writeSymbols)
 import           Lens.Micro.Platform             (to)
 import           Path                            (Abs, Dir, File, Path, fromAbsDir,
-                                                  fromAbsFile, fromRelDir, parseAbsFile,
-                                                  parseRelDir, parseRelFile, (</>))
-import           System.Directory                (createDirectoryIfMissing,
-                                                  doesDirectoryExist,
-                                                  removeDirectoryRecursive)
+                                                  fromAbsFile, parseAbsFile, parseRelDir,
+                                                  parseRelFile, (</>))
+import           Path.IO                         (doesDirExist, ensureDir, removeDirRecur)
 import           Turtle                          (shell)
 
 import           Extended.System.Wlog            (printDebug, printInfo, printWarning)
@@ -51,7 +49,7 @@ import           Importify.ParseException        (ModuleParseException, reportEr
                                                   setMpeFile)
 import           Importify.Path                  (decodeFileOrMempty, doInsideDir,
                                                   extensionsPath, findCabalFile,
-                                                  modulesFile, symbolsPath)
+                                                  modulesFile, modulesPath, symbolsPath)
 import           Importify.Preprocessor          (parseModuleWithPreprocessor)
 import           Importify.Resolution            (resolveModules)
 import           Importify.Stack                 (LocalPackages (..), QueryPackage (..),
@@ -163,21 +161,19 @@ cacheDependenciesWith dependencyName dependencyResolver = go
     isAlreadyCached libName = do
         libraryPath       <- parseRelDir $ toString libName
         let libSymbolsPath = symbolsPath </> libraryPath
-        liftIO $ doesDirectoryExist (fromRelDir libSymbolsPath)
+        doesDirExist libSymbolsPath
 
 -- | This function is passed to 'cacheDependenciesWith' for Hackage dependencies.
 unpackCacher :: Text -> RIO CacheEnvironment ModulesMap
 unpackCacher libName = do
     _exitCode <- shell ("stack unpack " <> libName) empty
 
-    let stringLibName    = toString libName
-    packagePath         <- parseRelDir stringLibName
+    packagePath         <- parseRelDir $ toString libName
     unpackedPackagePath <- view $ pathToImportify.to (</> packagePath)
+    packageModules      <- cachePackage unpackedPackagePath libName False
 
-    packageModules <- cachePackage unpackedPackagePath libName False
-
-    unlessM (view saveSources) $  -- TODO: use bracket here
-        liftIO $ removeDirectoryRecursive stringLibName
+    -- TODO: use bracket here
+    unlessM (view saveSources) $ removeDirRecur packagePath
 
     pure packageModules
 
@@ -230,7 +226,7 @@ createPackageCache
     -- Creates ./.importify/symbols/<package>/ directory
     packageNamePath  <- parseRelDir (toString packageName)
     packageCachePath <- view $ pathToSymbols.to (</> packageNamePath)
-    liftIO $ createDirectoryIfMissing True $ fromAbsDir packageCachePath
+    ensureDir packageCachePath
 
     -- Maps from full path to target and from target to list of extensions
     targetsMap <- liftIO $ extractTargetsMap packagePath packageCabalDesc
@@ -264,7 +260,7 @@ createPackageCache
 
         targetPath           <- parseRelDir $ toString targetDirectory
         let packageTargetPath = packageCachePath </> targetPath
-        liftIO $ createDirectoryIfMissing True $ fromAbsDir packageTargetPath
+        ensureDir packageTargetPath
 
         let moduleToPathMap = HM.fromList $ map (first getModuleTitle) targetModules
         let resolvedModules = resolveModules $ map fst targetModules
@@ -294,7 +290,7 @@ parseTargetModules packagePath pathsToModules targetInfo = do
     let pkgIncludeDirs = map (fromAbsDir . (packagePath </>)) includeDirPaths
 
     ghcDir <- view ghcIncludeDir
-    let includeDirs = pkgIncludeDirs ++ toList ghcDir
+    let includeDirs = pkgIncludeDirs ++ (toList $ fmap fromAbsDir ghcDir)
     let extensions  = withHarmlessExtensions $ buildInfoExtensions targetInfo
 
     let moduleParser path = do
@@ -310,6 +306,6 @@ parseTargetModules packagePath pathsToModules targetInfo = do
 
 updateModulesMap :: MonadIO m => ModulesMap -> m ()
 updateModulesMap newCachedModules = do
-    existingImportsMap <- decodeFileOrMempty modulesFile return
+    existingImportsMap <- decodeFileOrMempty modulesPath return
     let mergedMaps      = newCachedModules `HM.union` existingImportsMap
     liftIO $ LBS.writeFile modulesFile $ encodePretty mergedMaps
