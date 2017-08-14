@@ -21,8 +21,7 @@ import           Data.List                       (notElem)
 
 import           Distribution.PackageDescription (BuildInfo (includeDirs),
                                                   GenericPackageDescription)
-import           Fmt                             (Builder, blockListF, build, fmt, fmtLn,
-                                                  indent, listF, (+|), (+||), (|+), (||+))
+import           Fmt                             (listF, (+|), (+||), (|+), (||+))
 import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names          (writeSymbols)
 import           Lens.Micro.Platform             (to)
