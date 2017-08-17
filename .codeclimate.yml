@@ -1,0 +1,8 @@
+engines:
+  hlint:
+    enabled: true
+ratings:
+  paths:
+  - "**.hs"
+exclude_paths:
+- "HLint.hs"

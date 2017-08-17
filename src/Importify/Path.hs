@@ -92,7 +92,7 @@ decodeFileOrMempty file onDecodedContent = do
     isFileExist <- doesFileExist file
 
     if isFileExist then
-        eitherDecodeStrict <$> (liftIO $ BS.readFile $ toFilePath file) >>= \case
+        eitherDecodeStrict <$> liftIO (BS.readFile $ toFilePath file) >>= \case
             Right value -> onDecodedContent value
             Left msg    -> do
               let warning = "File '"+||file||+"' decoded incorrectly because of: "+|msg|+""
