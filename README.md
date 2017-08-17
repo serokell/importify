@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/serokell/importify.svg)](https://travis-ci.org/serokell/importify)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Coverage Status](https://coveralls.io/repos/github/serokell/importify/badge.svg?branch=master)](https://coveralls.io/github/input-output-hk/mantis?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/serokell/importify/badge.svg?branch=master)](https://coveralls.io/github/serokell/importify?branch=master)
 [![HLint Status](https://codeclimate.com/github/serokell/importify/badges/issue_count.svg)](https://codeclimate.com/github/serokell/importify)
 
 ## What this project about?
