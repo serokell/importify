@@ -1,6 +1,7 @@
 # importify — manage Haskell imports easily
 
 [![Build Status](https://travis-ci.org/serokell/importify.svg)](https://travis-ci.org/serokell/importify)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## What this project about?
 
