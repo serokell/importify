@@ -1,7 +1,6 @@
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -110,9 +109,9 @@ cacheProject (LocalPackages locals) (RemotePackages remotes) = do
                          (pkgName localPackage)
                          True
 
-        updateModulesMap $ (HM.unions localMaps)
-                `HM.union` (HM.unions remoteMaps)
-                `HM.union` (HM.unions hackageMaps)
+        updateModulesMap $ HM.unions localMaps
+                `HM.union` HM.unions remoteMaps
+                `HM.union` HM.unions hackageMaps
 
 localPackageDescription :: MonadIO m => QueryPackage -> m GenericPackageDescription
 localPackageDescription QueryPackage{..} = do
@@ -290,7 +289,7 @@ parseTargetModules packagePath pathsToModules targetInfo = do
     let pkgIncludeDirs = map (fromAbsDir . (packagePath </>)) includeDirPaths
 
     ghcDir <- view ghcIncludeDir
-    let includeDirs = pkgIncludeDirs ++ (toList $ fmap fromAbsDir ghcDir)
+    let includeDirs = pkgIncludeDirs ++ toList (fmap fromAbsDir ghcDir)
     let extensions  = withHarmlessExtensions $ buildInfoExtensions targetInfo
 
     let moduleParser path = do
