@@ -14,7 +14,22 @@ imports immediately. But this becomes tedious, especially if you use explicit im
 
 _Importify_ can remove unused imports automatically.
 
-In the future, we plan for _Importify_ to be able to add used symbols to imports automatically, so that you won't have to manage imports manually at all. To speed up _Importify_ runs, we will implement a cache server that caches each _Hackage_ package. You will be able to upload caches for your projects there as well. Also on the roadmap is functionality to convert imports between _implicit_ and _explicit_, and between _qualified_ and _unqualified_ forms. Finally, we will be adding functionality to resolve merge conflicts in import section automatically.
+In the future, we plan for _Importify_ to be able to:
+
+ + Add missing imports automatically, so you won't have to manage
+   imports manually at all.
+ + Implement a cache server with the following features:
+   + Download caches for Hackage packages to speed up _Importify_ runs.
+   + Upload your caches for yet-to-be-published FOSS projects to
+     make it easier to collaborate.
+   + Query mappings from any module of every package to symbols
+     exported by it to write your refactoring tools.
+ + Convert imports between _implicit_ and _explicit_, and between
+   _qualified_ and _unqualified_ forms.
+ + Add symbols that are not present in the import section of a module.
+ + Resolve merge conflicts in import section automatically. See an example below.
+
+![Merge conflict in import section](http://i.imgur.com/97YVCFk.png)
 
 ## Installation
 
@@ -45,19 +60,23 @@ $ importify file path/to/File/With/Unused/Imports.hs
 importify --help
 ```
 
-Before removing redundant imports run `importify cache` command. Importify stores
-local cache for the project under the `.importify` folder inside your project. This cache
-stores exported entities for each module for every dependency and for all your
-local packages. Make sure to re-run `importify cache` if you change the list of
-exported functions and types in your project modules. Cache is built incrementally; it builds dependencies only once. But if you add dependencies or use other versions
-of them (for instance, because of bumping stack lts) you need to run `importify cache` again.
-Although you can always perform `rm -rf .importify` before caching if you face any
+Before removing redundant imports run `importify cache`
+command. Importify stores local cache for the project under the
+`.importify` folder inside your project. This cache stores exported
+entities for each module for every dependency and for all your local
+packages. Make sure to re-run `importify cache` if you change the list
+of exported functions and types in your project modules. Cache is
+built incrementally; it builds dependencies only once. But if you add
+dependencies or use other versions of them (for instance, because of
+bumping stack lts) you need to run `importify cache` again. You can
+always perform `rm -rf .importify` before caching if you face any
 troubles.
 
-After the cache is built, you can use `importify file PATH_TO_FILE` command from your
-project root directory. This command runs _Importify_ on the file and the result in the terminal. If you want to change a file in-place use the following command:
+After the cache is built, you can use `importify file PATH_TO_FILE`
+command from your project root directory. This command runs
+_Importify_ on the file and prints the result in the terminal. If you
+want to change a file in-place use the following command:
 
 ```
 importify file -i PATH_TO_FILE
 ```
-
