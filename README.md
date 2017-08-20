@@ -7,6 +7,7 @@
 
 ## _Importify_ in a nutshell.
 
+
 `importify` tool helps you to manage the import section of your Haskell project modules.
 GHC compiler can warn you about unused imports, and it's a good practice to remove such
 imports immediately. But this becomes tedious, especially if you use explicit import lists.
