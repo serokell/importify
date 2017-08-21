@@ -114,7 +114,7 @@ instance FromJSON ModulesBundle where
 packageTargets :: GenericPackageDescription -> [TargetId]
 packageTargets GenericPackageDescription{..} =
   concat
-    [ maybe [] (\_ -> [LibraryId]) condLibrary
+    [ maybe [] (const [LibraryId]) condLibrary
     , targetMap ExecutableId condExecutables
     , targetMap TestSuiteId  condTestSuites
     , targetMap BenchmarkId  condBenchmarks

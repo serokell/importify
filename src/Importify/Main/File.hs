@@ -27,14 +27,15 @@ import           Language.Haskell.Names.SyntaxUtils (getModuleName)
 import           Path                               (Abs, File, Path, Rel, fromAbsFile,
                                                      fromRelFile, parseRelDir,
                                                      parseRelFile, (</>))
-import           Path.IO                            (getCurrentDir)
+import           Path.IO                            (doesDirExist, getCurrentDir)
 
 import           Extended.System.Wlog               (printError, printNotice)
 import           Importify.Cabal                    (ExtensionsMap, ModulesBundle (..),
                                                      ModulesMap, TargetId, targetIdDir)
 import           Importify.ParseException           (eitherParseResult, setMpeFile)
-import           Importify.Path                     (decodeFileOrMempty, extensionsPath,
-                                                     importifyPath, modulesPath,
+import           Importify.Path                     (decodeFileOrMempty, doInsideDir,
+                                                     extensionsPath, importifyPath,
+                                                     lookupToRoot, modulesPath,
                                                      symbolsPath)
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedImplicitImports,
@@ -59,8 +60,16 @@ newtype ImportifyFileException = IFE Text
 
 -- | Run @importify file@ command with given options.
 importifyFileOptions :: OutputOptions -> FilePath -> IO ()
-importifyFileOptions options srcFile =
-    parseRelFile srcFile >>= importifyFileContent >>= handleOptions
+importifyFileOptions options srcFile = do
+    srcPath   <- parseRelFile srcFile
+    foundRoot <- lookupToRoot (doesDirExist . (</> importifyPath)) srcPath
+    case foundRoot of
+        Nothing ->
+            printError "Directory '.importify' is not found. Either cache for project \
+                       \is not created or not running from project directory."
+        Just (rootDir, srcFromRootPath) -> do
+            importifyResult <- doInsideDir rootDir (importifyFileContent srcFromRootPath)
+            handleOptions importifyResult
   where
     handleOptions :: Either ImportifyFileException Text -> IO ()
     handleOptions (Left (IFE msg))    = printError msg
@@ -110,7 +119,7 @@ importifyAst src modulesMap ast@(Module _ _ _ imports _) =
             return $ unlines preamble
                   <> unlines printedImports
                   <> unlines decls
-importifyAst _ _ _ = return $ Left $ IFE "Module wasn't parser correctly"
+importifyAst _ _ _ = return $ Left $ IFE "Module wasn't parsed correctly"
 
 readModulesMap :: IO ModulesMap
 readModulesMap = decodeFileOrMempty (importifyPath </> modulesPath) pure
