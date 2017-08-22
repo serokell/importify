@@ -33,8 +33,8 @@ import           Path                (Abs, Dir, Path, (</>))
 import           Path.IO             (getCurrentDir)
 
 import           Extended.Lens.TH    (fieldsVerboseLensRules)
-import           Importify.Path      (importifyPath, symbolsPath)
-import           Importify.Stack     (ghcIncludePath)
+import           Importify.Path      (doInsideDir, importifyPath, symbolsPath)
+import           Importify.Stack     (ghcIncludePath, stackProjectRoot)
 
 -- | 'ReaderT' + 'IO' monad described here:
 -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
@@ -69,7 +69,14 @@ pathToSymbols = pathToImportify.to (</> symbolsPath)
 -- project directory and searches for ghc include path.
 runCache :: Bool -> RIO CacheEnvironment () -> IO ()
 runCache _saveSources cacheAction = do
-    projectPath         <- getCurrentDir
-    let _pathToImportify = projectPath </> importifyPath
-    _ghcIncludeDir      <- runMaybeT ghcIncludePath
-    usingReaderT CacheEnvironment{..} $ runRIO cacheAction
+    projectRoot         <- runMaybeT stackProjectRoot
+    case projectRoot of
+        Nothing              -> return ()  -- error is reported inside 'stackProjectRoot'
+        Just projectRootPath -> doInsideDir projectRootPath cacheRunner
+  where
+    cacheRunner :: IO ()
+    cacheRunner = do
+        projectPath         <- getCurrentDir
+        let _pathToImportify = projectPath </> importifyPath
+        _ghcIncludeDir      <- runMaybeT ghcIncludePath
+        usingReaderT CacheEnvironment{..} $ runRIO cacheAction

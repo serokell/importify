@@ -22,6 +22,7 @@ module Importify.Path
        , decodeFileOrMempty
        , doInsideDir
        , findCabalFile
+       , lookupToRoot
        ) where
 
 import           Universum
@@ -29,9 +30,9 @@ import           Universum
 import           Data.Aeson           (FromJSON, eitherDecodeStrict)
 import qualified Data.ByteString      as BS (readFile)
 import           Fmt                  ((+|), (+||), (|+), (||+))
-import           Path                 (Abs, Dir, File, Path, Rel, fromAbsDir, fromAbsFile,
-                                       fromRelDir, fromRelFile, reldir, relfile,
-                                       toFilePath)
+import           Path                 (Abs, Dir, File, Path, Rel, dirname, fromAbsDir,
+                                       fromAbsFile, fromRelDir, fromRelFile, parent,
+                                       reldir, relfile, toFilePath, (</>))
 import           Path.IO              (doesFileExist, ensureDir, getCurrentDir, listDir)
 import           System.FilePath      (takeExtension)
 import           Turtle               (cd, pwd)
@@ -73,13 +74,35 @@ isCabalFile :: Path Abs File -> Bool
 isCabalFile = (== ".cabal") . takeExtension . fromAbsFile
 
 -- | Create given directory and perform given action inside it.
-doInsideDir :: (MonadIO m, MonadMask m) => Path Abs Dir -> m () -> m ()
+doInsideDir :: (MonadIO m, MonadMask m) => Path Abs Dir -> m a -> m a
 doInsideDir dir action = do
     thisDirectory <- pwd
     bracket_ (do ensureDir dir
                  cd $ fromString $ fromAbsDir dir)
              (cd thisDirectory)
              action
+
+-- | Walk up till root while unpure predicate is 'False'. Returns
+-- absolute path to directory where predicate is 'True' and suffix of
+-- current directory prepended to given file.
+lookupToRoot :: (Path Abs Dir -> IO Bool)
+             -> Path Rel File
+             -> IO (Maybe (Path Abs Dir, Path Rel File))
+lookupToRoot predicate relativeFile = do
+    currentDir <- getCurrentDir
+    pathLoop currentDir relativeFile
+  where
+    pathLoop :: Path Abs Dir -> Path Rel File -> IO (Maybe (Path Abs Dir, Path Rel File))
+    pathLoop directory file = do
+        predicateIsTrue <- predicate directory
+        if predicateIsTrue then
+            return $ Just (directory, file)
+        else if parent directory == directory then  -- fixpoint reached
+            return Nothing
+        else do
+            let parentDir = parent  directory
+            let   thisDir = dirname directory
+            pathLoop parentDir (thisDir </> file)
 
 -- | Tries to read file and then 'decode' it. If either of two phases
 -- fails then 'mempty' returned and warning is printed to console.
