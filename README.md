@@ -11,9 +11,15 @@
 GHC compiler can warn you about unused imports. It's a good thing to remove such
 imports. But this becomes tedious especially if you use explicit import lists.
 
-**Importify** can remove unused imports automatically.
+**Importify** can remove unused imports automatically. Below you can see example.
 
-> TODO: describe what else we want it to do?
+Before importify |  After importify
+:---------------:|:-----------------:
+![Module with imports mess](https://user-images.githubusercontent.com/4276606/29321624-b6c2e11a-81e3-11e7-9003-da2a399c9161.png) | ![After removing all unused imports](https://user-images.githubusercontent.com/4276606/29321628-b98afb30-81e3-11e7-855f-3430fe9d250f.png)
+
+You can use [`stylish-haskell`](https://github.com/jaspervdj/stylish-haskell) after `importify` to prettify imports.
+
+> TODO: describe what else we want importify to do?
 
 ## Installation
 
