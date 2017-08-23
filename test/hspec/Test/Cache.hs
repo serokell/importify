@@ -54,5 +54,4 @@ subsetOf :: ModulesMap -> ModulesMap -> Bool
 testMap `subsetOf` cacheMap = all isInCacheMap (HM.toList testMap)
   where
     isInCacheMap :: (FilePath, ModulesBundle) -> Bool
-    isInCacheMap (path, bundle) = maybe False (== bundle)
-                                $ HM.lookup path cacheMap
+    isInCacheMap (path, bundle) = (== Just bundle) $ HM.lookup path cacheMap

@@ -34,7 +34,7 @@ parseModuleWithPreprocessor
     -> Path Abs File  -- ^ Path to module
     -> IO $ Either ModuleParseException $ Module SrcSpanInfo
 parseModuleWithPreprocessor extensions includeFiles pathToModule =
-    (join $ errorForcer <$> parseModuleAfterCPP extensions includeFiles pathToModule)
+    join (errorForcer <$> parseModuleAfterCPP extensions includeFiles pathToModule)
       `catch`
     (fmap Left . cppHandler) >>= \case
       err@(Left _exception)    -> return err

@@ -14,6 +14,7 @@ module Importify.Stack
        , pkgName
        , stackListDependencies
        , stackListPackages
+       , stackProjectRoot
        , upgradeWithVersions
        ) where
 
@@ -22,6 +23,7 @@ import           Universum
 import qualified Control.Foldl        as Fold (head, list)
 import qualified Data.HashMap.Strict  as HM
 import           Data.List            (notElem, partition)
+import qualified Data.Text            as T
 import           Data.Yaml            (FromJSON (parseJSON), Parser, Value (Object),
                                        decodeEither', prettyPrintParseException,
                                        withObject, (.:))
@@ -37,8 +39,9 @@ import           Extended.System.Wlog (printWarning)
 shStack :: [Text] -> Shell Line
 shStack args = inproc "stack" args empty
 
-pathArgs, depsArgs :: [Text]
+pathArgs, rootArgs, depsArgs :: [Text]
 pathArgs = ["path", "--compiler-bin"]
+rootArgs = ["path", "--project-root"]
 depsArgs = ["list-dependencies", "--test", "--bench"]
 
 -- | This function finds path to directory where @include@ for ghc lies.
@@ -66,6 +69,20 @@ ghcIncludePath = do
 
     guardM $ doesDirExist ghcIncludeDir
     return ghcIncludeDir
+
+-- | Acquires project using @stack path --project-root@ command.
+stackProjectRoot :: MaybeT IO (Path Abs Dir)
+stackProjectRoot = do
+    projectRootLine <- MaybeT $ Turtle.fold (shStack rootArgs) Fold.head
+    let projectRoot = lineToText projectRootLine
+    if ".stack/global-project" `T.isSuffixOf` projectRoot then do
+        printWarning "importify was executed outside of project" *> empty
+    else case eitherParseRoot projectRoot of
+        Left exception        -> printWarning (show exception) *> empty
+        Right projectRootPath -> return projectRootPath
+  where
+    eitherParseRoot :: Text -> Either SomeException (Path Abs Dir)
+    eitherParseRoot = parseAbsDir . toString
 
 -- TODO: remove after universum update to 0.6
 guardM :: MonadPlus m => m Bool -> m ()

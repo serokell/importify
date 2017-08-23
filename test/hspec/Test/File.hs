@@ -40,7 +40,7 @@ makeTestGroup testCasesPath = do
 makeTest :: Path Rel Dir -> Path Rel File -> Spec
 makeTest testDirPath testCasePath = do
     diff <- runIO $ loadTestDataDiff testDirPath testCasePath
-    let testType = if elem testCasePath pendingTests then xit else it
+    let testType = if testCasePath `elem` pendingTests then xit else it
     testType (fromRelFile testCasePath) $ diff `shouldBe` []
 
 pendingTests :: [Path Rel File]
