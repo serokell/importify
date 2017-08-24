@@ -31,7 +31,7 @@ install:
   - stack --jobs=2 build --test --bench --coverage --no-run-tests --no-run-benchmarks --no-terminal
 
 script:
-- stack --jobs=4 test --coverage --no-terminal
+  - stack --jobs=4 test --coverage --no-terminal
 
 after_script:
   - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-8.0.1.tar.bz2 | tar -xj

@@ -141,7 +141,6 @@ test-suite importify-test
                        Test.File
 
   build-depends:       base, importify
-                     , Diff
                      , filepath
                      , hspec
                      , log-warper
