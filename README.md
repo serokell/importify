@@ -27,9 +27,8 @@ In the future, we plan for _Importify_ to be able to:
  + Convert imports between _implicit_ and _explicit_, and between
    _qualified_ and _unqualified_ forms.
  + Add symbols that are not present in the import section of a module.
- + Resolve merge conflicts in import section automatically. See an example below.
-
-![Merge conflict in import section](http://i.imgur.com/97YVCFk.png)
+ + Resolve merge conflicts in import section automatically. See an
+   example of [such conflict](http://i.imgur.com/97YVCFk.png).
 
 ## Installation
 
