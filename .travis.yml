@@ -1,9 +1,6 @@
-sudo: required
+sudo: false
 
 language: c
-
-env:
-  - GHCVER=8.0.1
 
 cache:
   directories:
@@ -20,18 +17,24 @@ before_install:
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  - stack --version
 
 install:
-  - stack --version
-  - stack -j 2 setup --no-terminal
+  # Install GHC for current project
+  - stack --jobs=2 setup --no-terminal
   - stack ghc -- --version
-  - stack --jobs=2 build --test --bench --coverage --only-snapshot --no-terminal --no-run-tests --no-run-benchmarks
+
+  # Build only dependencies for project
+  - stack --jobs=2 build --only-snapshot --no-terminal
+
+  # Build project itself with --coverage option to generate code coverage results
+  - stack --jobs=2 build --test --bench --coverage --no-run-tests --no-run-benchmarks --no-terminal
 
 script:
-- stack --jobs=4 test --coverage --no-terminal
+  - stack --jobs=4 test --coverage --no-terminal
 
 after_script:
-  - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj
+  - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-8.0.1.tar.bz2 | tar -xj
   - ./shc importify importify-test
 
 notifications:
