@@ -1,0 +1,7 @@
+module UniversumTrueBothUnused where
+
+import           Prelude   (Bool       )
+import           Universum hiding (Bool             )
+
+foo :: Bool
+foo = undefined
