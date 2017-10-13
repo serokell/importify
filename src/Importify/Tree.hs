@@ -10,21 +10,20 @@ import           Universum
 
 import           Data.Generics.Aliases  (mkT)
 import           Data.Generics.Schemes  (everywhere)
-import           Data.List              (notElem, partition)
+import           Data.List              (partition)
 import           Extended.Data.List     (removeAtMultiple)
 import           Language.Haskell.Exts  (CName, ImportDecl (..), ImportSpec (..),
                                          ImportSpecList (..), Name (..), Namespace (..),
                                          SrcSpanInfo (..))
-import           Language.Haskell.Names (NameInfo (..), Scoped (..))
-import qualified Language.Haskell.Names as N
+import           Language.Haskell.Names (NameInfo (..), Scoped (..), Symbol)
 
 import           Importify.Syntax       (InScoped, pullScopedInfo)
 
 -- | @newtype@ wrapper for list of unused symbols.
-newtype UnusedSymbols = UnusedSymbols { getUnusedSymbols :: [N.Symbol] }
+newtype UnusedSymbols = UnusedSymbols { getUnusedSymbols :: [Symbol] }
 
 -- | @newtype@ wrapper for list of unused symbols from @hiding@.
-newtype UnusedHidings = UnusedHidings { getUnusedHidings :: [N.Symbol] }
+newtype UnusedHidings = UnusedHidings { getUnusedHidings :: [Symbol] }
 
 -- | Remove a list of identifiers from 'ImportDecl's.
 -- Next algorithm is used:
@@ -72,7 +71,7 @@ isVolatileImport ImportDecl{ importSpecs = Nothing }                      = True
 isVolatileImport _                                                        = False
 
 -- | Traverses 'ImportDecl's to remove symbols from 'IThingWith' specs.
-traverseToRemoveThing :: [N.Symbol]
+traverseToRemoveThing :: [Symbol]
                       -> InScoped ImportSpec
                       -> InScoped ImportSpec
 traverseToRemoveThing
@@ -99,7 +98,7 @@ traverseToRemoveThing
 traverseToRemoveThing _ spec = spec
 
 -- | Traverses 'ImportSpecList' to remove identifiers from those lists.
-traverseToRemove :: [N.Symbol]  -- ^
+traverseToRemove :: [Symbol]  -- ^
                  -> Bool
                  -> InScoped ImportSpecList
                  -> InScoped ImportSpecList
@@ -133,7 +132,7 @@ removeSrcSpanInfoPoints shouldKeepEntity entities SrcSpanInfo{..} =
     in (map snd neededEntities, SrcSpanInfo srcInfoSpan newPoints)
 
 -- | Returns 'False' if 'ImportSpec' is not needed.
-isSpecNeeded :: [N.Symbol] -> InScoped ImportSpec -> Bool
+isSpecNeeded :: [Symbol] -> InScoped ImportSpec -> Bool
 isSpecNeeded symbols (IVar _ name)          = isNameNeeded name symbols
 isSpecNeeded symbols (IAbs _ _ name)        = isNameNeeded name symbols
 isSpecNeeded symbols (IThingAll _ name)     = isNameNeeded name symbols
@@ -144,7 +143,7 @@ isSpecNeeded _       (IThingWith _ _ (_:_)) = True -- Do not remove if cnames li
 -- elements inside 'ImportSpec' annotated by 'ImportPart'. But
 -- this constructor contains list of symbols. So it's needed if
 -- at least one element inside list is needed.
-isNameNeeded :: InScoped Name -> [N.Symbol] -> Bool
+isNameNeeded :: InScoped Name -> [Symbol] -> Bool
 isNameNeeded (pullScopedInfo -> ImportPart symbols) unusedSymbols =
     any (`notElem` unusedSymbols) symbols
 isNameNeeded _ _ =

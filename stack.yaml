@@ -1,13 +1,14 @@
-resolver: lts-8.24
+resolver: lts-9.6
 
 packages: ['.']
 
 extra-deps:
-- universum-0.5.1
-- fmt-0.4.0.0
+- fmt-0.5.0.0
+- haskell-names-0.9.0
+- log-warper-1.3.2
 - path-0.6.1
 - path-io-1.3.3
-- log-warper-1.1.4
+- universum-0.7.0
 
 flags: {}
 extra-package-dbs: []

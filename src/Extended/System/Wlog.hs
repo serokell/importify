@@ -26,7 +26,7 @@ importifyLoggerConfig importifySeverity =
 
 -- | Initializes importify logger.
 initImportifyLogger :: MonadIO m => Severity -> m ()
-initImportifyLogger = setupLogging . importifyLoggerConfig
+initImportifyLogger = setupLogging Nothing . importifyLoggerConfig
 
 withImportify :: LoggerNameBox m a -> m a
 withImportify = usingLoggerName "importify"

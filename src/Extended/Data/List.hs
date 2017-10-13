@@ -7,8 +7,6 @@ module Extended.Data.List
 
 import           Universum
 
-import           Data.List (notElem)
-
 -- | Removes element from list by given index. If there's
 -- no element at such index then list returns unchanged.
 removeAt :: Int -> [a] -> [a]

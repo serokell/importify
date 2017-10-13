@@ -22,7 +22,7 @@ import           Universum
 
 import qualified Control.Foldl        as Fold (head, list)
 import qualified Data.HashMap.Strict  as HM
-import           Data.List            (notElem, partition)
+import           Data.List            (partition)
 import qualified Data.Text            as T
 import           Data.Yaml            (FromJSON (parseJSON), Parser, Value (Object),
                                        decodeEither', prettyPrintParseException,
@@ -83,10 +83,6 @@ stackProjectRoot = do
   where
     eitherParseRoot :: Text -> Either SomeException (Path Abs Dir)
     eitherParseRoot = parseAbsDir . toString
-
--- TODO: remove after universum update to 0.6
-guardM :: MonadPlus m => m Bool -> m ()
-guardM f = guard =<< f
 
 -- | Extract all dependencies with versions using
 -- @stack list-dependencies@ shell command.

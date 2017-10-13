@@ -13,8 +13,8 @@ import qualified Data.Map.Strict                          as M
 
 import           Language.Haskell.Exts                    (Module, ModuleName (..))
 import           Language.Haskell.Names                   (NameInfo (Export, GlobalSymbol),
-                                                           Scoped, resolve, symbolModule)
-import qualified Language.Haskell.Names                   as N (Symbol (..), symbolName)
+                                                           Scoped, Symbol (..), resolve,
+                                                           symbolModule)
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
 
 import           Importify.Syntax                         (anyAnnotation)
@@ -22,21 +22,21 @@ import           Importify.Syntax                         (anyAnnotation)
 
 -- | Checks if 'Symbol' is used inside annotations. This function
 -- needed to remove unused imports.
-symbolUsedIn :: N.Symbol -> [Scoped l] -> Bool
+symbolUsedIn :: Symbol -> [Scoped l] -> Bool
 symbolUsedIn symbol = anyAnnotation used
   where
     used :: NameInfo l -> Bool
 
     -- Constructors are special because the whole type should be considered used
     -- if one of its constructors is used
-    used (GlobalSymbol global@(N.Constructor smodule _sname stype) _) =
+    used (GlobalSymbol global@(Constructor smodule _sname stype) _) =
         symbol == global ||
-        (N.symbolName symbol == stype && symbolModule symbol == smodule)
+        (symbolName symbol == stype && symbolModule symbol == smodule)
 
     -- ditto for selectors
-    used (GlobalSymbol global@(N.Selector smodule _sname stype _scons) _) =
+    used (GlobalSymbol global@(Selector smodule _sname stype _scons) _) =
         symbol == global ||
-        (N.symbolName symbol == stype && symbolModule symbol == smodule)
+        (symbolName symbol == stype && symbolModule symbol == smodule)
 
     -- Symbol is used as a part of export declaration
     used (Export symbols) = symbol `elem` symbols
@@ -47,9 +47,9 @@ symbolUsedIn symbol = anyAnnotation used
 
 -- | Collect symbols unused in annotations.
 collectUnusedSymbolsBy
-    :: (N.Symbol -> Bool) -- ^ 'True' iff 'Symbol' is used
+    :: (Symbol -> Bool) -- ^ 'True' iff 'Symbol' is used
     -> Table              -- ^ Mapping from imported names to their symbols
-    -> [N.Symbol]         -- ^ Returns list of unused symbols from 'Table'
+    -> [Symbol]         -- ^ Returns list of unused symbols from 'Table'
 collectUnusedSymbolsBy isUsed table = do
     -- 1. For every pair (entity, its symbols) in Table
     (_, importedSymbols) <- M.toList table
@@ -64,5 +64,5 @@ collectUnusedSymbolsBy isUsed table = do
     pure symbol
 
 -- | Gather all symbols for given list of 'Module's.
-resolveModules :: (Data l, Eq l) => [Module l] -> [(ModuleName (), [N.Symbol])]
+resolveModules :: (Data l, Eq l) => [Module l] -> [(ModuleName (), [Symbol])]
 resolveModules modules = M.toList $ resolve modules mempty
