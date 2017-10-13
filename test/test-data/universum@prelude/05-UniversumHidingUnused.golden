@@ -1,0 +1,6 @@
+module Sandbox where
+
+import           Prelude   (Bool (True))
+
+foo :: Bool
+foo = True
