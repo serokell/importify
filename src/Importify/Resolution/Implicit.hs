@@ -8,19 +8,17 @@ module Importify.Resolution.Implicit
 
 import           Universum
 
-import           Data.List                     (notElem)
 import qualified Data.Map.Strict               as M
 
 import           Language.Haskell.Exts         (ImportDecl (..), ModuleName (..))
-import           Language.Haskell.Names        (Environment)
-import qualified Language.Haskell.Names        as N (Symbol (..))
+import           Language.Haskell.Names        (Environment, Symbol)
 
 import           Importify.Resolution.Explicit (collectUnusedSymbolsBy)
 import           Importify.Syntax              (InScoped, getImportModuleName,
                                                 importNamesWithTables, isImportImplicit)
 
 -- | Collect names of unused implicit imports.
-collectUnusedImplicitImports :: (N.Symbol -> Bool)
+collectUnusedImplicitImports :: (Symbol -> Bool)
                              -> [InScoped ImportDecl]
                              -> [ModuleName ()]
 collectUnusedImplicitImports isUsed imports =

@@ -10,7 +10,7 @@ module Importify.ParseException
 
 import           Universum
 
-import           Fmt                   (Builder, blockListF, build, indent, (+|), (|+))
+import           Fmt                   (Builder, blockListF, build, indentF, (+|), (|+))
 import           Language.Haskell.Exts (ParseResult (..), SrcLoc (srcFilename),
                                         prettyPrint)
 
@@ -23,9 +23,9 @@ data ModuleParseException = MPE !SrcLoc !String
 instance Exception ModuleParseException
 instance Buildable ModuleParseException where
     build (MPE loc reason) = "Location:\n"
-                          +| indent 4 (build $ charWrap 80 $ prettyPrint loc)
+                          +| indentF 4 (build $ charWrap 80 $ prettyPrint loc)
                           |+ "Reason:\n"
-                          +| indent 4 (build $ wordWrap 80 reason)
+                          +| indentF 4 (build $ wordWrap 80 reason)
                           |+ ""
 
 -- | Updates file name of error location. Sometimes error location
@@ -43,7 +43,7 @@ eitherParseResult (ParseFailed loc reason) = Left $ MPE loc reason
 prettyParseErrors :: Text -> NonEmpty ModuleParseException -> Text
 prettyParseErrors libName exceptions =
     "Next errors occured during caching of package: "+|libName|+"\n"
- +| indent 4 (blockListF exceptions) |+ ""
+ +| indentF 4 (blockListF exceptions) |+ ""
 
 -- | Prints parse errors if list of errors is not empty.
 reportErrorsIfAny :: [ModuleParseException] -> Text -> IO ()
