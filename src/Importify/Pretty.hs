@@ -28,19 +28,17 @@ printLovelyImports start end importsText importDecls =
         indexedImportLines = map (importStartLine &&& exactPrintImport) importDecls
         importsMap         = IM.fromList indexedImportLines
 
-        -- find indexes of empty lines
-        indexedTextLines  = zip [start..end] importsText
-        emptyLinesIndexes = map fst
-                          $ filter (null . strip . stripEndLineComment . snd)
-                                   indexedTextLines
+        -- find empty and single comment lines
+        indexedTextLines    = zip [start..end] importsText
+        emptyOrCommentLines = filter (null . strip . stripEndLineComment . snd) indexedTextLines
 
-        -- add empty lines to result map
-        importsMapWithEmptyLines = foldl' (\dict i -> IM.insert i [""] dict)
+        -- add empty and single comment lines to result map
+        importsMapWithExtraLines = foldl' (\dict (i,l) -> IM.insert i [l] dict)
                                           importsMap
-                                          emptyLinesIndexes
+                                          emptyOrCommentLines
 
         -- collect all values and concat them; order is guaranteed by IntMap
-        resultLines = concat $ IM.elems importsMapWithEmptyLines
+        resultLines = concat $ IM.elems importsMapWithExtraLines
     in resultLines
 
 importStartLine :: ImportDecl SrcSpanInfo -> Int
