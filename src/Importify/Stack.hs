@@ -24,7 +24,7 @@ import qualified Control.Foldl        as Fold (head, list)
 import qualified Data.HashMap.Strict  as HM
 import           Data.List            (partition)
 import qualified Data.Text            as T
-import           Data.Yaml            (FromJSON (parseJSON), Parser, Value (Object),
+import           Data.Yaml            (FromJSON (parseJSON), Value (Object),
                                        decodeEither', prettyPrintParseException,
                                        withObject, (.:))
 import           Path                 (Abs, Dir, Path, PathException, dirname, fromAbsDir,

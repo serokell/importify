@@ -10,7 +10,7 @@ module Importify.ParseException
 
 import           Universum
 
-import           Fmt                   (Builder, blockListF, build, indentF, (+|), (|+))
+import           Fmt                   (blockListF, build, indentF, (+|), (|+))
 import           Language.Haskell.Exts (ParseResult (..), SrcLoc (srcFilename),
                                         prettyPrint)
 

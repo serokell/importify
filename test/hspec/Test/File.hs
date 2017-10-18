@@ -12,7 +12,6 @@ import           Data.List      (sort)
 import           Path           (Dir, File, Path, Rel, dirname, fileExtension, filename,
                                  fromRelDir, fromRelFile, mkRelFile, (-<.>), (</>))
 import           Path.IO        (listDir)
-import           System.Wlog    (Severity)
 
 import           Test.Hspec     (Spec, describe, it, runIO, shouldBe, xit)
 

@@ -10,7 +10,7 @@ import           Data.Char                  (toUpper)
 import           Data.List                  (stripPrefix)
 import           Language.Haskell.TH.Syntax (Name, mkName, nameBase)
 import           Lens.Micro.Platform        (DefName (MethodName), LensRules,
-                                             camelCaseFields, lensField, makeLensesWith)
+                                             camelCaseFields, lensField)
 
 -- | A field namer for 'fieldsVerboseLensRules'.
 verboseFieldsNamer :: Name -> [Name] -> Name -> [DefName]
