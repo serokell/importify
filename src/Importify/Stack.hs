@@ -40,7 +40,7 @@ import           Extended.System.Wlog (printWarning)
 shStack :: [Text] -> Shell Line
 shStack args = do
   inNix <- inNixShell
-  inproc "stack" (if inNix then ("--nix" : args) else args) empty
+  inproc "stack" (if inNix then "--nix" : args else args) empty
 
 -- | Checks if running in nix shell
 inNixShell :: MonadIO m => m Bool
