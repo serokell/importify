@@ -27,6 +27,12 @@ Make your changes and consider the following check list to go through before sub
   + **_Example:_** `[#42] Short commit description`
   + _Recomended:_ add emoji to commit according to [this guide](https://github.com/slashsBin/styleguide-git-commit-message)
 
+If you fix bugs or add new features, please add tests following next instructions:
+
+1. Create files with example in [`test-data` folder](https://github.com/serokell/importify/tree/master/test/test-data) with `.hs` extension.
+2. Run `stack exec golden-generator`.
+3. Verify manually new generated files with `.golden` extension.
+
 After all above is done commit and push to your fork.
 Now you are ready to [submit a pull request][pr].
 
