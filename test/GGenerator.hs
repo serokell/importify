@@ -6,13 +6,14 @@
 
 module Main where
 
-import           Universum
+import           Universum  hiding (writeFile)
+
+import           Data.Text.IO      (writeFile)
 
 import           Path              (Abs, Dir, File, Path,
                                     fileExtension, fromAbsFile,
                                     (-<.>))
 import           Path.IO           (listDirRecur, removeFile)
-import           Test.Tasty.Golden (writeBinaryFile)
 
 import           Importify.Main    (importifyFileContent)
 import           Importify.Path    (testDataPath)
@@ -50,10 +51,13 @@ generateGoldenTestsPrompt False = do
 findHaskellFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
 findHaskellFiles = findByExtension "hs"
 
+writeBinaryFile :: Path Abs File -> Text -> IO ()
+writeBinaryFile = writeFile . fromAbsFile
+
 generateGoldenTests :: IO ()
 generateGoldenTests = do
     testCaseFiles <- findHaskellFiles testDataPath
     forM_ testCaseFiles $ \testCasePath -> do
        Right modifiedSrc <- importifyFileContent testCasePath
        goldenPath        <- testCasePath -<.> "golden"
-       writeBinaryFile (fromAbsFile goldenPath) (toString modifiedSrc)
+       writeBinaryFile goldenPath modifiedSrc

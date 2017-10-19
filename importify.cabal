@@ -121,9 +121,9 @@ executable golden-generator
   main-is:             GGenerator.hs
 
   build-depends:       base, importify
+                     , text
                      , path
                      , path-io
-                     , tasty-golden
                      , universum
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
