@@ -13,13 +13,15 @@ import           Universum
 
 import           Lens.Micro.Platform (zoom, (?=))
 import           System.Wlog         (LoggerConfig, LoggerNameBox, Severity (..),
-                                      consoleOutB, lcTree, logDebug, logError, logInfo,
-                                      logNotice, logWarning, ltSeverity, setupLogging,
-                                      usingLoggerName, zoomLogger)
+                                      consoleOutB, lcTermSeverity, lcTree, logDebug,
+                                      logError, logInfo, logNotice, logWarning,
+                                      ltSeverity, setupLogging, usingLoggerName,
+                                      zoomLogger)
 
 importifyLoggerConfig :: Severity -> LoggerConfig
-importifyLoggerConfig importifySeverity =
-    executingState consoleOutB $ zoom lcTree $ do
+importifyLoggerConfig importifySeverity = executingState consoleOutB $ do
+    lcTermSeverity ?= importifySeverity
+    zoom lcTree $ do
         ltSeverity ?= Warning
         zoomLogger "importify" $
             ltSeverity ?= importifySeverity
