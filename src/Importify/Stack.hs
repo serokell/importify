@@ -1,6 +1,7 @@
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Utilities which allows to use @stack@ tools for different
 -- dependencies stuff.
@@ -31,13 +32,21 @@ import           Path                 (Abs, Dir, Path, PathException, dirname, f
                                        mkRelDir, parent, parseAbsDir, (</>))
 import           Path.IO              (doesDirExist)
 import           System.FilePath      (splitPath)
-import           Turtle               (Line, Shell, inproc, lineToText, linesToText)
+import           Turtle               (Line, Shell, inproc, lineToText, linesToText, need)
 import qualified Turtle               (fold)
 
 import           Extended.System.Wlog (printWarning)
 
 shStack :: [Text] -> Shell Line
-shStack args = inproc "stack" args empty
+shStack args = do
+  inNix <- inNixShell
+  inproc "stack" (if inNix then "--nix" : args else args) empty
+
+-- | Checks if running in nix shell
+inNixShell :: MonadIO m => m Bool
+inNixShell = do
+  ns <- need "IN_NIX_SHELL"
+  pure $ maybe False (== "1") ns
 
 pathArgs, rootArgs, depsArgs :: [Text]
 pathArgs = ["path", "--compiler-bin"]
