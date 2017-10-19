@@ -28,7 +28,7 @@ main = do
         _           -> putText "Incorrect arguments!"
 
 findByExtension :: MonadIO m => String -> Path b Dir -> m [Path Abs File]
-findByExtension ext path = (filter $ (== ext) . fileExtension) . snd
+findByExtension ext path = filter ((== ext) . fileExtension) . snd
                           <$> listDirRecur path 
 
 findGoldenFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
