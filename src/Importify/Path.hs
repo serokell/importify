@@ -16,7 +16,6 @@ module Importify.Path
        , symbolsDir
        , symbolsPath
        , testDataPath
-       , testDataDir
 
          -- * Utility functions to work with files and directories
        , decodeFileOrMempty
@@ -57,12 +56,11 @@ testDataPath = [reldir|test/test-data/|]
 extensionsPath :: Path Rel File
 extensionsPath = [relfile|extensions|]
 
-importifyDir, extensionsFile, modulesFile, symbolsDir, testDataDir :: FilePath
+importifyDir, extensionsFile, modulesFile, symbolsDir :: FilePath
 importifyDir   = fromRelDir  importifyPath
 extensionsFile = fromRelFile extensionsPath
 modulesFile    = fromRelFile modulesPath
 symbolsDir     = fromRelDir  symbolsPath
-testDataDir    = fromRelDir  testDataPath
 
 -- | Returns relative path to cabal file under given directory.
 findCabalFile :: MonadIO m => Path Abs Dir -> m $ Maybe $ Path Abs File

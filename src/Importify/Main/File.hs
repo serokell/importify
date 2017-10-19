@@ -1,5 +1,7 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts      #-}
 
 -- | Contains implementation of @importify file@ command.
 
@@ -24,9 +26,9 @@ import           Language.Haskell.Names             (Environment, Scoped, annota
                                                      loadBase, readSymbols)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Path                               (Abs, File, Path, Rel, fromAbsFile,
-                                                     fromRelFile, parseRelDir,
-                                                     parseRelFile, (</>))
+import           Path                               (Abs, Dir, File, Path, Rel,
+                                                     fromAbsFile, fromRelFile,
+                                                     parseRelDir, parseRelFile, (</>))
 import           Path.IO                            (doesDirExist, getCurrentDir)
 
 import           Extended.System.Wlog               (printError, printNotice)
@@ -78,12 +80,24 @@ importifyFileOptions options srcFile = do
         InPlace   -> writeFile srcFile modifiedSrc
         ToFile to -> writeFile to      modifiedSrc
 
+class PathHandling b t where
+  toFilePath :: Path b t -> FilePath
+  toAbs :: Path Abs Dir -> Path b t -> Path Abs t
+
+instance PathHandling Rel File where
+  toFilePath = fromRelFile
+  toAbs = (</>)
+
+instance PathHandling Abs File where
+  toFilePath = fromAbsFile
+  toAbs _ p = p 
+
 -- | Return result of @importify file@ command.
-importifyFileContent :: Path Rel File -> IO (Either ImportifyFileException Text)
+importifyFileContent :: PathHandling b File => Path b File -> IO (Either ImportifyFileException Text)
 importifyFileContent srcPath = do
-    let srcFile    = fromRelFile srcPath
+    let srcFile    = toFilePath srcPath
     curDir        <- getCurrentDir
-    let absSrcPath = curDir </> srcPath
+    let absSrcPath = toAbs curDir srcPath
 
     modulesMap <- readModulesMap
     extensions <- readExtensions absSrcPath modulesMap

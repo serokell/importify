@@ -8,12 +8,14 @@ module Main where
 
 import           Universum
 
-import           Path              (fromRelFile, parseRelFile, (-<.>))
-import           Path.IO           (removeFile)
-import           Test.Tasty.Golden (findByExtension, writeBinaryFile)
+import           Path              (Abs, Dir, File, Path,
+                                    fileExtension, fromAbsFile,
+                                    (-<.>))
+import           Path.IO           (listDirRecur, removeFile)
+import           Test.Tasty.Golden (writeBinaryFile)
 
 import           Importify.Main    (importifyFileContent)
-import           Importify.Path    (testDataDir)
+import           Importify.Path    (testDataPath)
 
 main :: IO ()
 main = do
@@ -24,10 +26,18 @@ main = do
         []          -> generateGoldenTestsPrompt False
         _           -> putText "Incorrect arguments!"
 
-cleanGoldenExamples :: IO ()
+findByExtension :: MonadIO m => String -> Path b Dir -> m [Path Abs File]
+findByExtension ext path = (filter $ (== ext) . fileExtension) . snd
+                          <$> listDirRecur path 
+
+findGoldenFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
+findGoldenFiles = findByExtension "golden"
+
+cleanGoldenExamples :: MonadIO m => m ()
 cleanGoldenExamples = do
-    goldenExamples <- findByExtension [".golden"] testDataDir
-    mapM_ (parseRelFile >=> removeFile) goldenExamples
+    goldenExamples <- findGoldenFiles testDataPath
+    mapM_ removeFile goldenExamples
+
 
 generateGoldenTestsPrompt :: Bool -> IO ()
 generateGoldenTestsPrompt True  = generateGoldenTests
@@ -37,11 +47,13 @@ generateGoldenTestsPrompt False = do
         "y" -> generateGoldenTests
         _   -> putText "Aborting generation"
 
+findHaskellFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
+findHaskellFiles = findByExtension "hs"
+
 generateGoldenTests :: IO ()
 generateGoldenTests = do
-    testCaseFiles <- findByExtension [".hs"] testDataDir
-    forM_ testCaseFiles $ \testCaseFile -> do
-       testCasePath      <- parseRelFile testCaseFile
+    testCaseFiles <- findHaskellFiles testDataPath
+    forM_ testCaseFiles $ \testCasePath -> do
        Right modifiedSrc <- importifyFileContent testCasePath
        goldenPath        <- testCasePath -<.> "golden"
-       writeBinaryFile (fromRelFile goldenPath) (toString modifiedSrc)
+       writeBinaryFile (fromAbsFile goldenPath) (toString modifiedSrc)
