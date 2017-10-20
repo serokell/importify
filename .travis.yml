@@ -21,17 +21,17 @@ before_install:
 
 install:
   # Install GHC for current project
-  - stack setup --no-terminal
+  - travis_wait stack setup --no-terminal
   - stack ghc -- --version
 
-  # Build only dependencies for project
-  - stack --jobs=2 build --only-dependencies --no-terminal
+  # Build project dependencies
+  - travis_wait stack --jobs=2 build --only-dependencies --no-terminal
 
   # Build project itself
-  - stack --jobs=2 build --test --bench --no-run-tests --no-run-benchmarks --no-terminal
+  - travis_wait stack --jobs=2 build --test --bench --no-run-tests --no-run-benchmarks --no-terminal
 
 script:
-  - stack --jobs=4 test --no-terminal
+  - travis_wait stack --jobs=4 test --no-terminal
 
 notifications:
   email: false
