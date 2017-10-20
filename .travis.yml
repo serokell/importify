@@ -21,7 +21,7 @@ before_install:
 
 install:
   # Install GHC for current project
-  - stack --jobs=2 setup --no-terminal
+  - stack setup --no-terminal
   - stack ghc -- --version
 
   # Build only dependencies for project
