@@ -6,9 +6,7 @@
 
 module Main where
 
-import           Universum  hiding (writeFile)
-
-import           Data.Text.IO      (writeFile)
+import           Universum
 
 import           Path              (Abs, Dir, File, Path,
                                     fileExtension, fromAbsFile,
@@ -51,7 +49,7 @@ generateGoldenTestsPrompt False = do
 findHaskellFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
 findHaskellFiles = findByExtension "hs"
 
-writeBinaryFile :: Path Abs File -> Text -> IO ()
+writeBinaryFile :: MonadIO m => Path Abs File -> Text -> m ()
 writeBinaryFile = writeFile . fromAbsFile
 
 generateGoldenTests :: IO ()

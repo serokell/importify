@@ -70,7 +70,8 @@ importifyFileOptions options srcFile = do
             printError "Directory '.importify' is not found. Either cache for project \
                        \is not created or not running from project directory."
         Just (rootDir, srcFromRootPath) -> do
-            importifyResult <- doInsideDir rootDir (importifyFileContent srcFromRootPath)
+            curDir          <- getCurrentDir
+            importifyResult <- doInsideDir rootDir (importifyFileContent $ curDir </> srcFromRootPath)
             handleOptions importifyResult
   where
     handleOptions :: Either ImportifyFileException Text -> IO ()
@@ -80,29 +81,15 @@ importifyFileOptions options srcFile = do
         InPlace   -> writeFile srcFile modifiedSrc
         ToFile to -> writeFile to      modifiedSrc
 
-class PathHandling b t where
-  toFilePath :: Path b t -> FilePath
-  toAbs :: Path Abs Dir -> Path b t -> Path Abs t
-
-instance PathHandling Rel File where
-  toFilePath = fromRelFile
-  toAbs = (</>)
-
-instance PathHandling Abs File where
-  toFilePath = fromAbsFile
-  toAbs _ p = p 
-
 -- | Return result of @importify file@ command.
-importifyFileContent :: PathHandling b File => Path b File -> IO (Either ImportifyFileException Text)
+importifyFileContent :: Path Abs File -> IO (Either ImportifyFileException Text)
 importifyFileContent srcPath = do
-    let srcFile    = toFilePath srcPath
-    curDir        <- getCurrentDir
-    let absSrcPath = toAbs curDir srcPath
+    let srcFile    = fromAbsFile srcPath
 
     modulesMap <- readModulesMap
-    extensions <- readExtensions absSrcPath modulesMap
+    extensions <- readExtensions srcPath modulesMap
 
-    whenNothing_ (HM.lookup (fromAbsFile absSrcPath) modulesMap) $
+    whenNothing_ (HM.lookup (fromAbsFile srcPath) modulesMap) $
         printNotice $ "File '"+|srcFile|+"' is not cached: new file or caching error"
 
     src <- readFile srcFile
