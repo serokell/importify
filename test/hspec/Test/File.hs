@@ -9,8 +9,9 @@ module Test.File
 import           Universum
 
 import           Data.List      (sort)
-import           Path           (Dir, File, Path, Rel, dirname, fileExtension, filename,
-                                 fromRelDir, fromRelFile, mkRelFile, (-<.>), (</>))
+import           Path           (Abs, Dir, File, Path, Rel, dirname, fileExtension,
+                                 filename, fromRelDir, fromAbsFile, mkRelFile,
+                                 (-<.>), (</>))
 import           Path.IO        (listDir)
 import           System.Wlog    (Severity)
 
@@ -25,32 +26,31 @@ spec = do
     describe "file:unused" $
         mapM_ (makeTestGroup . (testDataPath </> ) . dirname) testFolders
 
+
 makeTestGroup :: Path Rel Dir -> Spec
 makeTestGroup testCasesPath = do
     (_, testDirPaths) <- runIO $ listDir testCasesPath
     let testHsOnly     = sort
-                       $ filter ((== ".hs") . fileExtension)
-                       $ map filename testDirPaths
+                       $ filter ((== ".hs") . fileExtension) testDirPaths
 
     describe ("subfolder: " ++ fromRelDir testCasesPath) $
-        mapM_ (makeTest testCasesPath) testHsOnly
+        mapM_ makeTest testHsOnly
 
-makeTest :: Path Rel Dir -> Path Rel File -> Spec
-makeTest testDirPath testCasePath = do
-    (result, expected) <- runIO $ loadTestData testDirPath testCasePath
-    let testType = if testCasePath `elem` pendingTests then xit else it
-    testType (fromRelFile testCasePath) $ result `shouldBe` expected
+makeTest :: Path Abs File -> Spec
+makeTest testCasePath = do
+    (result, expected) <- runIO $ loadTestData testCasePath
+    let testType = if filename testCasePath `elem` pendingTests then xit else it
+    testType (fromAbsFile testCasePath) $ result `shouldBe` expected
 
 pendingTests :: [Path Rel File]
 pendingTests = [ $(mkRelFile "01-ImportBothUsedQualified.hs") -- Importify can't modify source yet
                ]
 
-loadTestData :: Path Rel Dir -> Path Rel File -> IO (Text, Text)
-loadTestData testDirPath testCasePath = do
-    let fullPathToTest = testDirPath </> testCasePath
-    goldenExamplePath <- fullPathToTest -<.> ".golden"
+loadTestData :: Path Abs File -> IO (Text, Text)
+loadTestData testCasePath = do
+    goldenExamplePath <- testCasePath -<.> ".golden"
 
-    goldenExampleSrc     <- readFile (fromRelFile goldenExamplePath)
-    Right importifiedSrc <- importifyFileContent fullPathToTest
+    goldenExampleSrc     <- readFile (fromAbsFile goldenExamplePath)
+    Right importifiedSrc <- importifyFileContent testCasePath
 
     return (importifiedSrc, goldenExampleSrc)

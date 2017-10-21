@@ -1,5 +1,7 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts      #-}
 
 -- | Contains implementation of @importify file@ command.
 
@@ -25,9 +27,9 @@ import           Language.Haskell.Names             (Environment, Scoped, annota
                                                      loadBase, readSymbols)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Path                               (Abs, File, Path, Rel, fromAbsFile,
-                                                     fromRelFile, parseRelDir,
-                                                     parseRelFile, (</>))
+import           Path                               (Abs, Dir, File, Path, Rel,
+                                                     fromAbsFile, fromRelFile,
+                                                     parseRelDir, parseRelFile, (</>))
 import           Path.IO                            (doesDirExist, getCurrentDir)
 
 import           Extended.System.Wlog               (printError, printNotice)
@@ -69,7 +71,8 @@ importifyFileOptions options srcFile = do
             printError "Directory '.importify' is not found. Either cache for project \
                        \is not created or not running from project directory."
         Just (rootDir, srcFromRootPath) -> do
-            importifyResult <- doInsideDir rootDir (importifyFileContent srcFromRootPath)
+            curDir          <- getCurrentDir
+            importifyResult <- doInsideDir rootDir (importifyFileContent $ curDir </> srcFromRootPath)
             handleOptions importifyResult
   where
     handleOptions :: Either ImportifyFileException Text -> IO ()
@@ -80,16 +83,14 @@ importifyFileOptions options srcFile = do
         ToFile to -> writeFile to      modifiedSrc
 
 -- | Return result of @importify file@ command.
-importifyFileContent :: Path Rel File -> IO (Either ImportifyFileException Text)
+importifyFileContent :: Path Abs File -> IO (Either ImportifyFileException Text)
 importifyFileContent srcPath = do
-    let srcFile    = fromRelFile srcPath
-    curDir        <- getCurrentDir
-    let absSrcPath = curDir </> srcPath
+    let srcFile    = fromAbsFile srcPath
 
     modulesMap <- readModulesMap
-    extensions <- readExtensions absSrcPath modulesMap
+    extensions <- readExtensions srcPath modulesMap
 
-    whenNothing_ (HM.lookup (fromAbsFile absSrcPath) modulesMap) $
+    whenNothing_ (HM.lookup (fromAbsFile srcPath) modulesMap) $
         printNotice $ "File '"+|srcFile|+"' is not cached: new file or caching error"
 
     src <- readFile srcFile
