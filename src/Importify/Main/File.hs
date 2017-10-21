@@ -18,8 +18,9 @@ import           Fmt                                (fmt, (+|), (|+))
 import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
                                                      ModuleHead, ModuleName (..),
                                                      SrcSpanInfo, exactPrint,
-                                                     parseExtension,
-                                                     parseFileContentsWithExts)
+                                                     parseExtension, Comment (..),
+                                                     parseFileContentsWithComments)
+import           Language.Haskell.Exts.Parser       (defaultParseMode, ParseMode (..))
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
@@ -93,18 +94,19 @@ importifyFileContent srcPath = do
 
     src <- readFile srcFile
     let parseResult = eitherParseResult
-                    $ parseFileContentsWithExts extensions
+                    $ parseFileContentsWithComments (defaultParseMode { extensions = extensions })
                     $ toString src
 
     case parseResult of
-        Left exception -> return $ Left $ IFE $ setMpeFile srcFile exception |+ ""
-        Right ast      -> importifyAst src modulesMap ast
+        Left exception       -> return $ Left $ IFE $ setMpeFile srcFile exception |+ ""
+        Right (ast,comments) -> importifyAst src modulesMap comments ast
 
 importifyAst :: Text
              -> ModulesMap
+             -> [Comment]
              -> Module SrcSpanInfo
              -> IO (Either ImportifyFileException Text)
-importifyAst src modulesMap ast@(Module _ _ _ imports _) =
+importifyAst src modulesMap comments ast@(Module _ _ _ imports _) =
     Right <$> case importSlice imports of
         Nothing           -> return src
         Just (start, end) -> do
@@ -114,12 +116,12 @@ importifyAst src modulesMap ast@(Module _ _ _ imports _) =
 
             environment       <- loadEnvironment modulesMap
             let newImports     = removeUnusedImports ast imports environment
-            let printedImports = printLovelyImports start end impText newImports
+            let printedImports = printLovelyImports start end comments impText newImports
 
             return $ unlines preamble
                   <> unlines printedImports
                   <> unlines decls
-importifyAst _ _ _ = return $ Left $ IFE "Module wasn't parsed correctly"
+importifyAst _ _ _ _ = return $ Left $ IFE "Module wasn't parsed correctly"
 
 readModulesMap :: IO ModulesMap
 readModulesMap = decodeFileOrMempty (importifyPath </> modulesPath) pure
