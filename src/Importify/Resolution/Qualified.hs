@@ -55,7 +55,7 @@ possiblyUnusedImport unusedImplicits decl = isNothing (importSpecs decl)
                       ==> getImportModuleName decl `elem` unusedImplicits
 
 -- | For given import collect qualified name.
--- Qualified names gathered using next scheme:
+-- Qualified names gathered using the following scheme:
 -- @
 --   import           A      ⇒ Nothing
 --   import qualified B      ⇒ Just B

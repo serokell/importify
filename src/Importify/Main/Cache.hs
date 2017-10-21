@@ -74,7 +74,7 @@ importifyCacheProject :: RIO CacheEnvironment ()
 importifyCacheProject = do
     (localPackages@(LocalPackages locals), remotePackages) <- stackListPackages
     if null locals
-    then printWarning "No packages found :( This could happen due to next reasons:\n\
+    then printWarning "No packages found :( This could happen due to the following reasons:\n\
                       \    1. Not running from project root directory.\n\
                       \    2. 'stack query' command failure.\n\
                       \    3. Our failure in parsing 'stack query' output."
