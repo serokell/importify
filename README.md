@@ -35,10 +35,10 @@ In the future, we plan for _Importify_ to be able to:
 
 ## Installation
 
-Installation process assumes that you have already installed and configured `stack`
+Installation process assumes that you have already installed and configured the `stack`
 build tool. Currently `importify` works only with projects built with `stack`.
 
-Perform the next steps before driving:
+Perform the following steps before driving:
 
 ```bash
 $ git clone https://github.com/serokell/importify.git  # 1. Clone repository locally
@@ -51,7 +51,7 @@ $ stack install importify\:exe\:importify              # 3. Copy executable unde
 In short:
 
 ```bash
-$ cd my-project-which-build-with-stack
+$ cd my-project-which-builds-with-stack
 $ importify cache
 $ importify file path/to/File/With/Unused/Imports.hs
 ```
@@ -69,8 +69,8 @@ entities for each module for every dependency and for all your local
 packages. Make sure to re-run `importify cache` if you change the list
 of exported functions and types in your project modules. Cache is
 built incrementally; it builds dependencies only once. But if you add
-dependencies or use other versions of them (for instance, because of
-bumping stack lts) you need to run `importify cache` again. You can
+dependencies or use other versions of them 
+(for instance, bumping stack lts) you need to run `importify cache` again. You can
 always perform `rm -rf .importify` before caching if you face any
 troubles.
 
