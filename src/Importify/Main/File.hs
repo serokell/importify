@@ -14,10 +14,10 @@ import           Universum
 import qualified Data.HashMap.Strict                as HM
 import qualified Data.Map                           as M
 
-import           Fmt                                (fmt, (+|), (|+))
+import           Fmt                                ( (+|), (|+))       --mjh   was (fmt, ...
 import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
                                                      ModuleHead, ModuleName (..),
-                                                     SrcSpanInfo, exactPrint,
+                                                     SrcSpanInfo,  --mjh exactPrint
                                                      parseExtension,
                                                      parseFileContentsWithExts)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,

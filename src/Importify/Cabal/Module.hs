@@ -9,7 +9,7 @@ module Importify.Cabal.Module
 import           Universum                       hiding (fromString)
 
 import           Data.List                       (partition)
-import           Distribution.ModuleName         (ModuleName, fromString, toFilePath)
+import           Distribution.ModuleName         (ModuleName, toFilePath)
 import qualified Distribution.ModuleName         as Cabal
 import           Distribution.PackageDescription (BuildInfo (..), Library (..))
 import qualified Language.Haskell.Exts           as HSE

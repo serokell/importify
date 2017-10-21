@@ -1,5 +1,5 @@
 name:                importify
-version:             1.0
+version:             1.1
 synopsis:            Tool for haskell imports refactoring
 description:         Please see README.md
 homepage:            https://github.com/serokell/importify
