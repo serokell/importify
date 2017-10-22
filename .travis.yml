@@ -49,10 +49,18 @@ install:
   - travis_wait 40 stack build --only-dependencies --no-terminal
 
   # Build project itself
+  ## Compile with tests (`--test`) and benchmarks (`--bench`), but does not run executable.
   - travis_wait 40 stack build --test --bench --no-run-tests --no-run-benchmarks --no-terminal
 
+  # `false` can be used for fast `allow_failures` testing.
+  #- false
+
 script:
+  # Run tests
   - travis_wait 40 stack build --test --no-terminal
+
+  # Use `true` to force Travis to skip his default tries to help you out with his default actions in the `script`.
+  #- true
 
 notifications:
   email: false
