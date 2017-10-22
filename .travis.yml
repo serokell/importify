@@ -27,14 +27,18 @@ addons:
       - cabal-install-2.0    # required by declared GHC 8.0
 
 before_install:
-  # Download and unpack the stack executable
+  # Stack: add to PATH, download, unpack, check
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   - stack --version
 
 install:
-  # Install GHC for current project
+  ### Add ` || true` in the end of lines to allow step to fail. Very convinient for purpose to build-up hot cache, because cache get saved even if build reaches timeout/error.
+
+  ### `travis_wait 30` - means wait for 30 minutes. Otherwise Travis errors if in 10 minutes it not gets some new STDOUT. While GHC often compiles parts for ~10 minutes.
+
+  # Prepare Haskell environment for current project. This step is very standard, so let Travis wait here is just a safetynet.
   - travis_wait 30 stack setup --no-terminal
   - stack ghc -- --version
 
