@@ -9,6 +9,10 @@ language: haskell
 ghc:
   - 8.0
 
+# Speeding-up GIT pulls. If set to 1 - Travis builds would go only consequentially. 3 should be enough for small project. 5 is to be more universal.
+git:
+  depth: 5
+
 cache:
   directories:
   - "$HOME/.stack"
