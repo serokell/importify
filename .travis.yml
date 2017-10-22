@@ -42,6 +42,9 @@ install:
   - travis_wait 30 stack setup --no-terminal
   - stack ghc -- --version
 
+  # Just in case, force external GHC disabled.
+  - stack config set system-ghc --global false
+
   # Build project dependencies
   - travis_wait 30 stack build --only-dependencies --no-terminal
 
