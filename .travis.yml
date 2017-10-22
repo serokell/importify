@@ -1,4 +1,6 @@
-sudo: false
+# `sudo: true` switches usage from default container 4Gb RAM, 2 Cores to GCE VM with 7.5Gb RAM and dynamically available >=2 Cores.
+# Usage of `sudo: true` and VM in Travis is undesputably better for testing of Haskell builds.
+sudo: true
 
 language: c
 
