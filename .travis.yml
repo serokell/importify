@@ -45,14 +45,14 @@ install:
   # Just in case, force external GHC disabled.
   - stack config set system-ghc --global false
 
-  # Build project dependencies
-  - travis_wait 30 stack build --only-dependencies --no-terminal
+  # Build all project dependencies.
+  - travis_wait 40 stack build --only-dependencies --no-terminal
 
   # Build project itself
-  - travis_wait 30 stack build --test --bench --no-run-tests --no-run-benchmarks --no-terminal
+  - travis_wait 40 stack build --test --bench --no-run-tests --no-run-benchmarks --no-terminal
 
 script:
-  - travis_wait 30 stack test --no-terminal
+  - travis_wait 40 stack build --test --no-terminal
 
 notifications:
   email: false
