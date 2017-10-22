@@ -12,8 +12,10 @@ cache:
 
 addons:
   apt:
+    sources:
+      - sourceline: 'ppa:hvr/ghc'    # Official Trusty repo by Caninical is ancient. HVC is relevant and most widely used Haskell PPA repo.
     packages:
-    - libgmp-dev
+      - libgmp-dev
 
 before_install:
   # Download and unpack the stack executable
