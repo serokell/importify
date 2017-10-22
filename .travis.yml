@@ -5,6 +5,10 @@ sudo: true
 # `language: haskell` declares the use Haskell image and maybe some tweaking from Travis team. We would enable undocumented new GHC present on image, and safe startup time.
 language: haskell 
 
+# `ghc` sets systemwide compiler. Other way default behaviour of Travis is to use GHC 7.x and updates it to 7.10.x on every start of image. GHC 8.0.2 allready instaled with a package into /opt/. But that is not documented anywhere.
+ghc:
+  - 8.0
+
 cache:
   directories:
   - "$HOME/.stack"
@@ -16,6 +20,7 @@ addons:
       - sourceline: 'ppa:hvr/ghc'    # Official Trusty repo by Caninical is ancient. HVC is relevant and most widely used Haskell PPA repo.
     packages:
       - libgmp-dev
+      - cabal-install-2.0    # required by declared GHC 8.0
 
 before_install:
   # Download and unpack the stack executable
