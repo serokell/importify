@@ -2,7 +2,8 @@
 # Usage of `sudo: true` and VM in Travis is undesputably better for testing of Haskell builds.
 sudo: true
 
-language: c
+# `language: haskell` declares the use Haskell image and maybe some tweaking from Travis team. We would enable undocumented new GHC present on image, and safe startup time.
+language: haskell 
 
 cache:
   directories:
