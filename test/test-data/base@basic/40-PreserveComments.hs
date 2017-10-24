@@ -14,5 +14,5 @@ import {- B -} qualified Data.Map {- D -} as {- E -} Map {- F -} (empty)
 -- Dummy code
 main :: IO ()
 main = if True
-        then forM_ (replicate 2 2) $ return ()
+        then forM_ (Data.List.replicate 2 2) $ return ()
         else let m = Map.empty in return ()
