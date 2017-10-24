@@ -8,26 +8,24 @@ module Main where
 
 import           Universum
 
-import           Path              (Abs, Dir, File, Path,
-                                    fileExtension, fromAbsFile,
-                                    (-<.>))
-import           Path.IO           (listDirRecur, removeFile)
+import           Path           (Abs, Dir, File, Path, fileExtension, fromAbsFile, (-<.>))
+import           Path.IO        (listDirRecur, removeFile)
 
-import           Importify.Main    (importifyFileContent)
-import           Importify.Path    (testDataPath)
+import           Importify.Main (importifyFileContent)
+import           Importify.Path (testDataPath)
 
 main :: IO ()
 main = do
     arguments <- getArgs
     case arguments of
         ["--clean"] -> cleanGoldenExamples
-        ["--force"] -> generateGoldenTestsPrompt True
-        []          -> generateGoldenTestsPrompt False
+        ["--force"] -> generateGoldenTests
+        []          -> generateGoldenTestsPrompt
         _           -> putText "Incorrect arguments!"
 
 findByExtension :: MonadIO m => String -> Path b Dir -> m [Path Abs File]
 findByExtension ext path = filter ((== ext) . fileExtension) . snd
-                          <$> listDirRecur path 
+                          <$> listDirRecur path
 
 findGoldenFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
 findGoldenFiles = findByExtension "golden"
@@ -37,20 +35,18 @@ cleanGoldenExamples = do
     goldenExamples <- findGoldenFiles testDataPath
     mapM_ removeFile goldenExamples
 
+findHaskellFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
+findHaskellFiles = findByExtension ".hs"
 
-generateGoldenTestsPrompt :: Bool -> IO ()
-generateGoldenTestsPrompt True  = generateGoldenTests
-generateGoldenTestsPrompt False = do
+writeBinaryFile :: MonadIO m => Path Abs File -> Text -> m ()
+writeBinaryFile = writeFile . fromAbsFile
+
+generateGoldenTestsPrompt :: IO ()
+generateGoldenTestsPrompt = do
     putText "> Are you sure want to generate new golden examples? [y/N]"
     getLine >>= \case
         "y" -> generateGoldenTests
         _   -> putText "Aborting generation"
-
-findHaskellFiles :: MonadIO m => Path b Dir -> m [Path Abs File]
-findHaskellFiles = findByExtension "hs"
-
-writeBinaryFile :: MonadIO m => Path Abs File -> Text -> m ()
-writeBinaryFile = writeFile . fromAbsFile
 
 generateGoldenTests :: IO ()
 generateGoldenTests = do
