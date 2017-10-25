@@ -9,7 +9,7 @@ module Importify.Cabal.Package
 
 import           Universum                             hiding (fromString)
 
-import           Distribution.Package                  (Dependency (..), PackageName (..))
+import           Distribution.Package                  (Dependency (..), unPackageName)
 import           Distribution.PackageDescription       (Benchmark (benchmarkBuildInfo),
                                                         BuildInfo (..), CondTree,
                                                         Executable (..),
@@ -25,7 +25,7 @@ readCabal :: MonadIO m => FilePath -> m GenericPackageDescription
 readCabal = liftIO . readPackageDescription normal
 
 dependencyName :: Dependency -> String
-dependencyName (Dependency PackageName{..} _) = unPackageName
+dependencyName (Dependency name _) = unPackageName name
 
 -- | Retrieve list of unique names for all package dependencies inside
 -- library, all executables, all test suites and all benchmarks for a
@@ -56,5 +56,5 @@ extractFromTargets fromLib fromExe fromTst fromBnc GenericPackageDescription{..}
     , mapTargets fromBnc condBenchmarks
     ]
 
-mapTargets :: (t -> r) -> [(String, CondTree v c t)] -> [r]
+mapTargets :: (t -> r) -> [(s, CondTree v c t)] -> [r]
 mapTargets extractor = map (extractor . condTreeData . snd)

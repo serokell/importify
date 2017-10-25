@@ -1,5 +1,7 @@
+{-# LANGUAGE CPP           #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns  #-}
 
 -- | Functions to retrieve and store mapping from modules to their
 -- targets and extensions.
@@ -40,6 +42,10 @@ import           Distribution.PackageDescription (Benchmark (..), BenchmarkInter
                                                   GenericPackageDescription (..),
                                                   Library (..), TestSuite (..),
                                                   TestSuiteInterface (..), condTreeData)
+#if MIN_VERSION_Cabal(2,0,0)
+import Distribution.Types.UnqualComponentName (UnqualComponentName, unUnqualComponentName)
+#endif
+
 import           Language.Haskell.Exts           (prettyExtension)
 import           Path                            (Abs, Dir, File, Path, fromAbsFile)
 
@@ -120,7 +126,11 @@ packageTargets GenericPackageDescription{..} =
     , targetMap BenchmarkId  condBenchmarks
     ]
   where
+#if MIN_VERSION_Cabal(2,0,0)
+    targetMap tid = map (tid . toText . unUnqualComponentName . fst)
+#else
     targetMap tid = map (tid . toText . fst)
+#endif
 
 -- | Extracts 'BuildInfo' for given 'TargetId'.
 extractTargetBuildInfo
@@ -135,12 +145,22 @@ extractTargetBuildInfo (TestSuiteId name) =
 extractTargetBuildInfo (BenchmarkId name) =
     findTargetBuildInfo benchmarkBuildInfo name . condBenchmarks
 
+#if MIN_VERSION_Cabal(2,0,0)
+findTargetBuildInfo :: (target -> info)
+                    -> Text
+                    -> [(UnqualComponentName, CondTree v c target)]
+                    -> Maybe info
+findTargetBuildInfo toInfo name =
+    fmap (toInfo . condTreeData . snd)
+  . find ((== name) . toText . unUnqualComponentName . fst)
+#else
 findTargetBuildInfo :: (target -> info)
                     -> Text
                     -> [(String, CondTree v c target)]
                     -> Maybe info
 findTargetBuildInfo toInfo name = fmap (toInfo . condTreeData . snd)
                                 . find ((== name) . toText . fst)
+#endif
 
 -- | Extracts mapping from each package target to its extensions enabled by default.
 packageExtensions :: [TargetId] -> GenericPackageDescription -> ExtensionsMap
@@ -208,6 +228,16 @@ extractTargetsMap projectPath GenericPackageDescription{..} = do
 
 -- | Generalized 'TargetsMap' collector for executables, testsuites and
 -- benchmakrs of package.
+#if MIN_VERSION_Cabal(2,0,0)
+collectTargetsListMaps :: [(UnqualComponentName, CondTree v c target)]
+                       -> (Text -> TargetId)
+                       -> (TargetId -> target -> IO TargetsMap)
+                       -> IO [TargetsMap]
+collectTargetsListMaps treeList idConstructor mapBundler =
+    forM treeList $ \(name, condTree) ->
+        mapBundler (idConstructor $ toText $ unUnqualComponentName name)
+                   (condTreeData condTree)
+#else
 collectTargetsListMaps :: [(String, CondTree v c target)]
                        -> (Text -> TargetId)
                        -> (TargetId -> target -> IO TargetsMap)
@@ -215,6 +245,7 @@ collectTargetsListMaps :: [(String, CondTree v c target)]
 collectTargetsListMaps treeList idConstructor mapBundler =
     forM treeList $ \(name, condTree) ->
         mapBundler (idConstructor $ toText name) $ condTreeData condTree
+#endif
 
 collectTargetsMap :: (target -> IO [Path Abs File])
                   -> TargetId
