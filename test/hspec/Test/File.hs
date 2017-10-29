@@ -10,7 +10,7 @@ import           Universum
 
 import           Data.List      (sort)
 import           Path           (Abs, Dir, File, Path, Rel, dirname, fileExtension,
-                                 filename, fromRelDir, fromAbsFile, mkRelFile,
+                                 filename, fromRelDir, fromRelFile, fromAbsFile, mkRelFile,
                                  (-<.>), (</>))
 import           Path.IO        (listDir)
 import           System.Wlog    (Severity)
@@ -33,14 +33,14 @@ makeTestGroup testCasesPath = do
     let testHsOnly     = sort
                        $ filter ((== ".hs") . fileExtension) testDirPaths
 
-    describe ("subfolder: " ++ fromRelDir testCasesPath) $
+    describe ("subfolder: " ++ fromRelDir (dirname testCasesPath)) $
         mapM_ makeTest testHsOnly
 
 makeTest :: Path Abs File -> Spec
 makeTest testCasePath = do
     (result, expected) <- runIO $ loadTestData testCasePath
     let testType = if filename testCasePath `elem` pendingTests then xit else it
-    testType (fromAbsFile testCasePath) $ result `shouldBe` expected
+    testType (fromRelFile $ filename testCasePath) $ result `shouldBe` expected
 
 pendingTests :: [Path Rel File]
 pendingTests = [ $(mkRelFile "01-ImportBothUsedQualified.hs") -- Importify can't modify source yet
