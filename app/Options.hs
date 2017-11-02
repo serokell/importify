@@ -80,7 +80,7 @@ fileParser = do
       $ metavar "FILE"
      <> help "File to importify"
     sfoOutput <- outputOptionsParser
-    pure $ SingleFile SingleFileOptions{..}
+    pure (SingleFile SingleFileOptions{..})
   where
     outputOptionsParser :: Parser OutputOptions
     outputOptionsParser =
@@ -98,14 +98,14 @@ cacheParser = do
       $ long "preserve"
      <> short 'p'
      <> help "Don't remove downloaded package cache"
-    ccoDependencies <- fmap (map toText) $ many $ strOption
+    ccoDependencies <- many $ strOption
       $ metavar "[STRING]"
      <> long "dependency"
      <> short 'd'
      <> help "List of manually specified dependencies that should be used \
              \for caching instead of libraries from .cabal file. This option \
              \overrides default behavior."
-    pure $ CabalCache CabalCacheOptions{..}
+    pure (CabalCache CabalCacheOptions{..})
 
 optsInfo :: ParserInfo ImportifyCliArgs
 optsInfo = info
