@@ -1,7 +1,6 @@
-{-# LANGUAGE ExplicitForAll   #-}
-{-# LANGUAGE QuasiQuotes      #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE QuasiQuotes    #-}
+{-# LANGUAGE TypeOperators  #-}
 
 -- | This module contains common utilities for working with importify cache.
 

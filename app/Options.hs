@@ -14,14 +14,15 @@ module Options
 
 import           Universum
 
-import           Options.Applicative (Parser, ParserInfo, auto, command, execParser,
-                                      flag', fullDesc, help, helper, info, long, metavar,
-                                      option, progDesc, short, showDefault, strArgument,
-                                      strOption, subparser, switch, value)
-import qualified Prelude             (show)
-import           System.Wlog         (Severity (Info))
+import           Options.Applicative     (Parser, ParserInfo, auto, command, execParser,
+                                          flag', fullDesc, help, helper, info, long,
+                                          metavar, option, progDesc, short, showDefault,
+                                          strArgument, strOption, subparser, switch,
+                                          value)
+import qualified Prelude                 (show)
+import           System.Wlog             (Severity (Info))
 
-import           Importify.Main      (OutputOptions (..))
+import           Importify.OutputOptions (OutputOptions (..))
 
 data ImportifyCliArgs = ImportifyCliArgs
     { icaCommon  :: !CommonOptions

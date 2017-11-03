@@ -11,15 +11,15 @@ module Main where
 
 import           Universum
 
-import           Extended.System.Wlog  (initImportifyLogger)
-import           Importify.Environment (runCache)
-import           Importify.Main        (OutputOptions, importifyCacheList,
-                                        importifyCacheProject, importifyRemoveWithOptions,
-                                        importifyToExplicitWithOptions)
+import           Extended.System.Wlog    (initImportifyLogger)
+import           Importify.Environment   (runCache)
+import           Importify.Main          (importifyCacheList, importifyCacheProject,
+                                          importifyRemoveUnused, importifyToExplicit)
+import           Importify.OutputOptions (OutputOptions)
 
-import           Options               (CabalCacheOptions (..), Command (..),
-                                        ImportifyCliArgs (..), SingleFileOptions (..),
-                                        coLoggingSeverity, parseOptions)
+import           Options                 (CabalCacheOptions (..), Command (..),
+                                          ImportifyCliArgs (..), SingleFileOptions (..),
+                                          coLoggingSeverity, parseOptions)
 
 main :: IO ()
 main = do
@@ -27,8 +27,8 @@ main = do
     initImportifyLogger (coLoggingSeverity icaCommon)
     case icaCommand of
         CabalCache   ccOpts -> buildCabalCache ccOpts
-        RemoveUnused sfOpts -> runCommand importifyRemoveWithOptions     sfOpts
-        ToExplicit   sfOpts -> runCommand importifyToExplicitWithOptions sfOpts
+        RemoveUnused sfOpts -> runCommand importifyRemoveUnused sfOpts
+        ToExplicit   sfOpts -> runCommand importifyToExplicit   sfOpts
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =

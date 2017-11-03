@@ -1,12 +1,24 @@
 -- | Contains command to convert implicit imports to explicit.
 
 module Importify.Main.ToExplicit
-       ( importifyToExplicitWithOptions
+       ( importifyToExplicit
+       , importifyToExplicitPath
        ) where
 
 import           Universum
 
-import           Importify.Main.OutputOptions
+import           Path
 
-importifyToExplicitWithOptions :: OutputOptions -> FilePath -> IO ()
-importifyToExplicitWithOptions = undefined
+import           Importify.Bracket
+import           Importify.OutputOptions
+
+-- | Function for @importify to-explicit@ command.
+importifyToExplicit :: OutputOptions -> FilePath -> IO ()
+importifyToExplicit = importifyOptionsBracket importifyToExplicitPath
+
+-- | Return result of @importify to-explicit@ command on given file.
+importifyToExplicitPath :: Path Abs File -> IO ImportifyResult
+importifyToExplicitPath = importifyPathBracket (importifyAstBracket implicitToExplicitImports)
+
+implicitToExplicitImports :: ImportifyFunction
+implicitToExplicitImports = error "This is not implemented!"

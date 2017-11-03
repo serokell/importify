@@ -1,6 +1,6 @@
 -- | Contains data type which specifies output options for @importify@ commands.
 
-module Importify.Main.OutputOptions
+module Importify.OutputOptions
        ( OutputOptions (..)
        , printWithOutputOptions
        ) where

@@ -1,45 +1,27 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeApplications      #-}
 
 -- | Contains implementation of @importify remove@ command.
 
 module Importify.Main.RemoveUnused
-       ( importifyRemoveWithOptions
-       , importifyRemoveWithPath
+       ( importifyRemoveUnused
+       , importifyRemoveUnusedPath
        ) where
 
 import           Universum
 
-import qualified Data.HashMap.Strict                as HM
-import qualified Data.Map                           as M
-
 import           Fmt                                (fmt, (+|), (|+))
-import           Language.Haskell.Exts              (Comment (..), Extension, ImportDecl,
-                                                     Module (..), ModuleHead,
-                                                     ModuleName (..), SrcSpanInfo,
-                                                     exactPrint, parseExtension,
-                                                     parseFileContentsWithComments)
-import           Language.Haskell.Exts.Parser       (ParseMode (..), defaultParseMode)
-import           Language.Haskell.Names             (Environment, Scoped, annotate,
-                                                     loadBase, readSymbols)
+import           Language.Haskell.Exts              (ImportDecl, Module (..), ModuleHead,
+                                                     SrcSpanInfo, exactPrint)
+import           Language.Haskell.Names             (Environment, Scoped, annotate)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
 import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Path                               (Abs, Dir, File, Path, Rel,
-                                                     fromAbsFile, fromRelFile,
-                                                     parseRelDir, parseRelFile, (</>))
+import           Path                               (Abs, File, Path)
 import           Path.IO                            (doesDirExist, getCurrentDir)
 
-import           Extended.System.Wlog               (printError, printNotice)
-import           Importify.Cabal                    (ExtensionsMap, ModulesBundle (..),
-                                                     ModulesMap, TargetId, targetIdDir)
-import           Importify.Main.OutputOptions
-import           Importify.ParseException           (eitherParseResult, setMpeFile)
-import           Importify.Path                     (decodeFileOrMempty, doInsideDir,
-                                                     extensionsPath, importifyPath,
-                                                     lookupToRoot, modulesPath,
-                                                     symbolsPath)
+import           Importify.Bracket
+import           Importify.OutputOptions
 import           Importify.Pretty                   (printLovelyImports)
 import           Importify.Resolution               (collectUnusedImplicitImports,
                                                      collectUnusedSymbolsBy, hidingUsedIn,
@@ -52,111 +34,13 @@ import           Importify.Tree                     (UnusedHidings (UnusedHiding
                                                      UnusedSymbols (UnusedSymbols),
                                                      removeImports)
 
--- | Type that represents
-newtype ImportifyFileException = IFE Text
-
 -- | Run @importify remove@ command with given options.
-importifyRemoveWithOptions :: OutputOptions -> FilePath -> IO ()
-importifyRemoveWithOptions options srcFile = do
-    srcPath   <- parseRelFile srcFile
-    foundRoot <- lookupToRoot (doesDirExist . (</> importifyPath)) srcPath
-    case foundRoot of
-        Nothing ->
-            printError "Directory '.importify' is not found. Either cache for project \
-                       \is not created or not running from project directory."
-        Just (rootDir, srcFromRootPath) -> do
-            curDir          <- getCurrentDir
-            importifyResult <- doInsideDir rootDir (importifyRemoveWithPath $ curDir </> srcFromRootPath)
-            handleOptions importifyResult
-  where
-    handleOptions :: Either ImportifyFileException Text -> IO ()
-    handleOptions (Left (IFE msg))    = printError msg
-    handleOptions (Right modifiedSrc) = printWithOutputOptions options modifiedSrc
+importifyRemoveUnused :: OutputOptions -> FilePath -> IO ()
+importifyRemoveUnused = importifyOptionsBracket importifyRemoveUnusedPath
 
 -- | Return result of @importify remove@ command on given file.
-importifyRemoveWithPath :: Path Abs File -> IO (Either ImportifyFileException Text)
-importifyRemoveWithPath srcPath = do
-    let srcFile    = fromAbsFile srcPath
-
-    modulesMap <- readModulesMap
-    extensions <- readExtensions srcPath modulesMap
-
-    whenNothing_ (HM.lookup (fromAbsFile srcPath) modulesMap) $
-        printNotice $ "File '"+|srcFile|+"' is not cached: new file or caching error"
-
-    src <- readFile srcFile
-    let parseResult = eitherParseResult
-                    $ parseFileContentsWithComments (defaultParseMode { extensions = extensions })
-                    $ toString src
-
-    case parseResult of
-        Left exception       -> return $ Left $ IFE $ setMpeFile srcFile exception |+ ""
-        Right (ast,comments) -> importifyAst src modulesMap comments ast
-
-importifyAst :: Text
-             -> ModulesMap
-             -> [Comment]
-             -> Module SrcSpanInfo
-             -> IO (Either ImportifyFileException Text)
-importifyAst src modulesMap comments ast@(Module _ _ _ imports _) =
-    Right <$> case importSlice imports of
-        Nothing           -> return src
-        Just (start, end) -> do
-            let codeLines        = lines src
-            let (preamble, rest) = splitAt (start - 1) codeLines
-            let (impText, decls) = splitAt (end - start + 1) rest
-
-            environment       <- loadEnvironment modulesMap
-            let newImports     = removeUnusedImports ast imports environment
-            let printedImports = printLovelyImports start end comments impText newImports
-
-            return $ unlines preamble
-                  <> unlines printedImports
-                  <> unlines decls
-importifyAst _ _ _ _ = return $ Left $ IFE "Module wasn't parsed correctly"
-
-readModulesMap :: IO ModulesMap
-readModulesMap = decodeFileOrMempty (importifyPath </> modulesPath) pure
-
-readExtensions :: Path Abs File -> ModulesMap -> IO [Extension]
-readExtensions srcPath modulesMap = do
-    case HM.lookup (fromAbsFile srcPath) modulesMap of
-        Nothing                -> return []
-        Just ModulesBundle{..} -> do
-            packagePath <- parseRelDir $ toString mbPackage
-            projectPath <- getCurrentDir
-            let pathToExtensions = projectPath
-                               </> importifyPath
-                               </> symbolsPath
-                               </> packagePath
-                               </> extensionsPath
-
-            let lookupExtensions = fromMaybe [] . getExtensions mbTarget
-            decodeFileOrMempty @ExtensionsMap
-                               pathToExtensions
-                               (return . lookupExtensions)
-
-getExtensions :: TargetId -> ExtensionsMap -> Maybe [Extension]
-getExtensions targetId = fmap (map parseExtension) . HM.lookup targetId
-
-loadEnvironment :: ModulesMap -> IO Environment
-loadEnvironment modulesMap = do
-    baseEnvironment <- loadBase
-
-    let moduleBundles = HM.elems modulesMap
-    packages <- forM moduleBundles $ \ModulesBundle{..} -> do
-        packagePath     <- parseRelDir  $ toString mbPackage
-        symbolsFilePath <- parseRelFile $ mbModule ++ ".symbols"
-        targetPath      <- parseRelDir $ toString $ targetIdDir mbTarget
-        let pathToSymbols = importifyPath
-                        </> symbolsPath
-                        </> packagePath
-                        </> targetPath
-                        </> symbolsFilePath
-        moduleSymbols <- readSymbols (fromRelFile pathToSymbols)
-        pure (ModuleName () mbModule, moduleSymbols)
-
-    return $ M.union baseEnvironment (M.fromList packages)
+importifyRemoveUnusedPath :: Path Abs File -> IO ImportifyResult
+importifyRemoveUnusedPath = importifyPathBracket (importifyAstBracket removeUnusedImports)
 
 -- | Remove all unused entities in given module from given list of imports.
 -- Algorithm performs next steps:
@@ -166,12 +50,8 @@ loadEnvironment modulesMap = do
 --  2. Remove unused symbols from explicit list.
 --  3. Remove unused hidings from explicit lists.
 --  4. Remove unused qualified imports.
-removeUnusedImports
-    :: Module SrcSpanInfo        -- ^ Module where symbols should be removed
-    -> [ImportDecl SrcSpanInfo]  -- ^ Imports from module
-    -> Environment
-    -> [ImportDecl SrcSpanInfo]
-removeUnusedImports ast imports environment = do
+removeUnusedImports :: ImportifyFunction
+removeUnusedImports ast environment imports = do
     -- return exports to search for qualified imports there later
     let (annotations, moduleHead) = annotateModule ast environment
 

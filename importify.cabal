@@ -23,6 +23,7 @@ source-repository head
 library
   hs-source-dirs:      src
   exposed-modules:
+                       Importify.Bracket
                        Importify.Cabal
                            Importify.Cabal.Extension
                            Importify.Cabal.Module
@@ -31,9 +32,9 @@ library
                        Importify.Environment
                        Importify.Main
                            Importify.Main.Cache
-                           Importify.Main.OutputOptions
                            Importify.Main.RemoveUnused
                            Importify.Main.ToExplicit
+                       Importify.OutputOptions
                        Importify.ParseException
                        Importify.Path
                        Importify.Preprocessor
@@ -98,6 +99,7 @@ library
                        OverloadedStrings
                        PartialTypeSignatures
                        RecordWildCards
+                       TypeApplications
 
 executable importify
   hs-source-dirs:      app
