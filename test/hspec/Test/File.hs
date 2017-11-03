@@ -10,21 +10,21 @@ import           Universum
 
 import           Data.List      (sort)
 import           Path           (Abs, Dir, File, Path, Rel, dirname, fileExtension,
-                                 filename, fromRelDir, fromRelFile, fromAbsFile, mkRelFile,
-                                 (-<.>), (</>))
+                                 filename, fromAbsFile, fromRelDir, fromRelFile,
+                                 mkRelFile, (-<.>), (</>))
 import           Path.IO        (listDir)
 import           System.Wlog    (Severity)
 
 import           Test.Hspec     (Spec, describe, it, runIO, shouldBe, xit)
 
 import           Importify.Main (importifyFileContent)
-import           Importify.Path (testDataPath)
+import           Importify.Path (testUnusedPath)
 
 spec :: Spec
 spec = do
-    (testFolders, _) <- runIO $ listDir testDataPath
+    (testFolders, _) <- runIO $ listDir testUnusedPath
     describe "file:unused" $
-        mapM_ (makeTestGroup . (testDataPath </> ) . dirname) testFolders
+        mapM_ (makeTestGroup . (testUnusedPath </> ) . dirname) testFolders
 
 
 makeTestGroup :: Path Rel Dir -> Spec
