@@ -17,7 +17,7 @@ import           System.Wlog    (Severity)
 
 import           Test.Hspec     (Spec, describe, it, runIO, shouldBe, xit)
 
-import           Importify.Main (importifyFileContent)
+import           Importify.Main (importifyRemoveWithPath)
 import           Importify.Path (testUnusedPath)
 
 spec :: Spec
@@ -51,6 +51,6 @@ loadTestData testCasePath = do
     goldenExamplePath <- testCasePath -<.> ".golden"
 
     goldenExampleSrc     <- readFile (fromAbsFile goldenExamplePath)
-    Right importifiedSrc <- importifyFileContent testCasePath
+    Right importifiedSrc <- importifyRemoveWithPath testCasePath
 
     return (importifiedSrc, goldenExampleSrc)

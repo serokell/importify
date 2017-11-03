@@ -31,7 +31,9 @@ library
                        Importify.Environment
                        Importify.Main
                            Importify.Main.Cache
-                           Importify.Main.File
+                           Importify.Main.OutputOptions
+                           Importify.Main.RemoveUnused
+                           Importify.Main.ToExplicit
                        Importify.ParseException
                        Importify.Path
                        Importify.Preprocessor

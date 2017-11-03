@@ -1,14 +1,13 @@
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
 
--- | Contains implementation of @importify file@ command.
+-- | Contains implementation of @importify remove@ command.
 
-module Importify.Main.File
-       ( OutputOptions (..)
-       , importifyFileOptions
-       , importifyFileContent
+module Importify.Main.RemoveUnused
+       ( importifyRemoveWithOptions
+       , importifyRemoveWithPath
        ) where
 
 import           Universum
@@ -17,12 +16,12 @@ import qualified Data.HashMap.Strict                as HM
 import qualified Data.Map                           as M
 
 import           Fmt                                (fmt, (+|), (|+))
-import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
-                                                     ModuleHead, ModuleName (..),
-                                                     SrcSpanInfo, exactPrint,
-                                                     parseExtension, Comment (..),
+import           Language.Haskell.Exts              (Comment (..), Extension, ImportDecl,
+                                                     Module (..), ModuleHead,
+                                                     ModuleName (..), SrcSpanInfo,
+                                                     exactPrint, parseExtension,
                                                      parseFileContentsWithComments)
-import           Language.Haskell.Exts.Parser       (defaultParseMode, ParseMode (..))
+import           Language.Haskell.Exts.Parser       (ParseMode (..), defaultParseMode)
 import           Language.Haskell.Names             (Environment, Scoped, annotate,
                                                      loadBase, readSymbols)
 import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
@@ -35,6 +34,7 @@ import           Path.IO                            (doesDirExist, getCurrentDir
 import           Extended.System.Wlog               (printError, printNotice)
 import           Importify.Cabal                    (ExtensionsMap, ModulesBundle (..),
                                                      ModulesMap, TargetId, targetIdDir)
+import           Importify.Main.OutputOptions
 import           Importify.ParseException           (eitherParseResult, setMpeFile)
 import           Importify.Path                     (decodeFileOrMempty, doInsideDir,
                                                      extensionsPath, importifyPath,
@@ -52,18 +52,12 @@ import           Importify.Tree                     (UnusedHidings (UnusedHiding
                                                      UnusedSymbols (UnusedSymbols),
                                                      removeImports)
 
--- | This data type dictates how output of @importify@ should be
--- outputed.
-data OutputOptions = ToConsole        -- ^ Print to console
-                   | InPlace          -- ^ Change file in-place
-                   | ToFile FilePath  -- ^ Print to specified file
-                   deriving (Show)
-
+-- | Type that represents
 newtype ImportifyFileException = IFE Text
 
--- | Run @importify file@ command with given options.
-importifyFileOptions :: OutputOptions -> FilePath -> IO ()
-importifyFileOptions options srcFile = do
+-- | Run @importify remove@ command with given options.
+importifyRemoveWithOptions :: OutputOptions -> FilePath -> IO ()
+importifyRemoveWithOptions options srcFile = do
     srcPath   <- parseRelFile srcFile
     foundRoot <- lookupToRoot (doesDirExist . (</> importifyPath)) srcPath
     case foundRoot of
@@ -72,19 +66,16 @@ importifyFileOptions options srcFile = do
                        \is not created or not running from project directory."
         Just (rootDir, srcFromRootPath) -> do
             curDir          <- getCurrentDir
-            importifyResult <- doInsideDir rootDir (importifyFileContent $ curDir </> srcFromRootPath)
+            importifyResult <- doInsideDir rootDir (importifyRemoveWithPath $ curDir </> srcFromRootPath)
             handleOptions importifyResult
   where
     handleOptions :: Either ImportifyFileException Text -> IO ()
     handleOptions (Left (IFE msg))    = printError msg
-    handleOptions (Right modifiedSrc) = case options of
-        ToConsole -> putText modifiedSrc
-        InPlace   -> writeFile srcFile modifiedSrc
-        ToFile to -> writeFile to      modifiedSrc
+    handleOptions (Right modifiedSrc) = printWithOutputOptions options modifiedSrc srcFile
 
--- | Return result of @importify file@ command.
-importifyFileContent :: Path Abs File -> IO (Either ImportifyFileException Text)
-importifyFileContent srcPath = do
+-- | Return result of @importify remove@ command on given file.
+importifyRemoveWithPath :: Path Abs File -> IO (Either ImportifyFileException Text)
+importifyRemoveWithPath srcPath = do
     let srcFile    = fromAbsFile srcPath
 
     modulesMap <- readModulesMap

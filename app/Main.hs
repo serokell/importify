@@ -13,8 +13,9 @@ import           Universum
 
 import           Extended.System.Wlog  (initImportifyLogger)
 import           Importify.Environment (runCache)
-import           Importify.Main        (importifyCacheList, importifyCacheProject,
-                                        importifyFileOptions)
+import           Importify.Main        (OutputOptions, importifyCacheList,
+                                        importifyCacheProject, importifyRemoveWithOptions,
+                                        importifyToExplicitWithOptions)
 
 import           Options               (CabalCacheOptions (..), Command (..),
                                         ImportifyCliArgs (..), SingleFileOptions (..),
@@ -26,15 +27,14 @@ main = do
     initImportifyLogger (coLoggingSeverity icaCommon)
     case icaCommand of
         CabalCache   ccOpts -> buildCabalCache ccOpts
-        RemoveUnused sfOpts -> importifySingleFile sfOpts
-        ToExplicit   sfOpts -> error "Conversion to explicit imports is not supported :("
-
-importifySingleFile :: SingleFileOptions -> IO ()
-importifySingleFile SingleFileOptions{..} =
-    importifyFileOptions sfoOutput sfoFileName
+        RemoveUnused sfOpts -> runCommand importifyRemoveWithOptions     sfOpts
+        ToExplicit   sfOpts -> runCommand importifyToExplicitWithOptions sfOpts
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =
     runCache ccoSaveSources $ case ccoDependencies of
         []     -> importifyCacheProject
         (d:ds) -> importifyCacheList (d :| ds)
+
+runCommand :: (OutputOptions -> FilePath -> IO ()) -> SingleFileOptions -> IO ()
+runCommand command SingleFileOptions{..} = command sfoOutput sfoFileName

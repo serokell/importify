@@ -11,7 +11,7 @@ import           Universum
 import           Path           (Abs, Dir, File, Path, fileExtension, fromAbsFile, (-<.>))
 import           Path.IO        (listDirRecur, removeFile)
 
-import           Importify.Main (importifyFileContent)
+import           Importify.Main (importifyRemoveWithPath)
 import           Importify.Path (testDataPath)
 
 main :: IO ()
@@ -52,6 +52,6 @@ generateGoldenTests :: IO ()
 generateGoldenTests = do
     testCaseFiles <- findHaskellFiles testDataPath
     forM_ testCaseFiles $ \testCasePath -> do
-       Right modifiedSrc <- importifyFileContent testCasePath
+       Right modifiedSrc <- importifyRemoveWithPath testCasePath
        goldenPath        <- testCasePath -<.> "golden"
        writeBinaryFile goldenPath modifiedSrc
