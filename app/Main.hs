@@ -25,8 +25,9 @@ main = do
     ImportifyCliArgs{..} <- parseOptions
     initImportifyLogger (coLoggingSeverity icaCommon)
     case icaCommand of
-        SingleFile sfOpts -> importifySingleFile sfOpts
-        CabalCache ccOpts -> buildCabalCache ccOpts
+        CabalCache   ccOpts -> buildCabalCache ccOpts
+        RemoveUnused sfOpts -> importifySingleFile sfOpts
+        ToExplicit   sfOpts -> error "Conversion to explicit imports is not supported :("
 
 importifySingleFile :: SingleFileOptions -> IO ()
 importifySingleFile SingleFileOptions{..} =

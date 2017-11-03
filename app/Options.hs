@@ -32,13 +32,14 @@ data CommonOptions = CommonOptions
     } deriving (Show)
 
 data Command
-    = SingleFile SingleFileOptions
-    | CabalCache CabalCacheOptions
+    = CabalCache   CabalCacheOptions
+    | RemoveUnused SingleFileOptions
+    | ToExplicit   SingleFileOptions
     deriving (Show)
 
 data SingleFileOptions = SingleFileOptions
-    { sfoFileName :: !FilePath      -- ^ File where all redundant imports should be removed
-    , sfoOutput   :: !OutputOptions -- ^ Options for @importify file@ output
+    { sfoFileName :: !FilePath      -- ^ File that should be processed
+    , sfoOutput   :: !OutputOptions -- ^ Describes way of @importify@ output
     } deriving (Show)
 
 data CabalCacheOptions = CabalCacheOptions
@@ -65,22 +66,25 @@ commonArgsParser = do
 
 commandParser :: Parser Command
 commandParser = subparser $
-    command "file"
-            (info (helper <*> fileParser)
-                  (fullDesc <> progDesc "Importify a single file."))
- <> command "cache"
+    command "cache"
             (info (helper <*> cacheParser)
                   (fullDesc <> progDesc
                    "Search for .cabal file in current directory. If it's found then cache \
                    \all dependencies for every target and store them inside ./.importify folder."))
+ <> command "remove"
+            (info (helper <*> fmap RemoveUnused singleFileOptionsParser)
+                  (fullDesc <> progDesc "Remove unused imports from file."))
+ <> command "to-explicit"
+            (info (helper <*> fmap ToExplicit singleFileOptionsParser)
+                  (fullDesc <> progDesc "Convert all implicit imports to explicit."))
 
-fileParser :: Parser Command
-fileParser = do
+singleFileOptionsParser :: Parser SingleFileOptions
+singleFileOptionsParser = do
     sfoFileName <- strArgument
       $ metavar "FILE"
      <> help "File to importify"
     sfoOutput <- outputOptionsParser
-    pure (SingleFile SingleFileOptions{..})
+    pure SingleFileOptions{..}
   where
     outputOptionsParser :: Parser OutputOptions
     outputOptionsParser =
