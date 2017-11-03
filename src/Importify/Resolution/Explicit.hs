@@ -12,7 +12,7 @@ import           Data.Data                                (Data)
 import qualified Data.Map.Strict                          as M
 
 import           Language.Haskell.Exts                    (Module, ModuleName (..))
-import           Language.Haskell.Names                   (NameInfo (Export, GlobalSymbol),
+import           Language.Haskell.Names                   (NameInfo (Export, GlobalSymbol, RecPatWildcard),
                                                            Scoped, Symbol (..), resolve,
                                                            symbolModule)
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
@@ -27,23 +27,28 @@ symbolUsedIn symbol = anyAnnotation used
   where
     used :: NameInfo l -> Bool
 
-    -- Constructors are special because the whole type should be considered used
-    -- if one of its constructors is used
+    -- Constructors are special because the whole type should be
+    -- considered used if one of its constructors is used
     used (GlobalSymbol global@(Constructor smodule _sname stype) _) =
         symbol == global ||
         (symbolName symbol == stype && symbolModule symbol == smodule)
 
-    -- ditto for selectors
+    -- Symbol used as selectors; same as constuctors
     used (GlobalSymbol global@(Selector smodule _sname stype _scons) _) =
         symbol == global ||
         (symbolName symbol == stype && symbolModule symbol == smodule)
 
+    -- The symbol is used itself
+    used (GlobalSymbol global _) = symbol == global
+
     -- Symbol is used as a part of export declaration
     used (Export symbols) = symbol `elem` symbols
 
-    -- The symbol is used itself
-    used (GlobalSymbol global _) = symbol == global
-    used _                       = False
+    -- Symbol used as wildcard record
+    used (RecPatWildcard symbols) = symbol `elem` symbols
+
+    -- Other symbols
+    used _ = False
 
 -- | Collect symbols unused in annotations.
 collectUnusedSymbolsBy
