@@ -37,4 +37,4 @@ buildCabalCache CabalCacheOptions{..} =
         (d:ds) -> importifyCacheList (d :| ds)
 
 runCommand :: (OutputOptions -> FilePath -> IO ()) -> SingleFileOptions -> IO ()
-runCommand command SingleFileOptions{..} = command sfoOutput sfoFileName
+runCommand command SingleFileOptions{..} = command (sfoOutput sfoFileName) sfoFileName

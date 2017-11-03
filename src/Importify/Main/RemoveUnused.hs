@@ -71,7 +71,7 @@ importifyRemoveWithOptions options srcFile = do
   where
     handleOptions :: Either ImportifyFileException Text -> IO ()
     handleOptions (Left (IFE msg))    = printError msg
-    handleOptions (Right modifiedSrc) = printWithOutputOptions options modifiedSrc srcFile
+    handleOptions (Right modifiedSrc) = printWithOutputOptions options modifiedSrc
 
 -- | Return result of @importify remove@ command on given file.
 importifyRemoveWithPath :: Path Abs File -> IO (Either ImportifyFileException Text)
