@@ -7,7 +7,7 @@ language: haskell
 
 # `ghc` sets systemwide compiler. Other way default behaviour of Travis is to use GHC 7.x and updates it to 7.10.x on every start of image. GHC 8.0.2 allready instaled with a package into /opt/. But that is not documented anywhere.
 ghc:
-  - 8.0
+  - 8
 
 # Speeding-up GIT pulls. If set to 1 - Travis builds would go only consequentially. 3 should be enough for small project. 5 is to be more universal.
 git:
@@ -92,5 +92,5 @@ notifications:
   slack:
     rooms:
       - serokell:JWBvWb5PKOhknocQgcoQnflZ
-    on_success: change
-    on_failure: always
+    on_success: never
+    on_failure: never
