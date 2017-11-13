@@ -27,8 +27,7 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-    ghc:
-      - 8.0.1
+    ghc: 8.0.1
 
  - env: GHCVER=8.0.2 STACK_YAML=$HOME/build/serokell/importify/stack.yaml
     addons:
@@ -38,8 +37,7 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-    ghc:
-      - 8.0.2
+    ghc: 8.0.2
 
  - env: GHCVER=8.2.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.2.1.yaml
     addons:
@@ -49,8 +47,7 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-    ghc:
-      - 8.2.1
+    ghc: 8.2.1
 
 before_install:
   # Stack: add to PATH, download, unpack, check
