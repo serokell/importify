@@ -19,7 +19,8 @@ cache:
 matrix:
   include:
   # Full path to stack.yaml required because of call to `cd` inside running `importify`
-  - env: GHCVER=8.0.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.0.1.yaml
+  - ghc: 8.0.1
+    env: GHCVER=8.0.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.0.1.yaml
     addons:
       apt:
         sources:
@@ -27,9 +28,9 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-    ghc: 8.0.1
 
- - env: GHCVER=8.0.2 STACK_YAML=$HOME/build/serokell/importify/stack.yaml
+  - ghc: 8.0.2
+    env: GHCVER=8.0.2 STACK_YAML=$HOME/build/serokell/importify/stack.yaml
     addons:
       apt:
         sources:
@@ -37,9 +38,9 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-    ghc: 8.0.2
 
- - env: GHCVER=8.2.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.2.1.yaml
+  - ghc: 8.2.1
+    env: GHCVER=8.2.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.2.1.yaml
     addons:
       apt:
         sources:
@@ -47,7 +48,6 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-    ghc: 8.2.1
 
 before_install:
   # Stack: add to PATH, download, unpack, check
