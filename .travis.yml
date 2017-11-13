@@ -6,8 +6,6 @@ sudo: true
 language: haskell
 
 # `ghc` sets systemwide compiler. Other way default behaviour of Travis is to use GHC 7.x and updates it to 7.10.x on every start of image. GHC 8.0.2 allready instaled with a package into /opt/. But that is not documented anywhere.
-ghc:
-  - 8
 
 # Speeding-up GIT pulls. If set to 1 - Travis builds would go only consequentially. 3 should be enough for small project. 5 is to be more universal.
 git:
@@ -29,8 +27,10 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-          - ghc-8.0.1
-  - env: GHCVER=8.0.2 STACK_YAML=$HOME/build/serokell/importify/stack.yaml
+    ghc:
+      - 8.0.1
+
+ - env: GHCVER=8.0.2 STACK_YAML=$HOME/build/serokell/importify/stack.yaml
     addons:
       apt:
         sources:
@@ -38,8 +38,10 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-          - ghc-8.0.2
-  - env: GHCVER=8.2.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.2.1.yaml
+    ghc:
+      - 8.0.2
+
+ - env: GHCVER=8.2.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.2.1.yaml
     addons:
       apt:
         sources:
@@ -47,7 +49,8 @@ matrix:
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
-          - ghc-8.2.1
+    ghc:
+      - 8.2.1
 
 before_install:
   # Stack: add to PATH, download, unpack, check
