@@ -11,29 +11,30 @@ module Main where
 
 import           Universum
 
-import           Extended.System.Wlog  (initImportifyLogger)
-import           Importify.Environment (runCache)
-import           Importify.Main        (importifyCacheList, importifyCacheProject,
-                                        importifyFileOptions)
+import           Extended.System.Wlog    (initImportifyLogger)
+import           Importify.Environment   (runCache)
+import           Importify.Main          (importifyCacheList, importifyCacheProject,
+                                          importifyRemoveUnused, importifyToExplicit)
+import           Importify.OutputOptions (OutputOptions)
 
-import           Options               (CabalCacheOptions (..), Command (..),
-                                        ImportifyCliArgs (..), SingleFileOptions (..),
-                                        coLoggingSeverity, parseOptions)
+import           Options                 (CabalCacheOptions (..), Command (..),
+                                          ImportifyCliArgs (..), SingleFileOptions (..),
+                                          coLoggingSeverity, parseOptions)
 
 main :: IO ()
 main = do
     ImportifyCliArgs{..} <- parseOptions
     initImportifyLogger (coLoggingSeverity icaCommon)
     case icaCommand of
-        SingleFile sfOpts -> importifySingleFile sfOpts
-        CabalCache ccOpts -> buildCabalCache ccOpts
-
-importifySingleFile :: SingleFileOptions -> IO ()
-importifySingleFile SingleFileOptions{..} =
-    importifyFileOptions sfoOutput sfoFileName
+        CabalCache   ccOpts -> buildCabalCache ccOpts
+        RemoveUnused sfOpts -> runCommand importifyRemoveUnused sfOpts
+        ToExplicit   sfOpts -> runCommand importifyToExplicit   sfOpts
 
 buildCabalCache :: CabalCacheOptions -> IO ()
 buildCabalCache CabalCacheOptions{..} =
     runCache ccoSaveSources $ case ccoDependencies of
         []     -> importifyCacheProject
         (d:ds) -> importifyCacheList (d :| ds)
+
+runCommand :: (OutputOptions -> FilePath -> IO ()) -> SingleFileOptions -> IO ()
+runCommand command SingleFileOptions{..} = command (sfoOutput sfoFileName) sfoFileName

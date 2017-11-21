@@ -69,7 +69,7 @@ pathToSymbols = pathToImportify.to (</> symbolsPath)
 -- project directory and searches for ghc include path.
 runCache :: Bool -> RIO CacheEnvironment () -> IO ()
 runCache _saveSources cacheAction = do
-    projectRoot         <- runMaybeT stackProjectRoot
+    projectRoot <- runMaybeT stackProjectRoot
     case projectRoot of
         Nothing              -> return ()  -- error is reported inside 'stackProjectRoot'
         Just projectRootPath -> doInsideDir projectRootPath cacheRunner

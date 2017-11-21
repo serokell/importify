@@ -1,7 +1,6 @@
-{-# LANGUAGE ExplicitForAll   #-}
-{-# LANGUAGE QuasiQuotes      #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE QuasiQuotes    #-}
+{-# LANGUAGE TypeOperators  #-}
 
 -- | This module contains common utilities for working with importify cache.
 
@@ -15,7 +14,10 @@ module Importify.Path
        , modulesPath
        , symbolsDir
        , symbolsPath
+
+         -- * Paths for tests
        , testDataPath
+       , testUnusedPath
 
          -- * Utility functions to work with files and directories
        , decodeFileOrMempty
@@ -51,6 +53,10 @@ symbolsPath = [reldir|symbols/|]
 -- | Path to golden tests.
 testDataPath :: Path Rel Dir
 testDataPath = [reldir|test/test-data/|]
+
+-- | Path to tests for removing unused imports.
+testUnusedPath :: Path Rel Dir
+testUnusedPath = testDataPath </> [reldir|unused|]
 
 -- | Path to JSON-encoded Map from target to its list of default extensions.
 extensionsPath :: Path Rel File

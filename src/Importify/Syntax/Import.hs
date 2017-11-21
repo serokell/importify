@@ -4,6 +4,7 @@ module Importify.Syntax.Import
        ( getImportModuleName
        , importNamesWithTables
        , importSlice
+       , importedSymbols
        , isImportImplicit
        , switchHidingImports
        ) where
@@ -21,7 +22,8 @@ import           Language.Haskell.Exts                    (Extension (DisableExt
                                                            Name (Ident), SrcSpan (..),
                                                            SrcSpanInfo (..), combSpanInfo,
                                                            noSrcSpan, prettyExtension)
-import           Language.Haskell.Names                   (NameInfo (Import))
+import           Language.Haskell.Names                   (NameInfo (Import, ImportPart),
+                                                           Symbol)
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
 
 import           Importify.Syntax.Module                  (isInsideExport)
@@ -88,6 +90,13 @@ importNamesWithTables = map (getImportModuleName &&& getImportedSymbols)
     fromImportInfo :: NameInfo l -> Table
     fromImportInfo (Import dict) = dict
     fromImportInfo _             = mempty
+
+-- | Extracts list of imported symbols from 'ImportPart'. Should be
+-- called for implicit imports.
+importedSymbols :: InScoped ImportDecl -> [Symbol]
+importedSymbols ImportDecl{..} = do
+    ImportPart symbols <- [pullScopedInfo importModule]
+    symbols
 
 -- | Returns pair of line numbers — first and last line of import section
 -- if any import is in list.

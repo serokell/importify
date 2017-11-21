@@ -1,7 +1,8 @@
 -- | Resolvers for removing symbols from explicit import lists.
 
 module Importify.Resolution.Explicit
-       ( collectUnusedSymbolsBy
+       ( annotateModule
+       , collectUnusedSymbolsBy
        , resolveModules
        , symbolUsedIn
        ) where
@@ -11,13 +12,16 @@ import           Universum
 import           Data.Data                                (Data)
 import qualified Data.Map.Strict                          as M
 
-import           Language.Haskell.Exts                    (Module, ModuleName (..))
+import           Language.Haskell.Exts                    (Module (Module),
+                                                           ModuleHead (..),
+                                                           ModuleName (..), SrcSpanInfo)
 import           Language.Haskell.Names                   (NameInfo (Export, GlobalSymbol, RecPatWildcard),
                                                            Scoped, Symbol (..), resolve,
                                                            symbolModule)
+import           Language.Haskell.Names                   (Environment, annotate)
 import           Language.Haskell.Names.GlobalSymbolTable (Table)
 
-import           Importify.Syntax                         (anyAnnotation)
+import           Importify.Syntax                         (anyAnnotation, unscope)
 
 
 -- | Checks if 'Symbol' is used inside annotations. This function
@@ -71,3 +75,12 @@ collectUnusedSymbolsBy isUsed table = do
 -- | Gather all symbols for given list of 'Module's.
 resolveModules :: (Data l, Eq l) => [Module l] -> [(ModuleName (), [Symbol])]
 resolveModules modules = M.toList $ resolve modules mempty
+
+-- | Annotates module but drops import annotations because they can contain 'GlobalSymbol'
+-- annotations and collectUnusedSymbols later does its job by looking for 'GlobalSymbol'
+annotateModule :: Module SrcSpanInfo
+               -> Environment
+               -> ([Scoped SrcSpanInfo], Maybe (ModuleHead SrcSpanInfo))
+annotateModule ast environment =
+    let (Module l mhead mpragmas _mimports mdecls) = annotate environment ast
+    in (toList (Module l mhead mpragmas [] mdecls), fmap unscope mhead)

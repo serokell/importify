@@ -14,13 +14,15 @@ module Options
 
 import           Universum
 
-import           Options.Applicative (Parser, ParserInfo, auto, command, execParser,
-                                      flag', fullDesc, help, helper, info, long, metavar,
-                                      option, progDesc, short, showDefault, strArgument,
-                                      strOption, subparser, switch, value)
-import           System.Wlog         (Severity (Info))
+import           Options.Applicative     (Parser, ParserInfo, auto, command, execParser,
+                                          flag', fullDesc, help, helper, info, long,
+                                          metavar, option, progDesc, short, showDefault,
+                                          strArgument, strOption, subparser, switch,
+                                          value)
+import qualified Prelude                 (show)
+import           System.Wlog             (Severity (Info))
 
-import           Importify.Main      (OutputOptions (..))
+import           Importify.OutputOptions (OutputOptions (..))
 
 data ImportifyCliArgs = ImportifyCliArgs
     { icaCommon  :: !CommonOptions
@@ -32,14 +34,19 @@ data CommonOptions = CommonOptions
     } deriving (Show)
 
 data Command
-    = SingleFile SingleFileOptions
-    | CabalCache CabalCacheOptions
+    = CabalCache   CabalCacheOptions
+    | RemoveUnused SingleFileOptions
+    | ToExplicit   SingleFileOptions
     deriving (Show)
 
 data SingleFileOptions = SingleFileOptions
-    { sfoFileName :: !FilePath      -- ^ File where all redundant imports should be removed
-    , sfoOutput   :: !OutputOptions -- ^ Options for @importify file@ output
-    } deriving (Show)
+    { sfoFileName :: !FilePath                    -- ^ File that should be processed
+    , sfoOutput   :: !(FilePath -> OutputOptions) -- ^ Describes way of @importify@ output
+    }
+
+instance Show SingleFileOptions where
+    show SingleFileOptions{..} = "SingleFileOptions{ sfoFileName = " ++ sfoFileName ++ "\n"
+                              ++ "                 , sfoOutput X = " ++ show (sfoOutput "X") ++ " }"
 
 data CabalCacheOptions = CabalCacheOptions
     { ccoSaveSources  :: !Bool    -- ^ Don't delete downloaded package cache
@@ -65,32 +72,38 @@ commonArgsParser = do
 
 commandParser :: Parser Command
 commandParser = subparser $
-    command "file"
-            (info (helper <*> fileParser)
-                  (fullDesc <> progDesc "Importify a single file."))
- <> command "cache"
+    command "cache"
             (info (helper <*> cacheParser)
                   (fullDesc <> progDesc
                    "Search for .cabal file in current directory. If it's found then cache \
                    \all dependencies for every target and store them inside ./.importify folder."))
+ <> command "remove"
+            (info (helper <*> fmap RemoveUnused singleFileOptionsParser)
+                  (fullDesc <> progDesc "Remove unused imports from file."))
+ <> command "to-explicit"
+            (info (helper <*> fmap ToExplicit singleFileOptionsParser)
+                  (fullDesc <> progDesc "Convert all implicit imports to explicit."))
 
-fileParser :: Parser Command
-fileParser = do
+singleFileOptionsParser :: Parser SingleFileOptions
+singleFileOptionsParser = do
     sfoFileName <- strArgument
-      $ metavar "FILE"
+      $ metavar "FILE_PATH"
      <> help "File to importify"
     sfoOutput <- outputOptionsParser
-    pure (SingleFile SingleFileOptions{..})
+    pure SingleFileOptions{..}
   where
-    outputOptionsParser :: Parser OutputOptions
+    outputOptionsParser :: Parser (FilePath -> OutputOptions)
     outputOptionsParser =
-         flag' InPlace (  long "in-place"
-                       <> short 'i'
-                       <> help "Write changes directly to file")
-     <|> ToFile <$> strOption (  long "to"
-                              <> short 't'
-                              <> help "Write to specified file")
-     <|> pure ToConsole
+         flag' ToFile
+               (  long "in-place"
+               <> short 'i'
+               <> help "Write changes directly to file")
+     <|> const . ToFile <$> strOption
+         (  long "to"
+         <> short 't'
+         <> metavar "FILE_PATH"
+         <> help "Write to specified file")
+     <|> pure (const ToConsole)
 
 cacheParser :: Parser Command
 cacheParser = do
