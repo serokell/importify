@@ -23,7 +23,8 @@ import           Path.IO                            (doesDirExist, getCurrentDir
 import           Importify.Bracket
 import           Importify.OutputOptions
 import           Importify.Pretty                   (printLovelyImports)
-import           Importify.Resolution               (collectUnusedImplicitImports,
+import           Importify.Resolution               (annotateModule,
+                                                     collectUnusedImplicitImports,
                                                      collectUnusedSymbolsBy, hidingUsedIn,
                                                      isKnownImport, removeImplicitImports,
                                                      removeUnusedQualifiedImports,
@@ -79,13 +80,4 @@ removeUnusedImports ast environment imports = do
                                                               annotations
                                                               unusedImplicits
 
-    withoutUnusedQuals
-
--- | Annotates module but drops import annotations because they can contain GlobalSymbol
--- annotations and collectUnusedSymbols later does its job by looking for GlobalSymbol
-annotateModule :: Module SrcSpanInfo
-               -> Environment
-               -> ([Scoped SrcSpanInfo], Maybe (ModuleHead SrcSpanInfo))
-annotateModule ast environment =
-    let (Module l mhead mpragmas _mimports mdecls) = annotate environment ast
-    in (toList (Module l mhead mpragmas [] mdecls), fmap unscope mhead)
+    return withoutUnusedQuals

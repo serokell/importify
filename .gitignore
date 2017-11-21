@@ -26,3 +26,4 @@ module_backup
 test/Sandbox.hs
 *.out
 *.el
+TAGS

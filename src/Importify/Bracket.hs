@@ -101,10 +101,10 @@ importifyPathBracket importify srcPath = do
                                     }
 
 -- | Type of functions which processes imports.
-type ImportifyFunction = Module SrcSpanInfo        -- ^ Module where symbols should be removed
-                      -> Environment               -- ^ Environment of all cached modules
-                      -> [ImportDecl SrcSpanInfo]  -- ^ Imports from module
-                      -> [ImportDecl SrcSpanInfo]  -- ^ New imports
+type ImportifyFunction = Module SrcSpanInfo           -- ^ Module where symbols should be removed
+                      -> Environment                  -- ^ Environment of all cached modules
+                      -> [ImportDecl SrcSpanInfo]     -- ^ Imports from module
+                      -> IO [ImportDecl SrcSpanInfo]  -- ^ New imports
 
 -- | Process imports in AST with given function.
 -- TODO: this function is ugly :( Write it nicer somehow...
@@ -129,7 +129,7 @@ importifyAstBracket importify ImportifyArguments{..}
         let (impText, decls) = splitAt (end - start + 1) rest
 
         environment       <- loadEnvironment importifyArgumentsModulesMap
-        let newImports     = importify ast environment imports
+        newImports        <- importify ast environment imports
         let printedImports = printLovelyImports start
                                                 end
                                                 importifyArgumentsComments
