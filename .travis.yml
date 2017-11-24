@@ -24,7 +24,7 @@ matrix:
     addons:
       apt:
         sources:
-          - sourceline: 'ppa:hvr/ghc'    # Official Trusty repo by Caninical is ancient. HVC is relevant and most widely used Haskell PPA repo.
+          - sourceline: 'ppa:hvr/ghc'
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
@@ -34,7 +34,7 @@ matrix:
     addons:
       apt:
         sources:
-          - sourceline: 'ppa:hvr/ghc'    # Official Trusty repo by Caninical is ancient. HVC is relevant and most widely used Haskell PPA repo.
+          - sourceline: 'ppa:hvr/ghc'
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
@@ -44,7 +44,7 @@ matrix:
     addons:
       apt:
         sources:
-          - sourceline: 'ppa:hvr/ghc'    # Official Trusty repo by Caninical is ancient. HVC is relevant and most widely used Haskell PPA repo.
+          - sourceline: 'ppa:hvr/ghc'
         packages:
           - libgmp-dev
           - cabal-install-2.0    # required by declared GHC 8.0
