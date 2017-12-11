@@ -1,13 +1,16 @@
 sudo: true
 language: haskell
 
+
 git:
   depth: 5
+
 
 cache:
   directories:
   - "$HOME/.stack"
   - "$HOME/build/serokell/importify/.stack-work"
+
 
 matrix:
   include:
@@ -21,6 +24,7 @@ matrix:
   - ghc: 8.2.2
     env: GHCVER='8.2.2' STACK_YAML="$HOME/build/serokell/importify/stack-$GHCVER.yaml"
 
+
 addons:
   apt:
     sources:
@@ -31,22 +35,24 @@ addons:
 
 
 before_install:
+
   - mkdir -p ~/.local/bin
   - export PATH="$HOME/.local/bin:$PATH"
   - travis_retry curl -L 'https://www.stackage.org/stack/linux-x86_64' | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   - stack --version
 
+
 install:
+
   - travis_wait 30 stack setup --no-terminal
   - stack ghc -- --version
 
-
   - travis_wait 40 stack build --only-dependencies --no-terminal
-
   - travis_wait 40 stack build --test --bench --no-run-tests --no-run-benchmarks --no-terminal
 
 
 script:
+
   - travis_wait 40 stack build --test --no-terminal
 
 
