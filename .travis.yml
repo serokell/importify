@@ -61,5 +61,5 @@ notifications:
   slack:
     rooms:
       - serokell:JWBvWb5PKOhknocQgcoQnflZ
-    on_success: never
-    on_failure: never
+    on_success: change
+    on_failure: always
