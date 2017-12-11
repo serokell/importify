@@ -13,33 +13,21 @@ matrix:
   include:
   - ghc: 8.0.1
     env: GHCVER='8.0.1' STACK_YAML="$HOME/build/serokell/importify/stack-8.0.1.yaml"
-    addons:
-      apt:
-        sources:
-          - sourceline: 'ppa:hvr/ghc'
-        packages:
-          - libgmp-dev
-          - cabal-install-2.0
 
   - ghc: 8.0.2
     env: GHCVER='8.0.2' STACK_YAML="$HOME/build/serokell/importify/stack.yaml"
-    addons:
-      apt:
-        sources:
-          - sourceline: 'ppa:hvr/ghc'
-        packages:
-          - libgmp-dev
-          - cabal-install-2.0
 
   - ghc: 8.2.1
     env: GHCVER='8.2.1' STACK_YAML="$HOME/build/serokell/importify/stack-8.2.1.yaml"
-    addons:
-      apt:
-        sources:
-          - sourceline: 'ppa:hvr/ghc'
-        packages:
-          - libgmp-dev
-          - cabal-install-2.0
+
+addons:
+  apt:
+    sources:
+      - sourceline: 'ppa:hvr/ghc'
+    packages:
+      - libgmp-dev
+      - cabal-install-2.0
+
 
 before_install:
   - mkdir -p ~/.local/bin
