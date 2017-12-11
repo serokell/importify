@@ -46,7 +46,6 @@ before_install:
   - export PATH=$HOME/.local/bin:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   - stack --version
-  - export PATH=/opt/ghc/$GHCVER/bin:$PATH
 
 install:
   - travis_wait 30 stack setup --no-terminal
