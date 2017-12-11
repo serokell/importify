@@ -12,7 +12,7 @@ cache:
 matrix:
   include:
   - ghc: 8.0.1
-    env: GHCVER=8.0.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.0.1.yaml
+    env: GHCVER='8.0.1' STACK_YAML="$HOME/build/serokell/importify/stack-8.0.1.yaml"
     addons:
       apt:
         sources:
@@ -22,7 +22,7 @@ matrix:
           - cabal-install-2.0
 
   - ghc: 8.0.2
-    env: GHCVER=8.0.2 STACK_YAML=$HOME/build/serokell/importify/stack.yaml
+    env: GHCVER='8.0.2' STACK_YAML="$HOME/build/serokell/importify/stack.yaml"
     addons:
       apt:
         sources:
@@ -32,7 +32,7 @@ matrix:
           - cabal-install-2.0
 
   - ghc: 8.2.1
-    env: GHCVER=8.2.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.2.1.yaml
+    env: GHCVER='8.2.1' STACK_YAML="$HOME/build/serokell/importify/stack-8.2.1.yaml"
     addons:
       apt:
         sources:
@@ -43,8 +43,8 @@ matrix:
 
 before_install:
   - mkdir -p ~/.local/bin
-  - export PATH=$HOME/.local/bin:$PATH
-  - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  - export PATH="$HOME/.local/bin:$PATH"
+  - travis_retry curl -L 'https://www.stackage.org/stack/linux-x86_64' | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   - stack --version
 
 install:
