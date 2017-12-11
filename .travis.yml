@@ -52,7 +52,6 @@ install:
   - travis_wait 30 stack setup --no-terminal
   - stack ghc -- --version
 
-  - stack config set system-ghc --global false
 
   - travis_wait 40 stack build --only-dependencies --no-terminal
 
