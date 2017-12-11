@@ -1,13 +1,6 @@
-# `sudo: true` switches usage from default container 4Gb RAM, 2 Cores to GCE VM with 7.5Gb RAM and dynamically available >=2 Cores.
-# Usage of `sudo: true` and VM in Travis is undesputably better for testing of Haskell builds.
 sudo: true
-
-# `language: haskell` declares the use Haskell image and maybe some tweaking from Travis team. We would enable undocumented new GHC present on image, and safe startup time.
 language: haskell
 
-# `ghc` sets systemwide compiler. Other way default behaviour of Travis is to use GHC 7.x and updates it to 7.10.x on every start of image. GHC 8.0.2 allready instaled with a package into /opt/. But that is not documented anywhere.
-
-# Speeding-up GIT pulls. If set to 1 - Travis builds would go only consequentially. 3 should be enough for small project. 5 is to be more universal.
 git:
   depth: 5
 
@@ -18,7 +11,6 @@ cache:
 
 matrix:
   include:
-  # Full path to stack.yaml required because of call to `cd` inside running `importify`
   - ghc: 8.0.1
     env: GHCVER=8.0.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.0.1.yaml
     addons:
@@ -27,7 +19,7 @@ matrix:
           - sourceline: 'ppa:hvr/ghc'
         packages:
           - libgmp-dev
-          - cabal-install-2.0    # required by declared GHC 8.0
+          - cabal-install-2.0
 
   - ghc: 8.0.2
     env: GHCVER=8.0.2 STACK_YAML=$HOME/build/serokell/importify/stack.yaml
@@ -37,7 +29,7 @@ matrix:
           - sourceline: 'ppa:hvr/ghc'
         packages:
           - libgmp-dev
-          - cabal-install-2.0    # required by declared GHC 8.0
+          - cabal-install-2.0
 
   - ghc: 8.2.1
     env: GHCVER=8.2.1 STACK_YAML=$HOME/build/serokell/importify/stack-8.2.1.yaml
@@ -47,45 +39,29 @@ matrix:
           - sourceline: 'ppa:hvr/ghc'
         packages:
           - libgmp-dev
-          - cabal-install-2.0    # required by declared GHC 8.0
+          - cabal-install-2.0
 
 before_install:
-  # Stack: add to PATH, download, unpack, check
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   - stack --version
-  # ghc
   - export PATH=/opt/ghc/$GHCVER/bin:$PATH
 
 install:
-  ### Add ` || true` in the end of lines to allow step to fail. Very convinient for purpose to build-up hot cache, because cache get saved even if build reaches timeout/error.
-
-  ### `travis_wait 30` - means wait for 30 minutes. Otherwise Travis errors if in 10 minutes it not gets some new STDOUT. While GHC often compiles parts for ~10 minutes.
-
-  # Prepare Haskell environment for current project. This step is very standard, so let Travis wait here is just a safetynet.
   - travis_wait 30 stack setup --no-terminal
   - stack ghc -- --version
 
-  # Just in case, force external GHC disabled.
   - stack config set system-ghc --global false
 
-  # Build all project dependencies.
   - travis_wait 40 stack build --only-dependencies --no-terminal
 
-  # Build project itself
-  ## Compile with tests (`--test`) and benchmarks (`--bench`), but does not run executable.
   - travis_wait 40 stack build --test --bench --no-run-tests --no-run-benchmarks --no-terminal
 
-  # `false` can be used for fast `allow_failures` testing.
-  #- false
 
 script:
-  # Run tests
   - travis_wait 40 stack build --test --no-terminal
 
-  # Use `true` to force Travis to skip his default tries to help you out with his default actions in the `script`.
-  #- true
 
 notifications:
   email: false
