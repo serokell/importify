@@ -11,14 +11,15 @@ cache:
 
 matrix:
   include:
+
   - ghc: 8.0.1
-    env: GHCVER='8.0.1' STACK_YAML="$HOME/build/serokell/importify/stack-8.0.1.yaml"
+    env: GHCVER='8.0.1' STACK_YAML="$HOME/build/serokell/importify/stack-$GHCVER.yaml"
 
   - ghc: 8.0.2
     env: GHCVER='8.0.2' STACK_YAML="$HOME/build/serokell/importify/stack.yaml"
 
-  - ghc: 8.2.1
-    env: GHCVER='8.2.2' STACK_YAML="$HOME/build/serokell/importify/stack-8.2.2.yaml"
+  - ghc: 8.2.2
+    env: GHCVER='8.2.2' STACK_YAML="$HOME/build/serokell/importify/stack-$GHCVER.yaml"
 
 addons:
   apt:
