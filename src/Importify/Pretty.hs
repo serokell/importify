@@ -5,16 +5,17 @@ module Importify.Pretty
        ( printLovelyImports
        ) where
 
-import           Universum
+import Universum
 
-import           Control.Arrow         ((&&&))
-import qualified Data.IntMap.Strict    as IM
-import           Data.Text             (strip)
-import           Language.Haskell.Exts (ImportDecl (..), SrcSpanInfo (..), exactPrint,
-                                        SrcSpan (..), Comment (..), startLine)
-import           Language.Haskell.Exts.Syntax (Annotated (..))
+import Control.Arrow ((&&&))
+import Data.Text (strip)
+import Language.Haskell.Exts (Comment (..), ImportDecl (..), SrcSpan (..), SrcSpanInfo (..),
+                              exactPrint, startLine)
+import Language.Haskell.Exts.Syntax (Annotated (..))
 
-import           Importify.Syntax      (stripEndLineComment)
+import Importify.Syntax (stripEndLineComment)
+
+import qualified Data.IntMap.Strict as IM
 
 -- | This function takes range of origin text for import and
 -- AST of imports without unused entinties and then converts
@@ -58,7 +59,7 @@ exactPrintImport allComments importDecl = dropWhile null
     -- This would be much easier if Language.Haskell.Exts.ExactPrint exported more stuff
     endComments = printComments
                 $ filter (\(Comment _ (SrcSpan _ sl _ _ ec) _) -> ec > importEndPos && sl == curLine)
-                $ allComments
+                  allComments
     printComments = intercalate " " . map ((" " ++) . printComment)
     printComment (Comment multi _ s) = if multi
                                        then "{-" ++ s ++ "-}"

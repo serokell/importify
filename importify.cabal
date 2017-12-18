@@ -70,7 +70,7 @@ library
                      , haskell-names
                      , haskell-src-exts
                      , hse-cpp
-                     , log-warper
+                     , log-warper >= 1.8.2
                      , microlens-platform
                      , path
                      , path-io
@@ -80,7 +80,7 @@ library
                      , text
                      , text-format
                      , turtle
-                     , universum
+                     , universum >= 1.0.0
                      , unordered-containers
                      , yaml
 
@@ -103,9 +103,9 @@ executable importify
   other-modules:       Options
 
   build-depends:       base, importify
-                     , log-warper
+                     , log-warper >= 1.8.2
                      , optparse-applicative
-                     , universum
+                     , universum >= 1.0.0
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   if os(linux)
@@ -126,7 +126,7 @@ executable golden-generator
                      , text
                      , path
                      , path-io
-                     , universum
+                     , universum >= 1.0.0
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   if os(linux)
@@ -145,11 +145,11 @@ test-suite importify-test
   build-depends:       base, importify
                      , filepath
                      , hspec
-                     , log-warper
+                     , log-warper >= 1.8.2
                      , microlens-platform
                      , path
                      , path-io
-                     , universum
+                     , universum >= 1.0.0
                      , unordered-containers
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall

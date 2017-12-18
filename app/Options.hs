@@ -12,23 +12,22 @@ module Options
        , parseOptions
        ) where
 
-import           Universum
+import Universum
 
-import           Options.Applicative (Parser, ParserInfo, auto, command, execParser,
-                                      flag', fullDesc, help, helper, info, long, metavar,
-                                      option, progDesc, short, showDefault, strArgument,
-                                      strOption, subparser, switch, value)
-import           System.Wlog         (Severity (Info))
+import Options.Applicative (Parser, ParserInfo, auto, command, execParser, flag', fullDesc, help,
+                            helper, info, long, metavar, option, progDesc, short, showDefault,
+                            strArgument, strOption, subparser, switch, value)
+import System.Wlog (Severity (Info))
 
-import           Importify.Main      (OutputOptions (..))
+import Importify.Main (OutputOptions (..))
 
 data ImportifyCliArgs = ImportifyCliArgs
     { icaCommon  :: !CommonOptions
     , icaCommand :: !Command
     } deriving (Show)
 
-data CommonOptions = CommonOptions
-    { coLoggingSeverity :: !Severity -- ^ Severity for logger
+newtype CommonOptions = CommonOptions
+    { coLoggingSeverity :: Severity -- ^ Severity for logger
     } deriving (Show)
 
 data Command

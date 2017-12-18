@@ -9,25 +9,23 @@ module Extended.System.Wlog
        , printWarning
        ) where
 
-import           Universum
+import Universum
 
-import           Lens.Micro.Platform (zoom, (?=))
-import           System.Wlog         (LoggerConfig, LoggerNameBox, Severity (..),
-                                      consoleOutB, lcTermSeverity, lcTree, logDebug,
-                                      logError, logInfo, logNotice, logWarning,
-                                      ltSeverity, setupLogging, usingLoggerName,
-                                      zoomLogger)
+import Lens.Micro.Platform (zoom, (.=), (?=))
+import System.Wlog (LoggerConfig, LoggerNameBox, Severities, lcShowTime, lcTree, logDebug, logError,
+                    logInfo, logNotice, logWarning, ltSeverity, productionB, setupLogging,
+                    usingLoggerName, warningPlus, zoomLogger)
 
-importifyLoggerConfig :: Severity -> LoggerConfig
-importifyLoggerConfig importifySeverity = executingState consoleOutB $ do
-    lcTermSeverity ?= importifySeverity
+importifyLoggerConfig :: Severities -> LoggerConfig
+importifyLoggerConfig importifySeverities = executingState productionB $ do
+    lcShowTime .= Any False
     zoom lcTree $ do
-        ltSeverity ?= Warning
+        ltSeverity ?= warningPlus
         zoomLogger "importify" $
-            ltSeverity ?= importifySeverity
+            ltSeverity ?= importifySeverities
 
 -- | Initializes importify logger.
-initImportifyLogger :: MonadIO m => Severity -> m ()
+initImportifyLogger :: MonadIO m => Severities -> m ()
 initImportifyLogger = setupLogging Nothing . importifyLoggerConfig
 
 withImportify :: LoggerNameBox m a -> m a
