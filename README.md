@@ -1,8 +1,9 @@
 # importify — manage Haskell imports quickly
 
+[![Hackage](https://img.shields.io/hackage/v/importify.svg)](https://hackage.haskell.org/package/importify)
 [![Build Status](https://travis-ci.org/serokell/importify.svg)](https://travis-ci.org/serokell/importify)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![HLint Status](https://codeclimate.com/github/serokell/importify/badges/issue_count.svg)](https://codeclimate.com/github/serokell/importify)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## _Importify_ in a nutshell.
 
