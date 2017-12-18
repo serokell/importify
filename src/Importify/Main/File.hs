@@ -1,7 +1,7 @@
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
 
 -- | Contains implementation of @importify file@ command.
 
@@ -11,46 +11,34 @@ module Importify.Main.File
        , importifyFileContent
        ) where
 
-import           Universum
+import Universum
 
-import qualified Data.HashMap.Strict                as HM
-import qualified Data.Map                           as M
+import Fmt (fmt, (+|), (|+))
+import Language.Haskell.Exts (Comment (..), Extension, ImportDecl, Module (..), ModuleHead,
+                              ModuleName (..), SrcSpanInfo, ann, exactPrint, parseExtension,
+                              parseFileContentsWithComments)
+import Language.Haskell.Exts.Parser (ParseMode (..), defaultParseMode)
+import Language.Haskell.Names (Environment, Scoped, annotate, loadBase, readSymbols)
+import Language.Haskell.Names.Imports (annotateImportDecls, importTable)
+import Language.Haskell.Names.SyntaxUtils (getModuleName)
+import Path (Abs, Dir, File, Path, Rel, fromAbsFile, fromRelFile, parseRelDir, parseRelFile, (</>))
+import Path.IO (doesDirExist, getCurrentDir)
 
-import           Fmt                                (fmt, (+|), (|+))
-import           Language.Haskell.Exts              (Extension, ImportDecl, Module (..),
-                                                     ModuleHead, ModuleName (..),
-                                                     SrcSpanInfo, exactPrint,
-                                                     parseExtension, Comment (..),
-                                                     parseFileContentsWithComments)
-import           Language.Haskell.Exts.Parser       (defaultParseMode, ParseMode (..))
-import           Language.Haskell.Names             (Environment, Scoped, annotate,
-                                                     loadBase, readSymbols)
-import           Language.Haskell.Names.Imports     (annotateImportDecls, importTable)
-import           Language.Haskell.Names.SyntaxUtils (getModuleName)
-import           Path                               (Abs, Dir, File, Path, Rel,
-                                                     fromAbsFile, fromRelFile,
-                                                     parseRelDir, parseRelFile, (</>))
-import           Path.IO                            (doesDirExist, getCurrentDir)
+import Extended.System.Wlog (printError, printNotice)
+import Importify.Cabal (ExtensionsMap, ModulesBundle (..), ModulesMap, TargetId, targetIdDir)
+import Importify.ParseException (eitherParseResult, setMpeFile)
+import Importify.Path (decodeFileOrMempty, doInsideDir, extensionsPath, importifyPath, lookupToRoot,
+                       modulesPath, symbolsPath)
+import Importify.Pretty (printLovelyImports)
+import Importify.Resolution (collectUnusedImplicitImports, collectUnusedSymbolsBy, hidingUsedIn,
+                             isKnownImport, removeImplicitImports, removeUnusedQualifiedImports,
+                             symbolUsedIn)
+import Importify.Syntax (importSlice, switchHidingImports, unscope)
+import Importify.Tree (UnusedHidings (UnusedHidings), UnusedSymbols (UnusedSymbols), removeImports)
 
-import           Extended.System.Wlog               (printError, printNotice)
-import           Importify.Cabal                    (ExtensionsMap, ModulesBundle (..),
-                                                     ModulesMap, TargetId, targetIdDir)
-import           Importify.ParseException           (eitherParseResult, setMpeFile)
-import           Importify.Path                     (decodeFileOrMempty, doInsideDir,
-                                                     extensionsPath, importifyPath,
-                                                     lookupToRoot, modulesPath,
-                                                     symbolsPath)
-import           Importify.Pretty                   (printLovelyImports)
-import           Importify.Resolution               (collectUnusedImplicitImports,
-                                                     collectUnusedSymbolsBy, hidingUsedIn,
-                                                     isKnownImport, removeImplicitImports,
-                                                     removeUnusedQualifiedImports,
-                                                     symbolUsedIn)
-import           Importify.Syntax                   (importSlice, switchHidingImports,
-                                                     unscope)
-import           Importify.Tree                     (UnusedHidings (UnusedHidings),
-                                                     UnusedSymbols (UnusedSymbols),
-                                                     removeImports)
+import qualified Data.Foldable as Foldable (toList)
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Map as M
 
 -- | This data type dictates how output of @importify@ should be
 -- outputed.
@@ -217,4 +205,4 @@ annotateModule :: Module SrcSpanInfo
                -> ([Scoped SrcSpanInfo], Maybe (ModuleHead SrcSpanInfo))
 annotateModule ast environment =
     let (Module l mhead mpragmas _mimports mdecls) = annotate environment ast
-    in (toList (Module l mhead mpragmas [] mdecls), fmap unscope mhead)
+    in (Foldable.toList (Module l mhead mpragmas [] mdecls), fmap unscope mhead)

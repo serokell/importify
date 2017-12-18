@@ -9,20 +9,20 @@ module Importify.Preprocessor
        ( parseModuleWithPreprocessor
        ) where
 
-import           Universum
+import Universum
 
-import qualified Autoexporter              (mainWithArgs)
-import           Language.Haskell.Exts     (Extension, Module,
-                                            ModulePragma (OptionsPragma),
-                                            ParseMode (extensions), SrcSpanInfo,
-                                            Tool (GHC), defaultParseMode, noLoc)
-import           Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpphsOptions,
-                                            parseFileWithCommentsAndCPP)
-import           Path                      (Abs, File, Path, fromAbsFile, (-<.>))
-import           Path.IO                   (removeFile)
+import Language.Haskell.Exts (Extension, Module, ModulePragma (OptionsPragma),
+                              ParseMode (extensions), SrcSpanInfo, Tool (GHC), defaultParseMode,
+                              noLoc)
+import Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpphsOptions,
+                                  parseFileWithCommentsAndCPP)
+import Path (Abs, File, Path, fromAbsFile, (-<.>))
+import Path.IO (removeFile)
 
-import           Importify.ParseException  (ModuleParseException (MPE), eitherParseResult)
-import           Importify.Syntax          (modulePragmas)
+import Importify.ParseException (ModuleParseException (MPE), eitherParseResult)
+import Importify.Syntax (modulePragmas)
+
+import qualified Autoexporter (mainWithArgs)
 
 -- | Parse module after preproccessing this module with possibly
 -- custom preprocessor. It first calls parsing with CPP, then reads
@@ -77,7 +77,7 @@ parseModuleAfterCPP cabalExtensions includeFiles pathToModule =
                                  (fromAbsFile pathToModule)
 
 autoexportedArgs :: forall l. Module l -> Maybe [String]
-autoexportedArgs = head . mapMaybe autoexporterPragma . modulePragmas
+autoexportedArgs = safeHead . mapMaybe autoexporterPragma . modulePragmas
   where
     autoexporterPragma :: ModulePragma l -> Maybe [String]
     autoexporterPragma pragma = do

@@ -1,16 +1,16 @@
 module Main where
 
-import           Universum
+import Universum
 
-import           Data.List             (partition)
-import           System.Environment    (withArgs)
-import           System.Wlog           (Severity (Info))
+import Data.List (partition)
+import System.Environment (withArgs)
+import System.Wlog (infoPlus)
 
-import           Test.Hspec            (hspec)
+import Test.Hspec (hspec)
 
-import           Extended.System.Wlog  (initImportifyLogger)
-import           Importify.Environment (runCache)
-import           Importify.Main        (importifyCacheProject)
+import Extended.System.Wlog (initImportifyLogger)
+import Importify.Environment (runCache)
+import Importify.Main (importifyCacheProject)
 
 import qualified Test.Cache
 import qualified Test.File
@@ -18,7 +18,7 @@ import qualified Test.File
 main :: IO ()
 main = do
     (cacheArgs, hspecArgs) <- splitCmdOptions <$> getArgs
-    initImportifyLogger Info
+    initImportifyLogger infoPlus
     when (null cacheArgs) $ runCache False importifyCacheProject
 
     withArgs hspecArgs $ hspec $ do

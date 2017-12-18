@@ -9,21 +9,21 @@
 
 module Main where
 
-import           Universum
+import Universum
 
-import           Extended.System.Wlog  (initImportifyLogger)
-import           Importify.Environment (runCache)
-import           Importify.Main        (importifyCacheList, importifyCacheProject,
-                                        importifyFileOptions)
+import System.Wlog (severityPlus)
 
-import           Options               (CabalCacheOptions (..), Command (..),
-                                        ImportifyCliArgs (..), SingleFileOptions (..),
-                                        coLoggingSeverity, parseOptions)
+import Extended.System.Wlog (initImportifyLogger)
+import Importify.Environment (runCache)
+import Importify.Main (importifyCacheList, importifyCacheProject, importifyFileOptions)
+
+import Options (CabalCacheOptions (..), Command (..), ImportifyCliArgs (..), SingleFileOptions (..),
+                coLoggingSeverity, parseOptions)
 
 main :: IO ()
 main = do
     ImportifyCliArgs{..} <- parseOptions
-    initImportifyLogger (coLoggingSeverity icaCommon)
+    initImportifyLogger (severityPlus $ coLoggingSeverity icaCommon)
     case icaCommand of
         SingleFile sfOpts -> importifySingleFile sfOpts
         CabalCache ccOpts -> buildCabalCache ccOpts
