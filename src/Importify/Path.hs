@@ -1,7 +1,6 @@
-{-# LANGUAGE ExplicitForAll   #-}
-{-# LANGUAGE QuasiQuotes      #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE QuasiQuotes    #-}
+{-# LANGUAGE TypeOperators  #-}
 
 -- | This module contains common utilities for working with importify cache.
 
@@ -24,19 +23,19 @@ module Importify.Path
        , lookupToRoot
        ) where
 
-import           Universum
+import Universum
 
-import           Data.Aeson           (FromJSON, eitherDecodeStrict)
-import qualified Data.ByteString      as BS (readFile)
-import           Fmt                  ((+|), (+||), (|+), (||+))
-import           Path                 (Abs, Dir, File, Path, Rel, dirname, fromAbsDir,
-                                       fromAbsFile, fromRelDir, fromRelFile, parent,
-                                       reldir, relfile, toFilePath, (</>))
-import           Path.IO              (doesFileExist, ensureDir, getCurrentDir, listDir)
-import           System.FilePath      (takeExtension)
-import           Turtle               (cd, pwd)
+import Data.Aeson (FromJSON, eitherDecodeStrict)
+import Fmt ((+|), (+||), (|+), (||+))
+import Path (Abs, Dir, File, Path, Rel, dirname, fromAbsDir, fromAbsFile, fromRelDir, fromRelFile,
+             parent, reldir, relfile, toFilePath, (</>))
+import Path.IO (doesFileExist, ensureDir, getCurrentDir, listDir)
+import System.FilePath (takeExtension)
+import Turtle (cd, pwd)
 
-import           Extended.System.Wlog (printNotice, printWarning)
+import Extended.System.Wlog (printNotice, printWarning)
+
+import qualified Data.ByteString as BS (readFile)
 
 importifyPath :: Path Rel Dir
 importifyPath = [reldir|.importify/|]

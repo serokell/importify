@@ -1,7 +1,7 @@
 {-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Utilities which allows to use @stack@ tools for different
 -- dependencies stuff.
@@ -19,23 +19,23 @@ module Importify.Stack
        , upgradeWithVersions
        ) where
 
-import           Universum
+import Universum
 
-import qualified Control.Foldl        as Fold (head, list)
-import qualified Data.HashMap.Strict  as HM
-import           Data.List            (partition)
-import qualified Data.Text            as T
-import           Data.Yaml            (FromJSON (parseJSON), Parser, Value (Object),
-                                       decodeEither', prettyPrintParseException,
-                                       withObject, (.:))
-import           Path                 (Abs, Dir, Path, PathException, dirname, fromAbsDir,
-                                       mkRelDir, parent, parseAbsDir, (</>))
-import           Path.IO              (doesDirExist)
-import           System.FilePath      (splitPath)
-import           Turtle               (Line, Shell, inproc, lineToText, linesToText, need)
-import qualified Turtle               (fold)
+import Data.List (partition)
+import Data.Yaml (FromJSON (parseJSON), Parser, Value (Object), decodeEither',
+                  prettyPrintParseException, withObject, (.:))
+import Path (Abs, Dir, Path, PathException, dirname, fromAbsDir, mkRelDir, parent, parseAbsDir,
+             (</>))
+import Path.IO (doesDirExist)
+import System.FilePath (splitPath)
+import Turtle (Line, Shell, inproc, lineToText, linesToText, need)
 
-import           Extended.System.Wlog (printWarning)
+import Extended.System.Wlog (printWarning)
+
+import qualified Control.Foldl as Fold (head, list)
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Text as T
+import qualified Turtle (fold)
 
 shStack :: [Text] -> Shell Line
 shStack args = do
@@ -46,7 +46,7 @@ shStack args = do
 inNixShell :: MonadIO m => m Bool
 inNixShell = do
   ns <- need "IN_NIX_SHELL"
-  pure $ maybe False (== "1") ns
+  pure $ ns == Just "1"
 
 pathArgs, rootArgs, depsArgs :: [Text]
 pathArgs = ["path", "--compiler-bin"]
@@ -84,7 +84,7 @@ stackProjectRoot :: MaybeT IO (Path Abs Dir)
 stackProjectRoot = do
     projectRootLine <- MaybeT $ Turtle.fold (shStack rootArgs) Fold.head
     let projectRoot = lineToText projectRootLine
-    if ".stack/global-project" `T.isSuffixOf` projectRoot then do
+    if ".stack/global-project" `T.isSuffixOf` projectRoot then
         printWarning "importify was executed outside of project" *> empty
     else case eitherParseRoot projectRoot of
         Left exception        -> printWarning (show exception) *> empty

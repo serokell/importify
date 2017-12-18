@@ -116,7 +116,7 @@ readModulesMap :: IO ModulesMap
 readModulesMap = decodeFileOrMempty (importifyPath </> modulesPath) pure
 
 readExtensions :: Path Abs File -> ModulesMap -> IO [Extension]
-readExtensions srcPath modulesMap = do
+readExtensions srcPath modulesMap =
     case HM.lookup (fromAbsFile srcPath) modulesMap of
         Nothing                -> return []
         Just ModulesBundle{..} -> do

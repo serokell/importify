@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP           #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns  #-}
 
 -- | Functions to retrieve and store mapping from modules to their
 -- targets and extensions.
@@ -23,34 +22,30 @@ module Importify.Cabal.Target
        , targetIdDir
        ) where
 
-import           Universum                       hiding (fromString)
+import Universum hiding (fromString)
 
-import           Data.Aeson                      (FromJSON (parseJSON),
-                                                  FromJSONKey (fromJSONKey),
-                                                  FromJSONKeyFunction (FromJSONKeyTextParser),
-                                                  ToJSON (toJSON), ToJSONKey (toJSONKey),
-                                                  Value (String), object, withObject,
-                                                  withText, (.:), (.=))
-import           Data.Aeson.Types                (Parser, toJSONKeyText)
-import           Data.Hashable                   (Hashable)
-import qualified Data.HashMap.Strict             as HM
-import qualified Data.Text                       as T (split)
-import           Distribution.ModuleName         (ModuleName)
-import           Distribution.PackageDescription (Benchmark (..), BenchmarkInterface (..),
-                                                  BuildInfo (..), CondTree,
-                                                  Executable (..),
-                                                  GenericPackageDescription (..),
-                                                  Library (..), TestSuite (..),
-                                                  TestSuiteInterface (..), condTreeData)
+import Data.Aeson (FromJSON (parseJSON), FromJSONKey (fromJSONKey),
+                   FromJSONKeyFunction (FromJSONKeyTextParser), ToJSON (toJSON),
+                   ToJSONKey (toJSONKey), Value (String), object, withObject, withText, (.:), (.=))
+import Data.Aeson.Types (Parser, toJSONKeyText)
+import Data.Hashable (Hashable)
+import Distribution.ModuleName (ModuleName)
+import Distribution.PackageDescription (Benchmark (..), BenchmarkInterface (..), BuildInfo (..),
+                                        CondTree, Executable (..), GenericPackageDescription (..),
+                                        Library (..), TestSuite (..), TestSuiteInterface (..),
+                                        condTreeData)
 #if MIN_VERSION_Cabal(2,0,0)
 import Distribution.Types.UnqualComponentName (UnqualComponentName, unUnqualComponentName)
 #endif
 
-import           Language.Haskell.Exts           (prettyExtension)
-import           Path                            (Abs, Dir, File, Path, fromAbsFile)
+import Language.Haskell.Exts (prettyExtension)
+import Path (Abs, Dir, File, Path, fromAbsFile)
 
-import           Importify.Cabal.Extension       (buildInfoExtensions)
-import           Importify.Cabal.Module          (modulePaths)
+import Importify.Cabal.Extension (buildInfoExtensions)
+import Importify.Cabal.Module (modulePaths)
+
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Text as T (split)
 
 -- | Mapping from module path to its package and module name.
 type    ModulesMap = HashMap FilePath ModulesBundle  -- cached globally
