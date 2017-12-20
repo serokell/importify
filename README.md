@@ -1,7 +1,9 @@
 # importify — manage Haskell imports quickly
 
-[![Hackage](https://img.shields.io/hackage/v/importify.svg)](https://hackage.haskell.org/package/importify)
 [![Build Status](https://travis-ci.org/serokell/importify.svg)](https://travis-ci.org/serokell/importify)
+[![Hackage](https://img.shields.io/hackage/v/importify.svg)](https://hackage.haskell.org/package/importify)
+[![Stackage Nightly](http://stackage.org/package/importify/badge/nightly)](http://stackage.org/nightly/package/importify)
+[![Stackage LTS](http://stackage.org/package/importify/badge/lts)](http://stackage.org/lts/package/importify)
 [![HLint Status](https://codeclimate.com/github/serokell/importify/badges/issue_count.svg)](https://codeclimate.com/github/serokell/importify)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -39,12 +41,22 @@ In the future, we plan for _Importify_ to be able to:
 Installation process assumes that you have already installed and configured `stack`
 build tool. Currently `importify` works only with projects built with `stack`.
 
+### Installing from Stackage
+
+Install just as every usual package.
+
+```bash
+stack install importify
+```
+
+### Installing from source
+
 Perform the next steps before driving:
 
 ```bash
-$ git clone https://github.com/serokell/importify.git  # 1. Clone repository locally
-$ cd importify                                         # 2. Step into folder
-$ stack install importify\:exe\:importify              # 3. Copy executable under ~/.local/bin
+git clone https://github.com/serokell/importify.git  # 1. Clone repository locally
+cd importify                                         # 2. Step into folder
+stack install importify\:exe\:importify              # 3. Copy executable under ~/.local/bin
 ```
 
 ## Usage
