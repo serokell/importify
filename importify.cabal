@@ -1,5 +1,5 @@
 name:                importify
-version:             1.0
+version:             1.0.1
 synopsis:            Tool for haskell imports refactoring
 description:         Please see README.md
 homepage:            https://github.com/serokell/importify
@@ -15,7 +15,7 @@ cabal-version:       >=1.18
 tested-with:         GHC == 8.0.1
                    , GHC == 8.0.2
                    , GHC == 8.2.2
-extra-doc-files:     CHANGELOG.md
+extra-doc-files:     CHANGES.md
                    , README.md
 
 source-repository head
@@ -87,9 +87,10 @@ library
                      , yaml
 
   ghc-options:         -Wall
-  if os(linux)
-    ghc-options:       -optl-fuse-ld=gold
-    ld-options:        -fuse-ld=gold
+
+--  if os(linux)
+--    ghc-options:       -optl-fuse-ld=gold
+--    ld-options:        -fuse-ld=gold
 
   default-language:    Haskell2010
   default-extensions:  GeneralizedNewtypeDeriving
@@ -110,9 +111,10 @@ executable importify
                      , universum >= 1.0.0
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
-  if os(linux)
-    ghc-options:       -optl-fuse-ld=gold
-    ld-options:        -fuse-ld=gold
+
+--  if os(linux)
+--    ghc-options:       -optl-fuse-ld=gold
+--    ld-options:        -fuse-ld=gold
 
   default-language:    Haskell2010
   default-extensions:  GeneralizedNewtypeDeriving
@@ -131,9 +133,10 @@ executable golden-generator
                      , universum >= 1.0.0
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
-  if os(linux)
-    ghc-options:       -optl-fuse-ld=gold
-    ld-options:        -fuse-ld=gold
+
+--  if os(linux)
+--    ghc-options:       -optl-fuse-ld=gold
+--    ld-options:        -fuse-ld=gold
 
   default-language:    Haskell2010
 
@@ -155,9 +158,10 @@ test-suite importify-test
                      , unordered-containers
 
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
-  if os(linux)
-    ghc-options:       -optl-fuse-ld=gold
-    ld-options:        -fuse-ld=gold
+
+--  if os(linux)
+--    ghc-options:       -optl-fuse-ld=gold
+--    ld-options:        -fuse-ld=gold
 
   default-language:    Haskell2010
   default-extensions:  GeneralizedNewtypeDeriving
