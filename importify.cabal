@@ -144,11 +144,12 @@ test-suite importify-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test/hspec
   main-is:             Runner.hs
-  other-modules:       Test.Cache
+  other-modules:       Paths_importify
+
+                       Test.Cache
                        Test.File
 
   build-depends:       base, importify
-                     , Cabal
                      , filepath
                      , hspec
                      , log-warper >= 1.8.2

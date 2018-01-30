@@ -8,10 +8,7 @@ module Test.Cache
 
 import Universum
 
-import Distribution.Types.GenericPackageDescription (GenericPackageDescription (packageDescription))
-import Distribution.Types.PackageDescription (PackageDescription (package))
-import Distribution.Types.PackageId (PackageIdentifier (pkgVersion))
-import Distribution.Version (showVersion)
+import Data.Version (showVersion)
 import Lens.Micro.Platform (at, (?=))
 import Path (fromAbsFile, mkRelFile, (</>))
 import Path.IO (getCurrentDir)
@@ -20,13 +17,12 @@ import Test.Hspec (Spec, describe, it, runIO, shouldSatisfy)
 
 import Importify.Cabal (ModulesBundle (..), ModulesMap, TargetId (..), readCabal)
 import Importify.Path (decodeFileOrMempty, importifyPath, modulesPath)
+import Paths_importify (version)
 
 import qualified Data.HashMap.Strict as HM
 
-getVersion :: MonadIO m => m String
-getVersion = do
-    packageDescr <- readCabal "importify.cabal"
-    pure $ showVersion $ pkgVersion $ package $ packageDescription packageDescr
+getVersion :: Text
+getVersion = toText $ showVersion version
 
 -- | 'Spec' for modules mapping.
 modulesMapSpec :: Spec
@@ -41,8 +37,7 @@ createTestModulesMap :: IO ModulesMap
 createTestModulesMap = do
     curDir <- getCurrentDir
     let withDir path = fromAbsFile $ curDir </> path
-    version <- toText <$> getVersion
-    let importify = "importify-" <> version
+    let importify = "importify-" <> getVersion
     return $ executingState mempty $ do
         at (withDir $(mkRelFile "src/Importify/Path.hs")) ?=  -- Simple file from library
             ModulesBundle importify "Importify.Path" LibraryId
