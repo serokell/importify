@@ -1,5 +1,5 @@
 name:                importify
-version:             1.0.1
+version:             1.0.2
 synopsis:            Tool for haskell imports refactoring
 description:         Please see README.md
 homepage:            https://github.com/serokell/importify
@@ -8,7 +8,7 @@ license:             MIT
 license-file:        LICENSE
 author:              @serokell
 maintainer:          Serokell <hi@serokell.io>
-copyright:           2017 Serokell
+copyright:           2017-2018 Serokell
 category:            Development, Refactoring
 build-type:          Simple
 cabal-version:       >=1.18

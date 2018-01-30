@@ -6,7 +6,7 @@ module Extended.Data.Str
        , wordWrap
        ) where
 
-import           Universum
+import Universum
 
 import qualified Data.Text as T
 
@@ -22,7 +22,8 @@ wordWrap n = unlines . map unwords . go 0 [] . words . toText
   where
     go :: Int -> [Text] -> [Text] -> [[Text]]
     go _   row    []  = [row]
-    go acc row (w:ws) = let newAcc = acc + T.length w
+    go acc row (w:ws) = let wLen   = length w
+                            newAcc = acc + wLen
                         in if newAcc > n
-                           then row : go 0 [] ws
+                           then row : go wLen [w] ws
                            else go newAcc (row ++ [w]) ws
