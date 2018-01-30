@@ -148,6 +148,7 @@ test-suite importify-test
                        Test.File
 
   build-depends:       base, importify
+                     , Cabal
                      , filepath
                      , hspec
                      , log-warper >= 1.8.2
