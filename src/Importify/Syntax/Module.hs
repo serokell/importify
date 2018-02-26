@@ -6,13 +6,11 @@ module Importify.Syntax.Module
        , modulePragmas
        ) where
 
-import           Universum
+import Universum
 
-import           Language.Haskell.Exts              (ExportSpec (EModuleContents),
-                                                     ExportSpecList (..), Module (..),
-                                                     ModuleHead (..), ModuleName,
-                                                     ModuleName (..), ModulePragma)
-import           Language.Haskell.Names.SyntaxUtils (dropAnn, getModuleName)
+import Language.Haskell.Exts (ExportSpec (EModuleContents), ExportSpecList (..), Module (..),
+                              ModuleHead (..), ModuleName (..), ModulePragma)
+import Language.Haskell.Names.SyntaxUtils (dropAnn, getModuleName)
 
 {- TODO: this function used earlier, it works, but is not used anymore
    I'll keep it in case we need it again.
@@ -33,7 +31,7 @@ getSourceModuleName src =
 
 -- | Get name of module by dropping annonation.
 getModuleNameId :: ModuleName l -> String
-getModuleNameId (ModuleName _ id) = id
+getModuleNameId (ModuleName _ moduleId) = moduleId
 
 -- | Returns name of 'Module' as a 'String'.
 getModuleTitle :: Module l -> String

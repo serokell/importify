@@ -11,49 +11,37 @@ module Importify.Main.Cache
        , importifyCacheProject
        ) where
 
-import           Universum
+import Universum
 
-import           Data.Aeson.Encode.Pretty        (encodePretty)
-import qualified Data.ByteString.Lazy            as LBS (writeFile)
-import qualified Data.HashMap.Strict             as HM
+import Data.Aeson.Encode.Pretty (encodePretty)
+import qualified Data.ByteString.Lazy as LBS (writeFile)
+import qualified Data.HashMap.Strict as HM
 
-import           Distribution.PackageDescription (BuildInfo (includeDirs),
-                                                  GenericPackageDescription)
-import           Fmt                             (listF, (+|), (+||), (|+), (||+))
-import           Language.Haskell.Exts           (Module, ModuleName (..), SrcSpanInfo)
-import           Language.Haskell.Names          (writeSymbols)
-import           Lens.Micro.Platform             (to)
-import           Path                            (Abs, Dir, File, Path, fromAbsDir,
-                                                  fromAbsFile, parseAbsFile, parseRelDir,
-                                                  parseRelFile, (</>))
-import           Path.IO                         (doesDirExist, ensureDir, removeDirRecur)
-import           Turtle                          (shell)
+import Distribution.PackageDescription (BuildInfo (includeDirs), GenericPackageDescription)
+import Fmt (listF, (+|), (+||), (|+), (||+))
+import Language.Haskell.Exts (Module, ModuleName (..), SrcSpanInfo)
+import Language.Haskell.Names (writeSymbols)
+import Lens.Micro.Platform (to)
+import Path (Abs, Dir, File, Path, fromAbsDir, fromAbsFile, parseAbsFile, parseRelDir, parseRelFile,
+             (</>))
+import Path.IO (doesDirExist, ensureDir, removeDirRecur)
+import Turtle (shell)
 
-import           Extended.System.Wlog            (printDebug, printInfo, printWarning)
-import           Importify.Cabal                 (ModulesBundle (..), ModulesMap,
-                                                  TargetId (LibraryId),
-                                                  buildInfoExtensions,
-                                                  extractTargetBuildInfo,
-                                                  extractTargetsMap, packageDependencies,
-                                                  packageExtensions, packageTargets,
-                                                  readCabal, targetIdDir,
-                                                  withHarmlessExtensions)
-import           Importify.Environment           (CacheEnvironment, HasGhcIncludeDir,
-                                                  HasPathToImportify, RIO, ghcIncludeDir,
-                                                  pathToImportify, pathToSymbols,
-                                                  saveSources)
-import           Importify.ParseException        (ModuleParseException, reportErrorsIfAny,
-                                                  setMpeFile)
-import           Importify.Path                  (decodeFileOrMempty, doInsideDir,
-                                                  extensionsPath, findCabalFile,
-                                                  modulesFile, modulesPath, symbolsPath)
-import           Importify.Preprocessor          (parseModuleWithPreprocessor)
-import           Importify.Resolution            (resolveModules)
-import           Importify.Stack                 (LocalPackages (..), QueryPackage (..),
-                                                  RemotePackages (..), pkgName,
-                                                  stackListDependencies,
-                                                  stackListPackages, upgradeWithVersions)
-import           Importify.Syntax                (getModuleTitle)
+import Extended.System.Wlog (printDebug, printInfo, printWarning)
+import Importify.Cabal (ModulesBundle (..), ModulesMap, TargetId (LibraryId), buildInfoExtensions,
+                        extractTargetBuildInfo, extractTargetsMap, packageDependencies,
+                        packageExtensions, packageTargets, readCabal, targetIdDir,
+                        withHarmlessExtensions)
+import Importify.Environment (CacheEnvironment, HasGhcIncludeDir, HasPathToImportify, RIO,
+                              ghcIncludeDir, pathToImportify, pathToSymbols, saveSources)
+import Importify.ParseException (ModuleParseException, reportErrorsIfAny, setMpeFile)
+import Importify.Path (decodeFileOrMempty, doInsideDir, extensionsPath, findCabalFile, modulesFile,
+                       modulesPath, symbolsPath)
+import Importify.Preprocessor (parseModuleWithPreprocessor)
+import Importify.Resolution (resolveModules)
+import Importify.Stack (LocalPackages (..), QueryPackage (..), RemotePackages (..), pkgName,
+                        stackListDependencies, stackListPackages, upgradeWithVersions)
+import Importify.Syntax (getModuleTitle)
 
 -- | This function takes list of explicitly specified dependencies
 -- with versions and caches only them under @.importify@ folder inside
@@ -287,7 +275,7 @@ parseTargetModules packagePath pathsToModules targetInfo = do
     let pkgIncludeDirs = map (fromAbsDir . (packagePath </>)) includeDirPaths
 
     ghcDir <- view ghcIncludeDir
-    let includeDirs = pkgIncludeDirs ++ toList (fmap fromAbsDir ghcDir)
+    let includeDirs = pkgIncludeDirs ++ maybeToList (fmap fromAbsDir ghcDir)
     let extensions  = withHarmlessExtensions $ buildInfoExtensions targetInfo
 
     let moduleParser path = do
