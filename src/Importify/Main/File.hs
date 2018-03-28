@@ -83,7 +83,7 @@ importifyFileContent srcPath = do
 
     src <- readFile srcFile
     let parseResult = eitherParseResult
-                    $ parseFileContentsWithComments (defaultParseMode { extensions = extensions })
+                    $ parseFileContentsWithComments (defaultParseMode { extensions = extensions, fixities = Just [] })
                     $ toString src
 
     case parseResult of

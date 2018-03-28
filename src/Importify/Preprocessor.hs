@@ -12,7 +12,7 @@ module Importify.Preprocessor
 import Universum
 
 import Language.Haskell.Exts (Extension, Module, ModulePragma (OptionsPragma),
-                              ParseMode (extensions), SrcSpanInfo, Tool (GHC), defaultParseMode,
+                              ParseMode (extensions, fixities), SrcSpanInfo, Tool (GHC), defaultParseMode,
                               noLoc)
 import Language.Haskell.Exts.CPP (CpphsOptions (includes), defaultCpphsOptions,
                                   parseFileWithCommentsAndCPP)
@@ -73,7 +73,7 @@ parseModuleAfterCPP :: [Extension]    -- ^ List of extensions from .cabal file
 parseModuleAfterCPP cabalExtensions includeFiles pathToModule =
      second fst . eitherParseResult
  <$> parseFileWithCommentsAndCPP (defaultCpphsOptions {includes = includeFiles})
-                                 (defaultParseMode {extensions = cabalExtensions})
+                                 (defaultParseMode {extensions = cabalExtensions, fixities = Just []})
                                  (fromAbsFile pathToModule)
 
 autoexportedArgs :: forall l. Module l -> Maybe [String]
