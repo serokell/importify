@@ -69,10 +69,10 @@ library
                      , fmt
                      , foldl
                      , hashable
-                     , haskell-names
+                     , haskell-names >= 0.9.1
                      , haskell-src-exts
                      , hse-cpp
-                     , log-warper >= 1.8.2
+                     , log-warper >= 1.8.10
                      , microlens-platform
                      , path
                      , path-io
@@ -82,7 +82,7 @@ library
                      , text
                      , text-format
                      , turtle
-                     , universum >= 1.0.0
+                     , universum >= 1.1.0
                      , unordered-containers
                      , yaml
 

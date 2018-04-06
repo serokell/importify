@@ -1,4 +1,11 @@
-resolver: lts-10.3
+resolver: lts-10.7
+
+extra-deps:
+- haskell-names-0.9.1
+- haskell-src-exts-1.20.1
+- log-warper-1.8.10
+- o-clock-0.1.0
+- universum-1.1.0
 
 nix:
     packages: [stack, binutils]
